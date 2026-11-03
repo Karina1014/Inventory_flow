@@ -2,7 +2,7 @@ using System;
 
 namespace Inventory_Flow.Models.Dtos;
 
-public class UserLoginRegisterDto
+public class UserLoginResponseDto
 {
     public UserRegisterDto? User {get;set;}
     public string? Token {get;set;}
