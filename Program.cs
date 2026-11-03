@@ -1,4 +1,12 @@
+using Inventory_Flow.Data;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
+
+// 1. Configuración de la base de datos
+var dbConnectionString = builder.Configuration.GetConnectionString("ConexionSql");
+builder.Services.AddDbContext<AplicationDbContext>(options => 
+    options.UseSqlServer(dbConnectionString));
 
 // Add services to the container.
 
