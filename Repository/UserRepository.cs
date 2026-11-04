@@ -6,8 +6,7 @@ using Inventory_Flow.Models.Dtos;
 namespace Inventory_Flow.Repository;
 
 public class UserRepository : IUserRepository
-{
-    public readonly AplicationDbContext _db; //Creamos una instancia del contexto
+{ public readonly AplicationDbContext _db; //Creamos una instancia del contexto
     private string? secretKey;
 
     public UserRepository(AplicationDbContext db)
@@ -21,12 +20,12 @@ public class UserRepository : IUserRepository
 
     public ICollection<User> GetUsers()
     {
-        return _db.Users.OrderBy(u=> u.UserName).ToList();
+        return _db.Users.OrderBy(u=> u.Username).ToList();
     }
 
     public bool IsUniqueUser(string username)
     {
-        return !_db.Users.Any(u => u.UserName!.ToLower().Trim()== username.ToLower().Trim());
+        return !_db.Users.Any(u => u.Username.ToLower().Trim()== username.ToLower().Trim());
     }
 
     public Task<UserLoginResponseDto> Login(UserLoginDto userLoginDto)
@@ -34,8 +33,19 @@ public class UserRepository : IUserRepository
         throw new NotImplementedException();
     }
 
-    public Task<User> Register(CreateUserDto createUserDto)
+    public async Task<User> Register(CreateUserDto createUserDto)
     {
-        throw new NotImplementedException();
+        var encriptedPassword = BCrypt.Net.BCrypt.HashPassword(createUserDto.Password);
+        var user = new User()
+        {
+            Username = createUserDto.UserName ?? "No Username",
+            Name = createUserDto.Name,
+            Role = createUserDto.Role,
+            Password = encriptedPassword
+        };
+        _db.Users.Add(user);
+        await _db.SaveChangesAsync();
+        return user;
+
     }
 }
