@@ -14,5 +14,5 @@ public class CreateUserDto
     [Required(ErrorMessage = "El Campo Password es requerido")]
     public string? Password {get; set;}
     [Required(ErrorMessage = "El Campo rol es requerido")]
-    public string? Roles {get; set;}
+    public string? Role {get; set;}
 }
