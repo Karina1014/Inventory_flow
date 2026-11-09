@@ -20,12 +20,12 @@ public class UserRepository : IUserRepository
     }
     public User? GetUser(int IdUser)
     {
-        return _db.Users.FirstOrDefault(u=> u.IdUser == IdUser);
+        return _db.Users.Include(u => u.Role).FirstOrDefault(u=> u.IdUser == IdUser);
     }
 
     public ICollection<User> GetUsers()
     {
-        return _db.Users.OrderBy(u=> u.Username).ToList();
+        return _db.Users.Include(u => u.Role).OrderBy(u=> u.Username).ToList();
     }
 
     public bool IsUniqueUser(string username)
@@ -44,7 +44,7 @@ public class UserRepository : IUserRepository
             Message = "El Username es requerido "
         };
         }
-        var user = await _db.Users.FirstOrDefaultAsync<User>(u => u.Username.ToLower().Trim() == userLoginDto.UserName.ToLower().Trim());
+        var user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync<User>(u => u.Username.ToLower().Trim() == userLoginDto.UserName.ToLower().Trim());
         if (user == null)
         {
             return new UserLoginResponseDto()
@@ -77,7 +77,7 @@ public class UserRepository : IUserRepository
                 {
                     new Claim("idUser",user.IdUser.ToString()),
                     new Claim("username",user.Username),
-                    new Claim(ClaimTypes.Role,user.Role ?? string.Empty),
+                    new Claim(ClaimTypes.Role,user.Role?.Name ?? string.Empty),
                 }
              ),
         Expires = DateTime.UtcNow.AddHours(2),
@@ -91,7 +91,7 @@ public class UserRepository : IUserRepository
                 {
                     UserName = user.Username,
                     Name = user.Name,
-                    Role = user.Role,
+                    Role = user.Role.Name,
                     Password = user.Password ?? ""
                 },
             Message = "Usuario logueado correctamente"
@@ -105,7 +105,7 @@ public class UserRepository : IUserRepository
         {
             Username = createUserDto.UserName ?? "No Username",
             Name = createUserDto.Name,
-            Role = createUserDto.Role,
+            IdRole = createUserDto.IdRole,
             Password = encriptedPassword
         };
         _db.Users.Add(user);
