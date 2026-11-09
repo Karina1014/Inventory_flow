@@ -91,7 +91,7 @@ public class UserRepository : IUserRepository
                 {
                     UserName = user.Username,
                     Name = user.Name,
-                    Role = user.Role.Name,
+                    Role = user.Role?.Name,
                     Password = user.Password ?? ""
                 },
             Message = "Usuario logueado correctamente"

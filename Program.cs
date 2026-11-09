@@ -3,6 +3,7 @@ using Inventory_Flow.Components;
 using Inventory_Flow.Data;
 using Inventory_Flow.Mapping;
 using Inventory_Flow.Repository;
+using Inventory_Flow.Repository.IRepository;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -17,10 +18,12 @@ builder.Services.AddDbContext<AplicationDbContext>(options =>
 
 // 2. Registro del Repositorio (Inyección de dependencias)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 
 // 3. AutoMapper
 builder.Services.AddAutoMapper(cfg => {
     cfg.AddProfile<UserProfile>();
+    cfg.AddProfile<RoleProfile>();
 });
 
 var secretKey = builder.Configuration.GetValue<string>("ApiSettings:SecretKey");

@@ -16,3 +16,4 @@ public class User
     [ForeignKey("IdRole")]
     public Role? Role { get; set; }
 }
+    
