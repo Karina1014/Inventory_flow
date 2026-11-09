@@ -1,0 +1,13 @@
+:root {
+    --color-dark: #03045e;
+    --color-primary: #0077b6;
+    --color-primary-hover: #00b4d8;
+    --color-border: #90e0ef;
+    --color-bg: #caf0f8;
+}
+
+body {
+    color: var(--color-dark);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+

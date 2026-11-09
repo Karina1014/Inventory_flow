@@ -1,0 +1,109 @@
+@page "/"
+@page "/login"
+@layout LoginLayout
+@rendermode InteractiveServer
+@inject IUserRepository UserRepository
+@inject NavigationManager NavigationManager
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository
+
+<div class="login-screen">
+    <div class="left-brand-section"></div>
+
+    <div class="right-form-section">
+        <div class="floating-login-card">
+            <div class="card-header-brand">
+                <h1 class="brand-main-heading">Control de Inventario</h1>
+                <div class="brand-divider-box">
+                    <span class="brand-divider-line"></span>
+                    <span class="brand-divider-label">MEDVET</span>
+                    <span class="brand-divider-line"></span>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger py-2 px-3 small d-flex align-items-center mb-3" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <div>@errorMessage</div>
+                </div>
+            }
+
+            <EditForm Model="@loginDto" OnValidSubmit="HandleLogin">
+                <DataAnnotationsValidator />
+
+                <InputField Label="Usuario"
+                            Icon="bi-person-fill"
+                            Placeholder="Ingresa tu usuario"
+                            Autocomplete="username"
+                            @bind-Value="loginDto.UserName"
+                            For="@(() => loginDto.UserName)" />
+
+                <InputField Label="Contraseña"
+                            Icon="bi-shield-lock-fill"
+                            Placeholder="Ingresa tu contraseña"
+                            IsPassword="true"
+                            Autocomplete="current-password"
+                            @bind-Value="loginDto.Password"
+                            For="@(() => loginDto.Password)" />
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-submit-vibrant" disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Validando...</span>
+                        }
+                        else
+                        {
+                            <span>Ingresar</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+
+        <div class="copyright-notice">
+            © MedVet @DateTime.Now.Year · Todos los derechos reservados
+        </div>
+
+        <svg class="bottom-waves-svg" viewBox="0 0 1440 320" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#caf0f8" fill-opacity="0.55" d="M0,192L48,197.3C96,203,192,213,288,208C384,203,480,181,576,181.3C672,181,768,203,864,218.7C960,235,1056,245,1152,240C1248,235,1344,213,1392,202.7L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+            <path fill="#90e0ef" fill-opacity="0.3" d="M0,256L48,250.7C96,245,192,235,288,218.7C384,203,480,181,576,186.7C672,192,768,224,864,240C960,256,1056,256,1152,245.3C1248,235,1344,213,1392,202.7L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+        </svg>
+    </div>
+</div>
+
+@code {
+    private UserLoginDto loginDto = new();
+    private string? errorMessage;
+    private bool isLoading;
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var response = await UserRepository.Login(loginDto);
+
+            if (string.IsNullOrEmpty(response.Token))
+            {
+                errorMessage = response.Message ?? "Credenciales incorrectas.";
+            }
+            else
+            {
+                errorMessage = null;
+            }
+        }
+        catch (Exception)
+        {
+            errorMessage = "Ocurrió un error al procesar la solicitud.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

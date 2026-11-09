@@ -1,0 +1,58 @@
+@using System.Linq.Expressions
+
+<div class="field-container">
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <label class="field-label">@Label</label>
+    }
+
+    <div class="field-box">
+        @if (!string.IsNullOrEmpty(Icon))
+        {
+            <i class="bi @Icon field-icon"></i>
+        }
+
+        <input type="@InputType"
+               class="field-input"
+               placeholder="@Placeholder"
+               value="@Value"
+               @oninput="HandleInput"
+               autocomplete="@Autocomplete" />
+
+        @if (IsPassword)
+        {
+            <button type="button" class="btn-eye" @onclick="TogglePassword">
+                <i class="bi @(showPassword ? "bi-eye-slash-fill" : "bi-eye-fill")"></i>
+            </button>
+        }
+    </div>
+
+    @if (For != null)
+    {
+        <ValidationMessage For="@For" class="text-danger small mt-1" />
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public string Icon { get; set; } = string.Empty;
+    [Parameter] public string Placeholder { get; set; } = string.Empty;
+    [Parameter] public bool IsPassword { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public Expression<Func<string?>>? For { get; set; }
+    [Parameter] public string Autocomplete { get; set; } = "off";
+
+    private bool showPassword;
+
+    private string InputType => IsPassword ? (showPassword ? "text" : "password") : "text";
+
+    private void TogglePassword() => showPassword = !showPassword;
+
+    private async Task HandleInput(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString();
+        await ValueChanged.InvokeAsync(Value);
+    }
+}
+
