@@ -1,4 +1,5 @@
 using System.Text;
+using Inventory_Flow.Components;
 using Inventory_Flow.Data;
 using Inventory_Flow.Mapping;
 using Inventory_Flow.Repository;
@@ -46,6 +47,8 @@ builder.Services.AddAuthentication(options =>
 ;
 // 4. Controladores
 builder.Services.AddControllers();
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
 
 // 5. Configuración de Swagger (UI interactiva)
 builder.Services.AddEndpointsApiExplorer();
@@ -82,7 +85,11 @@ app.UseHttpsRedirection();
 
 app.UseCors("AllowSpecificOrigin");
 app.UseAuthorization();
+app.UseStaticFiles();
+app.UseAntiforgery();
 
 app.MapControllers();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
 
 app.Run();
