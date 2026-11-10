@@ -1,0 +1,294 @@
+@page "/warehouses"
+@layout MainLayout
+@rendermode InteractiveServer
+@using Inventory_Flow.Models
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository.IRepository
+@inject IWarehouseRepository WarehouseRepo
+
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="title">Almacenes</h1>
+            <p class="subtitle">Gestión de sucursales y puntos de almacenamiento</p>
+        </div>
+        <button class="btn-primary" @onclick="OpenCreate">
+            <i class="bi bi-plus-lg"></i>
+            Nuevo almacén
+        </button>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Listado de almacenes</span>
+            <span class="record-count">@warehouses.Count registros</span>
+        </div>
+
+        @if (warehouses.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="bi bi-building"></i>
+                <span>No hay almacenes registrados</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Nombre</th>
+                            <th>Dirección</th>
+                            <th>Estado</th>
+                            <th>Creado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var w in warehouses)
+                        {
+                            <tr>
+                                <td class="col-id">@w.IdWarehouse</td>
+                                <td class="col-name">@w.Name</td>
+                                <td class="col-address">@w.Address</td>
+                                <td>
+                                    @if (w.IsActive)
+                                    {
+                                        <span class="badge badge-active">Activo</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-inactive">Inactivo</span>
+                                    }
+                                </td>
+                                <td class="col-date">@w.CreationDate.ToString("dd/MM/yyyy")</td>
+                                <td class="col-actions">
+                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(w)" title="Editar">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <button class="action-btn btn-delete" @onclick="() => OpenDelete(w)" title="Eliminar">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (showModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title">@(isEditing ? "Editar almacén" : "Nuevo almacén")</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Nombre <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-building input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Nombre del almacén"
+                           @bind="formName" @bind:event="oninput" />
+                </div>
+                @if (showValidation && string.IsNullOrWhiteSpace(formName))
+                {
+                    <span class="field-error">El nombre es requerido.</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Dirección <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-geo-alt input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Dirección del almacén"
+                           @bind="formAddress" @bind:event="oninput" />
+                </div>
+                @if (showValidation && string.IsNullOrWhiteSpace(formAddress))
+                {
+                    <span class="field-error">La dirección es requerida.</span>
+                }
+            </div>
+
+            @if (isEditing)
+            {
+                <div class="form-group toggle-group">
+                    <label class="form-label">Estado</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" @bind="formIsActive" />
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label">@(formIsActive ? "Activo" : "Inactivo")</span>
+                    </label>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert-error">@errorMessage</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span>Guardando...</span>
+                }
+                else
+                {
+                    <span>Guardar</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+@if (showDeleteModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box modal-sm">
+        <div class="modal-header">
+            <span class="modal-title">Confirmar eliminación</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <p class="delete-msg">¿Deseas eliminar el almacén <strong>@selectedWarehouse?.Name</strong>? Esta acción no se puede deshacer.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+                @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Warehouse> warehouses = new();
+
+    private bool showModal;
+    private bool showDeleteModal;
+    private bool isEditing;
+    private bool isSaving;
+    private bool showValidation;
+
+    private string formName = string.Empty;
+    private string formAddress = string.Empty;
+    private bool formIsActive = true;
+    private string errorMessage = string.Empty;
+
+    private Warehouse? selectedWarehouse;
+
+    protected override void OnInitialized()
+    {
+        LoadWarehouses();
+    }
+
+    private void LoadWarehouses()
+    {
+        warehouses = WarehouseRepo.GetWarehouses().ToList();
+    }
+
+    private void OpenCreate()
+    {
+        formName = string.Empty;
+        formAddress = string.Empty;
+        formIsActive = true;
+        errorMessage = string.Empty;
+        showValidation = false;
+        isEditing = false;
+        selectedWarehouse = null;
+        showModal = true;
+    }
+
+    private void OpenEdit(Warehouse w)
+    {
+        selectedWarehouse = w;
+        formName = w.Name;
+        formAddress = w.Address;
+        formIsActive = w.IsActive;
+        errorMessage = string.Empty;
+        showValidation = false;
+        isEditing = true;
+        showModal = true;
+    }
+
+    private void OpenDelete(Warehouse w)
+    {
+        selectedWarehouse = w;
+        showDeleteModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        showDeleteModal = false;
+        isSaving = false;
+        errorMessage = string.Empty;
+    }
+
+    private async Task Save()
+    {
+        showValidation = true;
+
+        if (string.IsNullOrWhiteSpace(formName) || string.IsNullOrWhiteSpace(formAddress))
+            return;
+
+        isSaving = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            if (isEditing && selectedWarehouse != null)
+            {
+                var dto = new UpdateWarehouseDto
+                {
+                    Name = formName.Trim(),
+                    Address = formAddress.Trim(),
+                    IsActive = formIsActive
+                };
+                await WarehouseRepo.UpdateWarehouse(selectedWarehouse.IdWarehouse, dto);
+            }
+            else
+            {
+                var dto = new CreateWarehouseDto
+                {
+                    Name = formName.Trim(),
+                    Address = formAddress.Trim()
+                };
+                await WarehouseRepo.CreateWarehouse(dto);
+            }
+
+            LoadWarehouses();
+            CloseModal();
+        }
+        catch
+        {
+            errorMessage = "Ocurrió un error al guardar. Intenta nuevamente.";
+            isSaving = false;
+        }
+    }
+
+    private void ConfirmDelete()
+    {
+        if (selectedWarehouse == null) return;
+
+        isSaving = true;
+        try
+        {
+            WarehouseRepo.DeleteWarehouse(selectedWarehouse.IdWarehouse);
+            LoadWarehouses();
+            CloseModal();
+        }
+        catch
+        {
+            errorMessage = "No se pudo eliminar el almacén.";
+            isSaving = false;
+        }
+    }
+}
