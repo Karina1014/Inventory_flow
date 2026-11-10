@@ -72,6 +72,33 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.Warehouse", b =>
+                {
+                    b.Property<int>("IdWarehouse")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdWarehouse"));
+
+                    b.Property<string>("Addres")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("IdWarehouse");
+
+                    b.ToTable("Warehouses");
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.User", b =>
                 {
                     b.HasOne("Inventory_Flow.Models.Role", "Role")
