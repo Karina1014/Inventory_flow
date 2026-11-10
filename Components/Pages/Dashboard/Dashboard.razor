@@ -1,0 +1,59 @@
+@page "/dashboard"
+@layout MainLayout
+@rendermode InteractiveServer
+
+<div class="dashboard-container">
+    <div class="section-header">
+        <h1 class="title">Resumen General</h1>
+        <p class="subtitle">Estado de los módulos del sistema MedVet</p>
+    </div>
+
+    <div class="cards-grid">
+        <div class="stat-card">
+            <div class="stat-icon icon-blue">
+                <i class="bi bi-shield-lock-fill"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Módulo Roles</span>
+                <span class="stat-value">Activo</span>
+                <a href="roles" class="stat-link">Gestionar roles &rarr;</a>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon icon-cyan">
+                <i class="bi bi-boxes"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Inventario</span>
+                <span class="stat-value">Pendiente</span>
+                <span class="stat-hint">Siguiente módulo a desarrollar</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon icon-slate">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Usuarios</span>
+                <span class="stat-value">Configurado</span>
+                <span class="stat-hint">Autenticación funcional</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Accesos directos</span>
+        </div>
+        <div class="panel-body">
+            <div class="shortcuts">
+                <a href="roles" class="shortcut-btn">
+                    <i class="bi bi-shield-plus"></i>
+                    <span>Administrar Roles</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

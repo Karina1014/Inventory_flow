@@ -1,0 +1,171 @@
+@page "/roles"
+@rendermode InteractiveServer
+
+@using Inventory_Flow.Models
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository.IRepository
+
+@inject IRoleRepository RoleRepository
+@inject NavigationManager NavigationManager
+
+<div class="container mt-4">
+    <div class="row">
+        <!-- Formulario para Crear / Registrar Rol -->
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Crear Nuevo Rol</h5>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger py-2 px-3 small d-flex align-items-center mb-3">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <div>@errorMessage</div>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success py-2 px-3 small mb-3">
+                            <div>@successMessage</div>
+                        </div>
+                    }
+
+                    <EditForm Model="@roleDto" OnValidSubmit="HandleCreateRole">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Nombre del Rol</label>
+                            <InputText @bind-Value="roleDto.Name" class="form-control" placeholder="Ej: Administrador, Vendedor" />
+                            <ValidationMessage For="@(() => roleDto.Name)" class="text-danger small" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Descripción</label>
+                            <InputTextArea @bind-Value="roleDto.Description" class="form-control" rows="3" placeholder="Descripción de permisos..." />
+                            <ValidationMessage For="@(() => roleDto.Description)" class="text-danger small" />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100" disabled="@isSubmitting">
+                            @if (isSubmitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <span>Guardando...</span>
+                            }
+                            else
+                            {
+                                <span>Guardar Rol</span>
+                            }
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla con la lista de Roles -->
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Lista de Roles</h5>
+                    <button class="btn btn-sm btn-outline-light" @onclick="LoadRoles">
+                        <i class="bi bi-arrow-clockwise"></i> Recargar
+                    </button>
+                </div>
+                <div class="card-body">
+                    @if (roles == null)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2 text-muted">Cargando roles...</p>
+                        </div>
+                    }
+                    else if (!roles.Any())
+                    {
+                        <p class="text-muted text-center py-3">No hay roles registrados aún.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nombre</th>
+                                        <th>Descripción</th>
+                                        <th>Fecha Creación</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var role in roles)
+                                    {
+                                        <tr>
+                                            <td>@role.IdRole</td>
+                                            <td><span class="badge bg-info text-dark">@role.Name</span></td>
+                                            <td>@role.Description</td>
+                                            <td>@role.CreateDate.ToShortDateString()</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@code {
+    private CreateRoleDto roleDto = new(); 
+    private List<Inventory_Flow.Models.Role> roles = new(); // <-- Especificamos la ruta completa aquí
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isSubmitting = false;
+
+    protected override void OnInitialized()
+    {
+        LoadRoles();
+    }
+
+    private void LoadRoles()
+    {
+        try
+        {
+            roles = RoleRepository.GetRoles().ToList(); 
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Error al cargar los roles: " + ex.Message;
+        }
+    }
+
+    private async Task HandleCreateRole()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await RoleRepository.CreateRole(roleDto); 
+            if (result != null)
+            {
+                successMessage = "Rol creado exitosamente.";
+                roleDto = new(); 
+                LoadRoles(); 
+            }
+            else
+            {
+                errorMessage = "No se pudo guardar el rol.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Ocurrió un error: " + ex.Message;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}
