@@ -1,4 +1,3 @@
-using System;
 using AutoMapper;
 using Inventory_Flow.Models;
 using Inventory_Flow.Models.Dtos;
@@ -9,8 +8,8 @@ public class WarehouseProfile : Profile
 {
     public WarehouseProfile()
     {
-        CreateMap<CreateWarehouseDto, Warehouse>();
-        CreateMap<UpdateWarehouseDto, Warehouse>();
-        CreateMap<Warehouse, WarehouseResponseDto>();
+        CreateMap<Warehouse, WarehouseDto>().ReverseMap();
+        CreateMap<Warehouse, CreateWarehouseDto>().ReverseMap();
+        CreateMap<Warehouse, UpdateWarehouseDto>().ReverseMap();
     }
 }

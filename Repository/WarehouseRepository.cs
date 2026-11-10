@@ -46,13 +46,14 @@ public class WarehouseRepository : IWarehouseRepository
         return warehouse;
     }
 
-    public async Task<Warehouse> UpdateWarehouse(int IdWarehouse, CreateWarehouseDto updateWarehouseDto)
+    public async Task<Warehouse> UpdateWarehouse(int IdWarehouse, UpdateWarehouseDto updateWarehouseDto)
     {
         var warehouse = await _db.Warehouses.FindAsync(IdWarehouse)
             ?? throw new KeyNotFoundException($"Almacén con Id {IdWarehouse} no encontrado.");
 
         warehouse.Name = updateWarehouseDto.Name;
         warehouse.Address = updateWarehouseDto.Address;
+        warehouse.IsActive = updateWarehouseDto.IsActive;
 
         _db.Warehouses.Update(warehouse);
         await _db.SaveChangesAsync();

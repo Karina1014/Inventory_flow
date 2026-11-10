@@ -9,6 +9,6 @@ public interface IWarehouseRepository
     Warehouse? GetWarehouse(int IdWarehouse);
     bool IsUniqueName(string name);
     Task<Warehouse> CreateWarehouse(CreateWarehouseDto createWarehouseDto);
-    Task<Warehouse> UpdateWarehouse(int IdWarehouse, CreateWarehouseDto updateWarehouseDto);
+    Task<Warehouse> UpdateWarehouse(int IdWarehouse, UpdateWarehouseDto updateWarehouseDto);
     bool DeleteWarehouse(int IdWarehouse);
 }

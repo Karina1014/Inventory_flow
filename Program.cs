@@ -19,11 +19,13 @@ builder.Services.AddDbContext<AplicationDbContext>(options =>
 // 2. Registro del Repositorio (Inyección de dependencias)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+builder.Services.AddScoped<IWarehouseRepository, WarehouseRepository>();
 
 // 3. AutoMapper
 builder.Services.AddAutoMapper(cfg => {
     cfg.AddProfile<UserProfile>();
     cfg.AddProfile<RoleProfile>();
+    cfg.AddProfile<WarehouseProfile>();
 });
 
 var secretKey = builder.Configuration.GetValue<string>("ApiSettings:SecretKey");

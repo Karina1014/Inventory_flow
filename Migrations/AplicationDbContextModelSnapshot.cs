@@ -80,7 +80,7 @@ namespace Inventory_Flow.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdWarehouse"));
 
-                    b.Property<string>("Addres")
+                    b.Property<string>("Address")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
