@@ -1,0 +1,296 @@
+@page "/products"
+@layout MainLayout
+@rendermode InteractiveServer
+@using Inventory_Flow.Models
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository.IRepository
+@inject IProductRepository ProductRepo
+@inject ICategoryRepository CategoryRepo
+
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="title">Productos</h1>
+            <p class="subtitle">Gestión de productos del inventario</p>
+        </div>
+        <button class="btn-primary" @onclick="OpenCreate">
+            <i class="bi bi-plus-lg"></i>
+            Nuevo producto
+        </button>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Listado de productos</span>
+            <span class="record-count">@products.Count registros</span>
+        </div>
+
+        @if (products.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="bi bi-box-seam"></i>
+                <span>No hay productos registrados</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Nombre</th>
+                            <th>Descripción</th>
+                            <th>Categoría</th>
+                            <th>Creado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in products)
+                        {
+                            <tr>
+                                <td class="col-id">@p.IdProduct</td>
+                                <td class="col-name">@p.Name</td>
+                                <td class="col-address">@p.Description</td>
+                                <td>@GetCategoryName(p.IdCategory)</td>
+                                <td class="col-date">@p.CreationDate.ToString("dd/MM/yyyy")</td>
+                                <td class="col-actions">
+                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(p)" title="Editar">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <button class="action-btn btn-delete" @onclick="() => OpenDelete(p)" title="Eliminar">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (showModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title">@(isEditing ? "Editar producto" : "Nuevo producto")</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Nombre <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-box-seam input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Nombre del producto"
+                           @bind="formName" @bind:event="oninput" />
+                </div>
+                @if (showValidation && string.IsNullOrWhiteSpace(formName))
+                {
+                    <span class="field-error">El nombre es requerido.</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Descripción</label>
+                <div class="input-box">
+                    <i class="bi bi-card-text input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Descripción del producto"
+                           @bind="formDescription" @bind:event="oninput" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Categoría <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-tag input-icon"></i>
+                    <select class="form-input" @bind="formIdCategory">
+                        <option value="0">Seleccione una categoría</option>
+                        @foreach (var c in categories)
+                        {
+                            <option value="@c.IdCategory">@c.Name</option>
+                        }
+                    </select>
+                </div>
+                @if (showValidation && formIdCategory == 0)
+                {
+                    <span class="field-error">La categoría es requerida.</span>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert-error">@errorMessage</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span>Guardando...</span>
+                }
+                else
+                {
+                    <span>Guardar</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+@if (showDeleteModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box modal-sm">
+        <div class="modal-header">
+            <span class="modal-title">Confirmar eliminación</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <p class="delete-msg">¿Deseas eliminar el producto <strong>@selectedProduct?.Name</strong>? Esta acción no se puede deshacer.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+                @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Product> products = new();
+    private List<Category> categories = new();
+
+    private bool showModal;
+    private bool showDeleteModal;
+    private bool isEditing;
+    private bool isSaving;
+    private bool showValidation;
+
+    private string formName = string.Empty;
+    private string formDescription = string.Empty;
+    private int formIdCategory;
+    private string errorMessage = string.Empty;
+
+    private Product? selectedProduct;
+
+    protected override void OnInitialized()
+    {
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        products = ProductRepo.GetProducts().ToList();
+        categories = CategoryRepo.GetCategories().ToList();
+    }
+
+    private string GetCategoryName(int idCategory)
+    {
+        return categories.FirstOrDefault(c => c.IdCategory == idCategory)?.Name ?? "-";
+    }
+
+    private void OpenCreate()
+    {
+        formName = string.Empty;
+        formDescription = string.Empty;
+        formIdCategory = 0;
+        errorMessage = string.Empty;
+        showValidation = false;
+        isEditing = false;
+        selectedProduct = null;
+        showModal = true;
+    }
+
+    private void OpenEdit(Product p)
+    {
+        selectedProduct = p;
+        formName = p.Name;
+        formDescription = p.Description;
+        formIdCategory = p.IdCategory;
+        errorMessage = string.Empty;
+        showValidation = false;
+        isEditing = true;
+        showModal = true;
+    }
+
+    private void OpenDelete(Product p)
+    {
+        selectedProduct = p;
+        showDeleteModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        showDeleteModal = false;
+        isSaving = false;
+        errorMessage = string.Empty;
+    }
+
+    private async Task Save()
+    {
+        showValidation = true;
+
+        if (string.IsNullOrWhiteSpace(formName) || formIdCategory == 0)
+            return;
+
+        isSaving = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            if (isEditing && selectedProduct != null)
+            {
+                var dto = new UpdateProductDto
+                {
+                    Name = formName.Trim(),
+                    Description = formDescription?.Trim() ?? string.Empty,
+                    IdCategory = formIdCategory
+                };
+                await ProductRepo.UpdateProduct(selectedProduct.IdProduct, dto);
+            }
+            else
+            {
+                var dto = new CreateProductDto
+                {
+                    Name = formName.Trim(),
+                    Description = formDescription?.Trim() ?? string.Empty,
+                    IdCategory = formIdCategory
+                };
+                await ProductRepo.CreateProduct(dto);
+            }
+
+            LoadData();
+            CloseModal();
+        }
+        catch
+        {
+            errorMessage = "Ocurrió un error al guardar. Intenta nuevamente.";
+            isSaving = false;
+        }
+    }
+
+    private void ConfirmDelete()
+    {
+        if (selectedProduct == null) return;
+
+        isSaving = true;
+        try
+        {
+            ProductRepo.DeleteProduct(selectedProduct.IdProduct);
+            LoadData();
+            CloseModal();
+        }
+        catch
+        {
+            errorMessage = "No se pudo eliminar el producto.";
+            isSaving = false;
+        }
+    }
+}
