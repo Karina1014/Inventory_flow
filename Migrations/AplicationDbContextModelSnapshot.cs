@@ -46,6 +46,35 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("Categories");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.Product", b =>
+                {
+                    b.Property<int>("IdProduct")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdProduct"));
+
+                    b.Property<DateTime>("CreationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("IdCategory")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("IdProduct");
+
+                    b.HasIndex("IdCategory");
+
+                    b.ToTable("Products");
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.Role", b =>
                 {
                     b.Property<int>("IdRole")
@@ -121,6 +150,17 @@ namespace Inventory_Flow.Migrations
                     b.HasKey("IdWarehouse");
 
                     b.ToTable("Warehouses");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.Product", b =>
+                {
+                    b.HasOne("Inventory_Flow.Models.Category", "Category")
+                        .WithMany()
+                        .HasForeignKey("IdCategory")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
                 });
 
             modelBuilder.Entity("Inventory_Flow.Models.User", b =>
