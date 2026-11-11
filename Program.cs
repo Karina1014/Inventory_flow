@@ -22,6 +22,7 @@ builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IWarehouseRepository, WarehouseRepository>();
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<ILotRepository, LotRepository>();
 
 // 3. AutoMapper
 builder.Services.AddAutoMapper(cfg => {
@@ -30,6 +31,7 @@ builder.Services.AddAutoMapper(cfg => {
     cfg.AddProfile<WarehouseProfile>();
     cfg.AddProfile<ProductProfile>();
     cfg.AddProfile<CategoryProfile>();
+    cfg.AddProfile<LotProfile>();
 });
 
 var secretKey = builder.Configuration.GetValue<string>("ApiSettings:SecretKey");
