@@ -1,0 +1,349 @@
+@page "/lots"
+@layout MainLayout
+@rendermode InteractiveServer
+@using Inventory_Flow.Models
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository.IRepository
+@inject ILotRepository LotRepo
+@inject IProductRepository ProductRepo
+@inject IWarehouseRepository WarehouseRepo
+
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="title">Lotes</h1>
+            <p class="subtitle">Gestión de lotes, stock y fechas de caducidad</p>
+        </div>
+        <button class="btn-primary" @onclick="OpenCreate">
+            <i class="bi bi-plus-lg"></i>
+            Nuevo lote
+        </button>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Listado de lotes</span>
+            <span class="record-count">@lots.Count registros</span>
+        </div>
+
+        @if (lots.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="bi bi-boxes"></i>
+                <span>No hay lotes registrados</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Producto</th>
+                            <th>Almacén</th>
+                            <th>N° Lote</th>
+                            <th>Cantidad</th>
+                            <th>Caducidad</th>
+                            <th>Creado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var l in lots)
+                        {
+                            <tr>
+                                <td class="col-id">@l.IdLot</td>
+                                <td class="col-name">@GetProductName(l.IdProduct)</td>
+                                <td>@GetWarehouseName(l.IdWarehouse)</td>
+                                <td>@l.LotNumber</td>
+                                <td>@l.Quantity</td>
+                                <td class="col-date">@l.ExpirationDate.ToString("dd/MM/yyyy")</td>
+                                <td class="col-date">@l.CreationDate.ToString("dd/MM/yyyy")</td>
+                                <td class="col-actions">
+                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(l)" title="Editar">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <button class="action-btn btn-delete" @onclick="() => OpenDelete(l)" title="Eliminar">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (showModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title">@(isEditing ? "Editar lote" : "Nuevo lote")</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Producto <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-box-seam input-icon"></i>
+                    <select class="form-input" @bind="formIdProduct">
+                        <option value="0">Seleccione un producto</option>
+                        @foreach (var p in products)
+                        {
+                            <option value="@p.IdProduct">@p.Name</option>
+                        }
+                    </select>
+                </div>
+                @if (showValidation && formIdProduct == 0)
+                {
+                    <span class="field-error">El producto es requerido.</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Almacén <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-building input-icon"></i>
+                    <select class="form-input" @bind="formIdWarehouse">
+                        <option value="0">Seleccione un almacén</option>
+                        @foreach (var w in warehouses)
+                        {
+                            <option value="@w.IdWarehouse">@w.Name</option>
+                        }
+                    </select>
+                </div>
+                @if (showValidation && formIdWarehouse == 0)
+                {
+                    <span class="field-error">El almacén es requerido.</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">N° Lote</label>
+                <div class="input-box">
+                    <i class="bi bi-upc-scan input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Número de lote"
+                           @bind="formLotNumber" @bind:event="oninput" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Cantidad <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-123 input-icon"></i>
+                    <input class="form-input" type="number" min="0" placeholder="Cantidad"
+                           @bind="formQuantity" />
+                </div>
+                @if (showValidation && formQuantity < 0)
+                {
+                    <span class="field-error">La cantidad debe ser mayor o igual a 0.</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Fecha de caducidad <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-calendar-event input-icon"></i>
+                    <input class="form-input" type="date"
+                           @bind="formExpirationDate" @bind:format="yyyy-MM-dd" />
+                </div>
+                @if (showValidation && formExpirationDate == default)
+                {
+                    <span class="field-error">La fecha de caducidad es requerida.</span>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert-error">@errorMessage</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span>Guardando...</span>
+                }
+                else
+                {
+                    <span>Guardar</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+@if (showDeleteModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box modal-sm">
+        <div class="modal-header">
+            <span class="modal-title">Confirmar eliminación</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <p class="delete-msg">¿Deseas eliminar el lote <strong>@selectedLot?.LotNumber</strong>? Esta acción no se puede deshacer.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+                @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Lot> lots = new();
+    private List<Product> products = new();
+    private List<Warehouse> warehouses = new();
+
+    private bool showModal;
+    private bool showDeleteModal;
+    private bool isEditing;
+    private bool isSaving;
+    private bool showValidation;
+
+    private int formIdProduct;
+    private int formIdWarehouse;
+    private string formLotNumber = string.Empty;
+    private int formQuantity;
+    private DateTime formExpirationDate = DateTime.Today;
+    private string errorMessage = string.Empty;
+
+    private Lot? selectedLot;
+
+    protected override void OnInitialized()
+    {
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        lots = LotRepo.GetLots().ToList();
+        products = ProductRepo.GetProducts().ToList();
+        warehouses = WarehouseRepo.GetWarehouses().ToList();
+    }
+
+    private string GetProductName(int idProduct)
+    {
+        return products.FirstOrDefault(p => p.IdProduct == idProduct)?.Name ?? "-";
+    }
+
+    private string GetWarehouseName(int idWarehouse)
+    {
+        return warehouses.FirstOrDefault(w => w.IdWarehouse == idWarehouse)?.Name ?? "-";
+    }
+
+    private void OpenCreate()
+    {
+        formIdProduct = 0;
+        formIdWarehouse = 0;
+        formLotNumber = string.Empty;
+        formQuantity = 0;
+        formExpirationDate = DateTime.Today;
+        errorMessage = string.Empty;
+        showValidation = false;
+        isEditing = false;
+        selectedLot = null;
+        showModal = true;
+    }
+
+    private void OpenEdit(Lot l)
+    {
+        selectedLot = l;
+        formIdProduct = l.IdProduct;
+        formIdWarehouse = l.IdWarehouse;
+        formLotNumber = l.LotNumber;
+        formQuantity = l.Quantity;
+        formExpirationDate = l.ExpirationDate;
+        errorMessage = string.Empty;
+        showValidation = false;
+        isEditing = true;
+        showModal = true;
+    }
+
+    private void OpenDelete(Lot l)
+    {
+        selectedLot = l;
+        showDeleteModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        showDeleteModal = false;
+        isSaving = false;
+        errorMessage = string.Empty;
+    }
+
+    private async Task Save()
+    {
+        showValidation = true;
+
+        if (formIdProduct == 0 || formIdWarehouse == 0 || formQuantity < 0 || formExpirationDate == default)
+            return;
+
+        isSaving = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            if (isEditing && selectedLot != null)
+            {
+                var dto = new UpdateLotDto
+                {
+                    IdProduct = formIdProduct,
+                    IdWarehouse = formIdWarehouse,
+                    LotNumber = formLotNumber?.Trim() ?? string.Empty,
+                    Quantity = formQuantity,
+                    ExpirationDate = formExpirationDate
+                };
+                await LotRepo.UpdateLot(selectedLot.IdLot, dto);
+            }
+            else
+            {
+                var dto = new CreateLotDto
+                {
+                    IdProduct = formIdProduct,
+                    IdWarehouse = formIdWarehouse,
+                    LotNumber = formLotNumber?.Trim() ?? string.Empty,
+                    Quantity = formQuantity,
+                    ExpirationDate = formExpirationDate
+                };
+                await LotRepo.CreateLot(dto);
+            }
+
+            LoadData();
+            CloseModal();
+        }
+        catch
+        {
+            errorMessage = "Ocurrió un error al guardar. Intenta nuevamente.";
+            isSaving = false;
+        }
+    }
+
+    private void ConfirmDelete()
+    {
+        if (selectedLot == null) return;
+
+        isSaving = true;
+        try
+        {
+            LotRepo.DeleteLot(selectedLot.IdLot);
+            LoadData();
+            CloseModal();
+        }
+        catch
+        {
+            errorMessage = "No se pudo eliminar el lote.";
+            isSaving = false;
+        }
+    }
+}
