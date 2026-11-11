@@ -37,7 +37,7 @@ public class WarehouseRepository : IWarehouseRepository
         {
             Name = createWarehouseDto.Name,
             Address = createWarehouseDto.Address,
-            IsActive = true,
+            IsActive = createWarehouseDto.IsActive,
             CreationDate = DateTime.Now
         };
 

@@ -150,7 +150,9 @@
 }
 
 .col-actions {
-    width: 80px;
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
 }
 
 .badge {

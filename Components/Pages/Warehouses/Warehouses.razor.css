@@ -150,7 +150,9 @@
 }
 
 .col-actions {
-    width: 80px;
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
 }
 
 .badge {
@@ -188,6 +190,7 @@
     background: #e0f2fe;
     color: #0077b6;
     margin-right: 0.3rem;
+    vertical-align: middle;
 }
 
 .btn-edit:hover {

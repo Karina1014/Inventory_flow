@@ -9,4 +9,6 @@ public class CreateWarehouseDto
 
     [Required(ErrorMessage = "El Campo Dirección es requerido")]
     public string Address { get; set; } = string.Empty;
+
+    public bool IsActive { get; set; } = true;
 }

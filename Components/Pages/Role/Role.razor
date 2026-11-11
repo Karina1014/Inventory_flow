@@ -1,126 +1,161 @@
 @page "/roles"
+@layout MainLayout
 @rendermode InteractiveServer
-
 @using Inventory_Flow.Models
 @using Inventory_Flow.Models.Dtos
 @using Inventory_Flow.Repository.IRepository
+@using RoleModel = Inventory_Flow.Models.Role
+@inject IRoleRepository RoleRepo
 
-@inject IRoleRepository RoleRepository
-@inject NavigationManager NavigationManager
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="title">Roles</h1>
+            <p class="subtitle">Gestión de roles y permisos del sistema</p>
+        </div>
+        <button class="btn-primary" @onclick="OpenCreate">
+            <i class="bi bi-plus-lg"></i>
+            Nuevo rol
+        </button>
+    </div>
 
-<div class="container mt-4">
-    <div class="row">
-        <!-- Formulario para Crear / Registrar Rol -->
-        <div class="col-md-4">
-            <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Crear Nuevo Rol</h5>
-                </div>
-                <div class="card-body">
-                    @if (!string.IsNullOrEmpty(errorMessage))
-                    {
-                        <div class="alert alert-danger py-2 px-3 small d-flex align-items-center mb-3">
-                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                            <div>@errorMessage</div>
-                        </div>
-                    }
-
-                    @if (!string.IsNullOrEmpty(successMessage))
-                    {
-                        <div class="alert alert-success py-2 px-3 small mb-3">
-                            <div>@successMessage</div>
-                        </div>
-                    }
-
-                    <EditForm Model="@roleDto" OnValidSubmit="HandleCreateRole">
-                        <DataAnnotationsValidator />
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Nombre del Rol</label>
-                            <InputText @bind-Value="roleDto.Name" class="form-control" placeholder="Ej: Administrador, Vendedor" />
-                            <ValidationMessage For="@(() => roleDto.Name)" class="text-danger small" />
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Descripción</label>
-                            <InputTextArea @bind-Value="roleDto.Description" class="form-control" rows="3" placeholder="Descripción de permisos..." />
-                            <ValidationMessage For="@(() => roleDto.Description)" class="text-danger small" />
-                        </div>
-
-                        <button type="submit" class="btn btn-primary w-100" disabled="@isSubmitting">
-                            @if (isSubmitting)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                                <span>Guardando...</span>
-                            }
-                            else
-                            {
-                                <span>Guardar Rol</span>
-                            }
-                        </button>
-                    </EditForm>
-                </div>
-            </div>
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Listado de roles</span>
+            <span class="record-count">@roles.Count registros</span>
         </div>
 
-        <!-- Tabla con la lista de Roles -->
-        <div class="col-md-8">
-            <div class="card shadow-sm">
-                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Lista de Roles</h5>
-                    <button class="btn btn-sm btn-outline-light" @onclick="LoadRoles">
-                        <i class="bi bi-arrow-clockwise"></i> Recargar
-                    </button>
-                </div>
-                <div class="card-body">
-                    @if (roles == null)
-                    {
-                        <div class="text-center py-4">
-                            <div class="spinner-border text-primary" role="status"></div>
-                            <p class="mt-2 text-muted">Cargando roles...</p>
-                        </div>
-                    }
-                    else if (!roles.Any())
-                    {
-                        <p class="text-muted text-center py-3">No hay roles registrados aún.</p>
-                    }
-                    else
-                    {
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Nombre</th>
-                                        <th>Descripción</th>
-                                        <th>Fecha Creación</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var role in roles)
-                                    {
-                                        <tr>
-                                            <td>@role.IdRole</td>
-                                            <td><span class="badge bg-info text-dark">@role.Name</span></td>
-                                            <td>@role.Description</td>
-                                            <td>@role.CreateDate.ToShortDateString()</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
-                </div>
+        @if (roles.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="bi bi-shield-lock"></i>
+                <span>No hay roles registrados</span>
             </div>
-        </div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Nombre</th>
+                            <th>Descripción</th>
+                            <th>Creado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in roles)
+                        {
+                            <tr>
+                                <td class="col-id">@r.IdRole</td>
+                                <td class="col-name">@r.Name</td>
+                                <td class="col-address">@r.Description</td>
+                                <td class="col-date">@r.CreateDate.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                                <td class="col-actions">
+                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(r)" title="Editar">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <button class="action-btn btn-delete" @onclick="() => OpenDelete(r)" title="Eliminar">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
     </div>
 </div>
+
+@if (showModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title">@(isEditing ? "Editar rol" : "Nuevo rol")</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Nombre <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-shield-lock input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Ej: Administrador, Vendedor"
+                           @bind="formName" @bind:event="oninput" />
+                </div>
+                @if (showValidation && string.IsNullOrWhiteSpace(formName))
+                {
+                    <span class="field-error">El nombre es requerido.</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Descripción</label>
+                <div class="input-box">
+                    <i class="bi bi-card-text input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Descripción de permisos"
+                           @bind="formDescription" @bind:event="oninput" />
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert-error">@errorMessage</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span>Guardando...</span>
+                }
+                else
+                {
+                    <span>Guardar</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+@if (showDeleteModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box modal-sm">
+        <div class="modal-header">
+            <span class="modal-title">Confirmar eliminación</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <p class="delete-msg">¿Deseas eliminar el rol <strong>@selectedRole?.Name</strong>? Esta acción no se puede deshacer.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+                @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
+            </button>
+        </div>
+    </div>
+}
+
 @code {
-    private CreateRoleDto roleDto = new(); 
-    private List<Inventory_Flow.Models.Role> roles = new(); // <-- Especificamos la ruta completa aquí
-    private string? errorMessage;
-    private string? successMessage;
-    private bool isSubmitting = false;
+    private List<RoleModel> roles = new();
+
+    private bool showModal;
+    private bool showDeleteModal;
+    private bool isEditing;
+    private bool isSaving;
+    private bool showValidation;
+
+    private string formName = string.Empty;
+    private string formDescription = string.Empty;
+    private string errorMessage = string.Empty;
+
+    private RoleModel? selectedRole;
 
     protected override void OnInitialized()
     {
@@ -131,41 +166,102 @@
     {
         try
         {
-            roles = RoleRepository.GetRoles().ToList(); 
+            roles = RoleRepo.GetRoles().ToList();
         }
-        catch (Exception ex)
+        catch
         {
-            errorMessage = "Error al cargar los roles: " + ex.Message;
+            errorMessage = "No se pudieron cargar los roles.";
         }
     }
 
-    private async Task HandleCreateRole()
+    private void OpenCreate()
     {
-        isSubmitting = true;
-        errorMessage = null;
-        successMessage = null;
+        formName = string.Empty;
+        formDescription = string.Empty;
+        errorMessage = string.Empty;
+        showValidation = false;
+        isEditing = false;
+        selectedRole = null;
+        showModal = true;
+    }
+
+    private void OpenEdit(RoleModel r)
+    {
+        selectedRole = r;
+        formName = r.Name ?? string.Empty;
+        formDescription = r.Description ?? string.Empty;
+        errorMessage = string.Empty;
+        showValidation = false;
+        isEditing = true;
+        showModal = true;
+    }
+
+    private void OpenDelete(RoleModel r)
+    {
+        selectedRole = r;
+        showDeleteModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        showDeleteModal = false;
+        isSaving = false;
+        errorMessage = string.Empty;
+    }
+
+    private async Task Save()
+    {
+        showValidation = true;
+
+        if (string.IsNullOrWhiteSpace(formName))
+            return;
+
+        isSaving = true;
+        errorMessage = string.Empty;
 
         try
         {
-            var result = await RoleRepository.CreateRole(roleDto); 
-            if (result != null)
+            var dto = new CreateRoleDto
             {
-                successMessage = "Rol creado exitosamente.";
-                roleDto = new(); 
-                LoadRoles(); 
+                Name = formName.Trim(),
+                Description = string.IsNullOrWhiteSpace(formDescription) ? null : formDescription.Trim()
+            };
+
+            if (isEditing && selectedRole != null)
+            {
+                await RoleRepo.UpdateRole(selectedRole.IdRole, dto);
             }
             else
             {
-                errorMessage = "No se pudo guardar el rol.";
+                await RoleRepo.CreateRole(dto);
             }
+
+            LoadRoles();
+            CloseModal();
         }
-        catch (Exception ex)
+        catch
         {
-            errorMessage = "Ocurrió un error: " + ex.Message;
+            errorMessage = "Ocurrió un error al guardar. Intenta nuevamente.";
+            isSaving = false;
         }
-        finally
+    }
+
+    private void ConfirmDelete()
+    {
+        if (selectedRole == null) return;
+
+        isSaving = true;
+        try
         {
-            isSubmitting = false;
+            RoleRepo.DeleteRole(selectedRole.IdRole);
+            LoadRoles();
+            CloseModal();
+        }
+        catch
+        {
+            errorMessage = "No se pudo eliminar el rol.";
+            isSaving = false;
         }
     }
 }

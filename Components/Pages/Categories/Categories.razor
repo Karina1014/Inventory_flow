@@ -1,0 +1,267 @@
+@page "/categories"
+@layout MainLayout
+@rendermode InteractiveServer
+@using Inventory_Flow.Models
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository.IRepository
+@inject ICategoryRepository CategoryRepo
+
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="title">Categorías</h1>
+            <p class="subtitle">Clasificación de los productos del inventario</p>
+        </div>
+        <button class="btn-primary" @onclick="OpenCreate">
+            <i class="bi bi-plus-lg"></i>
+            Nueva categoría
+        </button>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Listado de categorías</span>
+            <span class="record-count">@categories.Count registros</span>
+        </div>
+
+        @if (categories.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="bi bi-tags"></i>
+                <span>No hay categorías registradas</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Nombre</th>
+                            <th>Descripción</th>
+                            <th>Creado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in categories)
+                        {
+                            <tr>
+                                <td class="col-id">@c.IdCategory</td>
+                                <td class="col-name">@c.Name</td>
+                                <td class="col-address">@c.Description</td>
+                                <td class="col-date">@c.CreationDate.ToString("dd/MM/yyyy")</td>
+                                <td class="col-actions">
+                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(c)" title="Editar">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <button class="action-btn btn-delete" @onclick="() => OpenDelete(c)" title="Eliminar">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (showModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title">@(isEditing ? "Editar categoría" : "Nueva categoría")</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Nombre <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-tag input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Nombre de la categoría"
+                           @bind="formName" @bind:event="oninput" />
+                </div>
+                @if (showValidation && string.IsNullOrWhiteSpace(formName))
+                {
+                    <span class="field-error">El nombre es requerido.</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Descripción <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-card-text input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Descripción de la categoría"
+                           @bind="formDescription" @bind:event="oninput" />
+                </div>
+                @if (showValidation && string.IsNullOrWhiteSpace(formDescription))
+                {
+                    <span class="field-error">La descripción es requerida.</span>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert-error">@errorMessage</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span>Guardando...</span>
+                }
+                else
+                {
+                    <span>Guardar</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+@if (showDeleteModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box modal-sm">
+        <div class="modal-header">
+            <span class="modal-title">Confirmar eliminación</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <p class="delete-msg">¿Deseas eliminar la categoría <strong>@selectedCategory?.Name</strong>? Esta acción no se puede deshacer.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+                @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Category> categories = new();
+
+    private bool showModal;
+    private bool showDeleteModal;
+    private bool isEditing;
+    private bool isSaving;
+    private bool showValidation;
+
+    private string formName = string.Empty;
+    private string formDescription = string.Empty;
+    private string errorMessage = string.Empty;
+
+    private Category? selectedCategory;
+
+    protected override void OnInitialized()
+    {
+        LoadCategories();
+    }
+
+    private void LoadCategories()
+    {
+        categories = CategoryRepo.GetCategories().ToList();
+    }
+
+    private void OpenCreate()
+    {
+        formName = string.Empty;
+        formDescription = string.Empty;
+        errorMessage = string.Empty;
+        showValidation = false;
+        isEditing = false;
+        selectedCategory = null;
+        showModal = true;
+    }
+
+    private void OpenEdit(Category c)
+    {
+        selectedCategory = c;
+        formName = c.Name;
+        formDescription = c.Description;
+        errorMessage = string.Empty;
+        showValidation = false;
+        isEditing = true;
+        showModal = true;
+    }
+
+    private void OpenDelete(Category c)
+    {
+        selectedCategory = c;
+        showDeleteModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        showDeleteModal = false;
+        isSaving = false;
+        errorMessage = string.Empty;
+    }
+
+    private async Task Save()
+    {
+        showValidation = true;
+
+        if (string.IsNullOrWhiteSpace(formName) || string.IsNullOrWhiteSpace(formDescription))
+            return;
+
+        isSaving = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            if (isEditing && selectedCategory != null)
+            {
+                var dto = new UpdateCategoryDto
+                {
+                    Name = formName.Trim(),
+                    Description = formDescription.Trim()
+                };
+                await CategoryRepo.UpdateCategory(selectedCategory.IdCategory, dto);
+            }
+            else
+            {
+                var dto = new CreateCategoryDto
+                {
+                    Name = formName.Trim(),
+                    Description = formDescription.Trim()
+                };
+                await CategoryRepo.CreateCategory(dto);
+            }
+
+            LoadCategories();
+            CloseModal();
+        }
+        catch
+        {
+            errorMessage = "Ocurrió un error al guardar. Intenta nuevamente.";
+            isSaving = false;
+        }
+    }
+
+    private void ConfirmDelete()
+    {
+        if (selectedCategory == null) return;
+
+        isSaving = true;
+        try
+        {
+            CategoryRepo.DeleteCategory(selectedCategory.IdCategory);
+            LoadCategories();
+            CloseModal();
+        }
+        catch
+        {
+            errorMessage = "No se pudo eliminar la categoría.";
+            isSaving = false;
+        }
+    }
+}
