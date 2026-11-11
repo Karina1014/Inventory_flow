@@ -20,12 +20,16 @@ builder.Services.AddDbContext<AplicationDbContext>(options =>
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IWarehouseRepository, WarehouseRepository>();
+builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
 
 // 3. AutoMapper
 builder.Services.AddAutoMapper(cfg => {
     cfg.AddProfile<UserProfile>();
     cfg.AddProfile<RoleProfile>();
     cfg.AddProfile<WarehouseProfile>();
+    cfg.AddProfile<ProductProfile>();
+    cfg.AddProfile<CategoryProfile>();
 });
 
 var secretKey = builder.Configuration.GetValue<string>("ApiSettings:SecretKey");
