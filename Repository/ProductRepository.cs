@@ -34,8 +34,12 @@ public class ProductRepository : IProductRepository
     {
         var product = new Product()
         {
+            Code = createProductDto.Code,
             Name = createProductDto.Name,
             Description = createProductDto.Description,
+            SuggestedPrice = createProductDto.SuggestedPrice,
+            Iva = createProductDto.Iva,
+            IsActive = createProductDto.IsActive,
             IdCategory = createProductDto.IdCategory,
             CreationDate = DateTime.Now
         };
@@ -50,8 +54,12 @@ public class ProductRepository : IProductRepository
         var product = await _db.Products.FindAsync(IdProduct)
             ?? throw new KeyNotFoundException($"Producto con Id {IdProduct} no encontrado.");
 
+        product.Code = updateProductDto.Code;
         product.Name = updateProductDto.Name;
         product.Description = updateProductDto.Description;
+        product.SuggestedPrice = updateProductDto.SuggestedPrice;
+        product.Iva = updateProductDto.Iva;
+        product.IsActive = updateProductDto.IsActive;
         product.IdCategory = updateProductDto.IdCategory;
 
         _db.Products.Update(product);

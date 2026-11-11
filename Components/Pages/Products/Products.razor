@@ -38,11 +38,15 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>#</th>
+                            @* <th>#</th> *@
+                            <th>Código</th>
                             <th>Nombre</th>
                             <th>Descripción</th>
                             <th>Categoría</th>
-                            <th>Creado</th>
+                            <th>Precio</th>
+                            <th>IVA</th>
+                            <th>Estado</th>
+                            @* <th>Creado</th> *@
                             <th>Acciones</th>
                         </tr>
                     </thead>
@@ -50,11 +54,33 @@
                         @foreach (var p in products)
                         {
                             <tr>
-                                <td class="col-id">@p.IdProduct</td>
+                                @* <td class="col-id">@p.IdProduct</td> *@
+                                <td class="col-code">@p.Code</td>
                                 <td class="col-name">@p.Name</td>
                                 <td class="col-address">@p.Description</td>
                                 <td>@GetCategoryName(p.IdCategory)</td>
-                                <td class="col-date">@p.CreationDate.ToString("dd/MM/yyyy")</td>
+                                <td class="col-price">@p.SuggestedPrice.ToString("C2")</td>
+                                <td>
+                                    @if (p.Iva)
+                                    {
+                                        <span class="badge badge-iva">Sí</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-no-iva">No</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (p.IsActive)
+                                    {
+                                        <span class="badge badge-active">Activo</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-inactive">Inactivo</span>
+                                    }
+                                </td>
+                                @* <td class="col-date">@p.CreationDate.ToString("dd/MM/yyyy")</td> *@
                                 <td class="col-actions">
                                     <button class="action-btn btn-edit" @onclick="() => OpenEdit(p)" title="Editar">
                                         <i class="bi bi-pencil-fill"></i>
@@ -95,6 +121,32 @@
             </div>
 
             <div class="form-group">
+                <label class="form-label">Código <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-upc-scan input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Código del producto"
+                           @bind="formCode" @bind:event="oninput" />
+                </div>
+                @if (showValidation && string.IsNullOrWhiteSpace(formCode))
+                {
+                    <span class="field-error">El código es requerido.</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Precio sugerido</label>
+                <div class="input-box">
+                    <i class="bi bi-cash-stack input-icon"></i>
+                    <input class="form-input" type="number" step="0.01" min="0" placeholder="0.00"
+                           @bind="formSuggestedPrice" />
+                </div>
+                @if (showValidation && formSuggestedPrice < 0)
+                {
+                    <span class="field-error">El precio debe ser mayor o igual a 0.</span>
+                }
+            </div>
+
+            <div class="form-group">
                 <label class="form-label">Descripción</label>
                 <div class="input-box">
                     <i class="bi bi-card-text input-icon"></i>
@@ -119,6 +171,24 @@
                 {
                     <span class="field-error">La categoría es requerida.</span>
                 }
+            </div>
+
+            <div class="form-group toggle-group">
+                <label class="form-label">Aplica IVA</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" @bind="formIva" />
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">@(formIva ? "Sí" : "No")</span>
+                </label>
+            </div>
+
+            <div class="form-group toggle-group">
+                <label class="form-label">Estado</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" @bind="formIsActive" />
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">@(formIsActive ? "Activo" : "Inactivo")</span>
+                </label>
             </div>
 
             @if (!string.IsNullOrEmpty(errorMessage))
@@ -172,8 +242,12 @@
     private bool isSaving;
     private bool showValidation;
 
+    private string formCode = string.Empty;
     private string formName = string.Empty;
     private string formDescription = string.Empty;
+    private decimal formSuggestedPrice;
+    private bool formIva;
+    private bool formIsActive;
     private int formIdCategory;
     private string errorMessage = string.Empty;
 
@@ -197,8 +271,12 @@
 
     private void OpenCreate()
     {
+        formCode = string.Empty;
         formName = string.Empty;
         formDescription = string.Empty;
+        formSuggestedPrice = 0;
+        formIva = false;
+        formIsActive = true;
         formIdCategory = 0;
         errorMessage = string.Empty;
         showValidation = false;
@@ -210,8 +288,12 @@
     private void OpenEdit(Product p)
     {
         selectedProduct = p;
+        formCode = p.Code;
         formName = p.Name;
         formDescription = p.Description;
+        formSuggestedPrice = p.SuggestedPrice;
+        formIva = p.Iva;
+        formIsActive = p.IsActive;
         formIdCategory = p.IdCategory;
         errorMessage = string.Empty;
         showValidation = false;
@@ -237,7 +319,7 @@
     {
         showValidation = true;
 
-        if (string.IsNullOrWhiteSpace(formName) || formIdCategory == 0)
+        if (string.IsNullOrWhiteSpace(formCode) || string.IsNullOrWhiteSpace(formName) || formIdCategory == 0)
             return;
 
         isSaving = true;
@@ -249,8 +331,12 @@
             {
                 var dto = new UpdateProductDto
                 {
+                    Code = formCode.Trim(),
                     Name = formName.Trim(),
                     Description = formDescription?.Trim() ?? string.Empty,
+                    SuggestedPrice = formSuggestedPrice,
+                    Iva = formIva,
+                    IsActive = formIsActive,
                     IdCategory = formIdCategory
                 };
                 await ProductRepo.UpdateProduct(selectedProduct.IdProduct, dto);
@@ -259,8 +345,12 @@
             {
                 var dto = new CreateProductDto
                 {
+                    Code = formCode.Trim(),
                     Name = formName.Trim(),
                     Description = formDescription?.Trim() ?? string.Empty,
+                    SuggestedPrice = formSuggestedPrice,
+                    Iva = formIva,
+                    IsActive = formIsActive,
                     IdCategory = formIdCategory
                 };
                 await ProductRepo.CreateProduct(dto);
