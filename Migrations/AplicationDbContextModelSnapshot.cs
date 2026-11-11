@@ -46,6 +46,34 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("Categories");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.InventoryMovement", b =>
+                {
+                    b.Property<int>("IdInventoryMovement")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdInventoryMovement"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("IdInventoryMovement");
+
+                    b.ToTable("InventoryMovements");
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.Lot", b =>
                 {
                     b.Property<int>("IdLot")
