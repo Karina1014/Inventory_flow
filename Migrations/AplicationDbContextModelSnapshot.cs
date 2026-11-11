@@ -22,6 +22,30 @@ namespace Inventory_Flow.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Inventory_Flow.Models.Category", b =>
+                {
+                    b.Property<int>("IdCategory")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdCategory"));
+
+                    b.Property<DateTime>("CreationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("IdCategory");
+
+                    b.ToTable("Categories");
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.Role", b =>
                 {
                     b.Property<int>("IdRole")
