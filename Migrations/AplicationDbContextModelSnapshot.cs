@@ -46,6 +46,42 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("Categories");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.Lot", b =>
+                {
+                    b.Property<int>("IdLot")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdLot"));
+
+                    b.Property<DateTime>("CreationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpirationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("IdProduct")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdWarehouse")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LotNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.HasKey("IdLot");
+
+                    b.HasIndex("IdProduct");
+
+                    b.HasIndex("IdWarehouse");
+
+                    b.ToTable("Lots");
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.Product", b =>
                 {
                     b.Property<int>("IdProduct")
@@ -150,6 +186,25 @@ namespace Inventory_Flow.Migrations
                     b.HasKey("IdWarehouse");
 
                     b.ToTable("Warehouses");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.Lot", b =>
+                {
+                    b.HasOne("Inventory_Flow.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("IdProduct")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("IdWarehouse")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("Inventory_Flow.Models.Product", b =>
