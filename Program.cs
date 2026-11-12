@@ -25,6 +25,7 @@ builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ILotRepository, LotRepository>();
 builder.Services.AddScoped<IMovementTypeRepository, MovementTypeRepository>();
 builder.Services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();
+builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 
 // 3. AutoMapper
 builder.Services.AddAutoMapper(cfg => {
