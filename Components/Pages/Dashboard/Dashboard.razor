@@ -1,74 +1,235 @@
 @page "/dashboard"
 @layout MainLayout
 @rendermode InteractiveServer
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository.IRepository
+@inject IDashboardRepository DashboardRepo
+@inject NavigationManager NavigationManager
 
 <div class="dashboard-container">
-    <div class="section-header">
-        <h1 class="title">Resumen General</h1>
-        <p class="subtitle">Estado de los módulos del sistema MedVet</p>
-    </div>
-
-    <div class="cards-grid">
-        <div class="stat-card">
-            <div class="stat-icon icon-blue">
-                <i class="bi bi-shield-lock-fill"></i>
+    @if (isLoading)
+    {
+        <div class="loading-state">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
             </div>
-            <div class="stat-info">
-                <span class="stat-label">Módulo Roles</span>
-                <span class="stat-value">Activo</span>
-                <a href="roles" class="stat-link">Gestionar roles &rarr;</a>
+            <span>Calculando métricas del inventario...</span>
+        </div>
+    }
+    else
+    {
+        <!-- 1. Banner Principal de Bienvenida -->
+        <div class="welcome-banner">
+            <div class="banner-content">
+                <span class="banner-pill">Panel de control</span>
+                <h1 class="banner-greeting">@GreetingText, Karina 👋</h1>
+                <p class="banner-subtitle">Este es el resumen de tu inventario, movimientos y stock al día de hoy.</p>
+                <div class="banner-actions">
+                    <button class="btn-banner btn-banner-white" @onclick='() => NavigationManager.NavigateTo("products")'>
+                        <i class="bi bi-box-seam"></i> Ver productos
+                    </button>
+                    <button class="btn-banner btn-banner-ghost" @onclick='() => NavigationManager.NavigateTo("movements")'>
+                        <i class="bi bi-arrow-left-right"></i> Registrar movimiento
+                    </button>
+                </div>
+            </div>
+            <div class="banner-graphic">
+                <div class="graphic-circle">
+                    <i class="bi bi-graph-up-arrow"></i>
+                </div>
             </div>
         </div>
 
-        <div class="stat-card">
-            <div class="stat-icon icon-cyan">
-                <i class="bi bi-building"></i>
+        <!-- 2. Tarjetas de Indicadores Principales (KPIs) -->
+        <div class="kpi-grid">
+            <!-- Valor Total del Inventario -->
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <div class="kpi-icon icon-blue">
+                        <i class="bi bi-wallet2"></i>
+                    </div>
+                </div>
+                <div class="kpi-body">
+                    <span class="kpi-title">Valor total del inventario</span>
+                    <span class="kpi-value">$ @metrics.TotalInventoryValue.ToString("N2")</span>
+                    <span class="kpi-hint">Valorizado a precio sugerido</span>
+                </div>
             </div>
-            <div class="stat-info">
-                <span class="stat-label">Sucursales</span>
-                <span class="stat-value">Activo</span>
-                <a href="warehouses" class="stat-link">Gestionar sucursales &rarr;</a>
+
+            <!-- Movimientos de Hoy -->
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <div class="kpi-icon icon-green">
+                        <i class="bi bi-arrow-left-right"></i>
+                    </div>
+                </div>
+                <div class="kpi-body">
+                    <span class="kpi-title">Movimientos hoy</span>
+                    <span class="kpi-value">@metrics.TodayMovementsCount</span>
+                    <span class="kpi-hint">Registrados en la fecha</span>
+                </div>
+            </div>
+
+            <!-- Sucursales y Lotes -->
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <div class="kpi-icon icon-cyan">
+                        <i class="bi bi-building"></i>
+                    </div>
+                </div>
+                <div class="kpi-body">
+                    <span class="kpi-title">Sucursales y Lotes</span>
+                    <span class="kpi-value">@metrics.ActiveWarehousesCount sucursales</span>
+                    <span class="kpi-hint">@metrics.TotalLotsCount lotes activos</span>
+                </div>
+            </div>
+
+            <!-- Productos Bajo Stock -->
+            <div class="kpi-card @(metrics.LowStockProductsCount > 0 ? "kpi-card-alert" : "")">
+                <div class="kpi-header">
+                    <div class="kpi-icon icon-red">
+                        <i class="bi bi-exclamation-triangle"></i>
+                    </div>
+                </div>
+                <div class="kpi-body">
+                    <span class="kpi-title">Productos bajo stock</span>
+                    <span class="kpi-value text-danger">@metrics.LowStockProductsCount</span>
+                    <div class="kpi-alert-bar">
+                        <div class="kpi-alert-fill" style="width: @(metrics.LowStockProductsCount > 0 ? "100%" : "0%")"></div>
+                    </div>
+                    <a href="lots" class="kpi-link-alert">Revisar reposición &rarr;</a>
+                </div>
             </div>
         </div>
 
-        <div class="stat-card">
-            <div class="stat-icon icon-teal">
-                <i class="bi bi-boxes"></i>
+        <!-- 3. Sección Inferior: Gráfico de Categorías y Actividad Reciente -->
+        <div class="analytics-grid">
+            <!-- Stock por Categoría -->
+            <div class="panel-card">
+                <div class="panel-card-header">
+                    <div class="panel-header-title">
+                        <i class="bi bi-bar-chart-fill text-primary"></i>
+                        <span>Stock por categoría</span>
+                    </div>
+                </div>
+                <div class="panel-card-body">
+                    @if (metrics.StockByCategory.Count == 0)
+                    {
+                        <div class="empty-analytics">
+                            <i class="bi bi-box"></i>
+                            <span>No hay stock registrado en las categorías</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="categories-list">
+                            @foreach (var cat in metrics.StockByCategory)
+                            {
+                                <div class="category-row">
+                                    <div class="category-meta">
+                                        <span class="category-name">@cat.CategoryName</span>
+                                        <span class="category-units">@cat.TotalUnits.ToString("N0") unidades (@cat.Percentage%)</span>
+                                    </div>
+                                    <div class="progress-bar-bg">
+                                        <div class="progress-bar-fill" style="width: @cat.Percentage%"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
             </div>
-            <div class="stat-info">
-                <span class="stat-label">Inventario</span>
-                <span class="stat-value">Pendiente</span>
-                <span class="stat-hint">Siguiente módulo a desarrollar</span>
-            </div>
-        </div>
 
-        <div class="stat-card">
-            <div class="stat-icon icon-slate">
-                <i class="bi bi-people-fill"></i>
-            </div>
-            <div class="stat-info">
-                <span class="stat-label">Usuarios</span>
-                <span class="stat-value">Configurado</span>
-                <span class="stat-hint">Autenticación funcional</span>
+            <!-- Actividad Reciente -->
+            <div class="panel-card">
+                <div class="panel-card-header">
+                    <div class="panel-header-title">
+                        <i class="bi bi-clock-history text-primary"></i>
+                        <span>Actividad reciente</span>
+                    </div>
+                </div>
+                <div class="panel-card-body">
+                    @if (metrics.RecentActivities.Count == 0)
+                    {
+                        <div class="empty-analytics">
+                            <i class="bi bi-inbox"></i>
+                            <span>No hay movimientos registrados recientemente</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="activity-list">
+                            @foreach (var act in metrics.RecentActivities)
+                            {
+                                <div class="activity-item">
+                                    <div class="activity-icon-col">
+                                        @if (act.MovementTypeMode == "E")
+                                        {
+                                            <span class="act-icon act-entry" title="Entrada"><i class="bi bi-arrow-down-left"></i></span>
+                                        }
+                                        else if (act.MovementTypeMode == "S")
+                                        {
+                                            <span class="act-icon act-exit" title="Salida"><i class="bi bi-arrow-up-right"></i></span>
+                                        }
+                                        else
+                                        {
+                                            <span class="act-icon act-transfer" title="Transferencia"><i class="bi bi-arrow-left-right"></i></span>
+                                        }
+                                    </div>
+                                    <div class="activity-info">
+                                        <div class="activity-desc">
+                                            <strong>@act.Description</strong>
+                                            @if (act.TotalItems > 0)
+                                            {
+                                                <span class="activity-badge">@act.TotalItems u.</span>
+                                            }
+                                        </div>
+                                        <span class="activity-time">(@act.TimeAgo) · por @act.UserName</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
             </div>
         </div>
-    </div>
-
-    <div class="panel">
-        <div class="panel-header">
-            <span class="panel-title">Accesos directos</span>
-        </div>
-        <div class="panel-body">
-            <div class="shortcuts">
-                <a href="roles" class="shortcut-btn">
-                    <i class="bi bi-shield-plus"></i>
-                    <span>Administrar Roles</span>
-                </a>
-                <a href="warehouses" class="shortcut-btn">
-                    <i class="bi bi-building-add"></i>
-                    <span>Administrar Sucursales</span>
-                </a>
-            </div>
-        </div>
-    </div>
+    }
 </div>
+
+@code {
+    private DashboardMetricsDto metrics = new();
+    private bool isLoading = true;
+
+    private string GreetingText
+    {
+        get
+        {
+            var hour = DateTime.Now.Hour;
+            if (hour < 12) return "Buenos días";
+            if (hour < 19) return "Buenas tardes";
+            return "Buenas noches";
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardMetrics();
+    }
+
+    private async Task LoadDashboardMetrics()
+    {
+        isLoading = true;
+        try
+        {
+            metrics = await DashboardRepo.GetDashboardMetricsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar métricas: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
