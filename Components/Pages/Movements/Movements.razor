@@ -1,0 +1,300 @@
+@page "/movements"
+@layout MainLayout
+@rendermode InteractiveServer
+@using Inventory_Flow.Models
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository.IRepository
+@inject IInventoryMovementRepository MovementRepo
+
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="title">Movimientos de inventario</h1>
+            <p class="subtitle">Registro de movimientos de inventario con su tipo</p>
+        </div>
+        <button class="btn-primary" @onclick="OpenCreate">
+            <i class="bi bi-plus-lg"></i>
+            Nuevo movimiento
+        </button>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Listado de movimientos</span>
+            <span class="record-count">@movements.Count registros</span>
+        </div>
+
+        @if (movements.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="bi bi-arrow-left-right"></i>
+                <span>No hay movimientos registrados</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            @* <th>#</th> *@
+                            <th>Código</th>
+                            <th>Modo</th>
+                            <th>Descripción</th>
+                            @* <th>Creado</th> *@
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in movements)
+                        {
+                            <tr>
+                                @* <td class="col-id">@m.IdInventoryMovement</td> *@
+                                <td class="col-code">@m.Code</td>
+                                <td>
+                                    <span class="badge">@m.Mode</span>
+                                </td>
+                                <td class="col-address">@m.Description</td>
+                                @* <td class="col-date">@m.CreationDate.ToString("dd/MM/yyyy HH:mm")</td> *@
+                                <td class="col-actions">
+                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(m)" title="Editar">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <button class="action-btn btn-delete" @onclick="() => OpenDelete(m)" title="Eliminar">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (showModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title">@(isEditing ? "Editar movimiento" : "Nuevo movimiento")</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Código <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-upc-scan input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Código del movimiento"
+                           @bind="formCode" @bind:event="oninput" />
+                </div>
+                @if (showValidation && string.IsNullOrWhiteSpace(formCode))
+                {
+                    <span class="field-error">El código es requerido.</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Modo<span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-arrow-left-right input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Tipo de movimiento"
+                           @bind="formMode" @bind:event="oninput" />
+                </div>
+                @if (showValidation && string.IsNullOrWhiteSpace(formMode))
+                {
+                    <span class="field-error">El Modo de movimiento es requerido.</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Descripción</label>
+                <div class="input-box">
+                    <i class="bi bi-card-text input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Detalle del movimiento"
+                           @bind="formDescription" @bind:event="oninput" />
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert-error">@errorMessage</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span>Guardando...</span>
+                }
+                else
+                {
+                    <span>Guardar</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+@if (showDeleteModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box modal-sm">
+        <div class="modal-header">
+            <span class="modal-title">Confirmar eliminación</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <p class="delete-msg">¿Deseas eliminar el movimiento <strong>@selectedMovement?.Code</strong>? Esta acción no se puede deshacer.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+                @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<InventoryMovement> movements = new();
+
+    private bool showModal;
+    private bool showDeleteModal;
+    private bool isEditing;
+    private bool isSaving;
+    private bool showValidation;
+
+    private string formCode = string.Empty;
+    private string formMode = string.Empty;
+    private string formDescription = string.Empty;
+    private string errorMessage = string.Empty;
+
+    private InventoryMovement? selectedMovement;
+
+    protected override void OnInitialized()
+    {
+        LoadMovements();
+    }
+
+    private void LoadMovements()
+    {
+        try
+        {
+            movements = MovementRepo.GetInventoryMovements().ToList();
+        }
+        catch
+        {
+            errorMessage = "No se pudieron cargar los movimientos.";
+        }
+    }
+
+    private void OpenCreate()
+    {
+        formCode = string.Empty;
+        formMode = string.Empty;
+        formDescription = string.Empty;
+        errorMessage = string.Empty;
+        showValidation = false;
+        isEditing = false;
+        selectedMovement = null;
+        showModal = true;
+    }
+
+    private void OpenEdit(InventoryMovement m)
+    {
+        selectedMovement = m;
+        formCode = m.Code;
+        formMode = m.Mode;
+        formDescription = m.Description;
+        errorMessage = string.Empty;
+        showValidation = false;
+        isEditing = true;
+        showModal = true;
+    }
+
+    private void OpenDelete(InventoryMovement m)
+    {
+        selectedMovement = m;
+        showDeleteModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        showDeleteModal = false;
+        isSaving = false;
+        errorMessage = string.Empty;
+    }
+
+    private async Task Save()
+    {
+        showValidation = true;
+
+        if (string.IsNullOrWhiteSpace(formCode) || string.IsNullOrWhiteSpace(formMode))
+            return;
+
+        isSaving = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            if (isEditing && selectedMovement != null)
+            {
+                var dto = new UpdateInventoryMovementDto
+                {
+                    Code = formCode.Trim(),
+                    Mode = formMode.Trim(),
+                    Description = formDescription?.Trim() ?? string.Empty
+                };
+                await MovementRepo.UpdateInventoryMovement(selectedMovement.IdInventoryMovement, dto);
+            }
+            else
+            {
+                var dto = new CreateInventoryMovementDto
+                {
+                    Code = formCode.Trim(),
+                    Mode = formMode.Trim(),
+                    Description = formDescription?.Trim() ?? string.Empty
+                };
+
+                if (!MovementRepo.IsUniqueCode(dto.Code))
+                {
+                    errorMessage = "Ya existe un movimiento con ese código.";
+                    isSaving = false;
+                    return;
+                }
+
+                await MovementRepo.CreateInventoryMovement(dto);
+            }
+
+            LoadMovements();
+            CloseModal();
+        }
+        catch
+        {
+            errorMessage = "Ocurrió un error al guardar. Intenta nuevamente.";
+            isSaving = false;
+        }
+    }
+
+    private void ConfirmDelete()
+    {
+        if (selectedMovement == null) return;
+
+        isSaving = true;
+        try
+        {
+            MovementRepo.DeleteInventoryMovement(selectedMovement.IdInventoryMovement);
+            LoadMovements();
+            CloseModal();
+        }
+        catch
+        {
+            errorMessage = "No se pudo eliminar el movimiento.";
+            isSaving = false;
+        }
+    }
+}
