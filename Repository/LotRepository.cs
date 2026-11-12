@@ -2,6 +2,7 @@ using Inventory_Flow.Data;
 using Inventory_Flow.Models;
 using Inventory_Flow.Models.Dtos;
 using Inventory_Flow.Repository.IRepository;
+using Microsoft.EntityFrameworkCore;
 
 namespace Inventory_Flow.Repository;
 
@@ -16,7 +17,11 @@ public class LotRepository : ILotRepository
 
     public ICollection<Lot> GetLots()
     {
-        return _db.Lots.OrderBy(l => l.ExpirationDate).ToList();
+        return _db.Lots
+            .Include(l => l.Product)
+            .Include(l => l.Warehouse)
+            .OrderBy(l => l.ExpirationDate)
+            .ToList();
     }
 
     public Lot? GetLot(int IdLot)

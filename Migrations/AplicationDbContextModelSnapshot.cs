@@ -46,6 +46,88 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("Categories");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.InventoryMovement", b =>
+                {
+                    b.Property<int>("IdInventoryMovement")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdInventoryMovement"));
+
+                    b.Property<int?>("IdDestinationWarehouse")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdMovementType")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IdOriginWarehouse")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IdUser")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("MovementDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Observation")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int?>("ReferenceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReferenceSource")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("IdInventoryMovement");
+
+                    b.HasIndex("IdDestinationWarehouse");
+
+                    b.HasIndex("IdMovementType");
+
+                    b.HasIndex("IdOriginWarehouse");
+
+                    b.HasIndex("IdUser");
+
+                    b.ToTable("InventoryMovements");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.InventoryMovementDetail", b =>
+                {
+                    b.Property<int>("IdInventoryMovementDetail")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdInventoryMovementDetail"));
+
+                    b.Property<int>("IdInventoryMovement")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IdLot")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdProduct")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("IdInventoryMovementDetail");
+
+                    b.HasIndex("IdInventoryMovement");
+
+                    b.HasIndex("IdLot");
+
+                    b.HasIndex("IdProduct");
+
+                    b.ToTable("InventoryMovementDetails");
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.Lot", b =>
                 {
                     b.Property<int>("IdLot")
@@ -65,6 +147,9 @@ namespace Inventory_Flow.Migrations
 
                     b.Property<int>("IdWarehouse")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
 
                     b.Property<string>("LotNumber")
                         .IsRequired()
@@ -229,6 +314,60 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("Warehouses");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.InventoryMovement", b =>
+                {
+                    b.HasOne("Inventory_Flow.Models.Warehouse", "DestinationWarehouse")
+                        .WithMany()
+                        .HasForeignKey("IdDestinationWarehouse");
+
+                    b.HasOne("Inventory_Flow.Models.MovementType", "MovementType")
+                        .WithMany()
+                        .HasForeignKey("IdMovementType")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.Warehouse", "OriginWarehouse")
+                        .WithMany()
+                        .HasForeignKey("IdOriginWarehouse");
+
+                    b.HasOne("Inventory_Flow.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("IdUser");
+
+                    b.Navigation("DestinationWarehouse");
+
+                    b.Navigation("MovementType");
+
+                    b.Navigation("OriginWarehouse");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.InventoryMovementDetail", b =>
+                {
+                    b.HasOne("Inventory_Flow.Models.InventoryMovement", "InventoryMovement")
+                        .WithMany("Details")
+                        .HasForeignKey("IdInventoryMovement")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.Lot", "Lot")
+                        .WithMany()
+                        .HasForeignKey("IdLot");
+
+                    b.HasOne("Inventory_Flow.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("IdProduct")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("InventoryMovement");
+
+                    b.Navigation("Lot");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.Lot", b =>
                 {
                     b.HasOne("Inventory_Flow.Models.Product", "Product")
@@ -266,6 +405,11 @@ namespace Inventory_Flow.Migrations
                         .HasForeignKey("IdRole");
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.InventoryMovement", b =>
+                {
+                    b.Navigation("Details");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,0 +1,959 @@
+@page "/movements"
+@layout MainLayout
+@rendermode InteractiveServer
+@using Inventory_Flow.Models
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository.IRepository
+@inject IInventoryMovementRepository MovementRepo
+@inject IMovementTypeRepository MovementTypeRepo
+@inject IWarehouseRepository WarehouseRepo
+@inject IProductRepository ProductRepo
+@inject ILotRepository LotRepo
+
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="title">Movimientos</h1>
+            <p class="subtitle">Gestión y registro de movimientos de inventario</p>
+        </div>
+        <button class="btn-primary" @onclick="OpenCreate">
+            <i class="bi bi-plus-lg"></i>
+            Nuevo movimiento
+        </button>
+    </div>
+
+    <!-- Barra de Búsqueda y Filtros Rápidos -->
+    <div class="search-filter-card">
+        <div class="search-box">
+            <i class="bi bi-search search-icon"></i>
+            <input type="text" class="search-input" placeholder="Buscar por motivo, usuario o código..." 
+                   @bind="searchTerm" @bind:event="oninput" />
+            @if (!string.IsNullOrEmpty(searchTerm))
+            {
+                <button class="btn-clear" @onclick="() => searchTerm = string.Empty">
+                    <i class="bi bi-x"></i>
+                </button>
+            }
+        </div>
+        <div class="filter-group">
+            <select class="filter-select" @bind="selectedTypeFilter">
+                <option value="">Todos los tipos</option>
+                @foreach (var mt in movementTypes)
+                {
+                    <option value="@mt.Code">@mt.Description (@mt.Mode)</option>
+                }
+            </select>
+            <select class="filter-select" @bind="selectedWarehouseFilter">
+                <option value="0">Todas las sucursales</option>
+                @foreach (var w in warehouses)
+                {
+                    <option value="@w.IdWarehouse">@w.Name</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Listado de movimientos</span>
+            <span class="record-count">@filteredMovements.Count registros</span>
+        </div>
+
+        @if (filteredMovements.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="bi bi-arrow-left-right"></i>
+                <span>No hay movimientos de inventario registrados</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Tipo Mov.</th>
+                            <th>Flujo (Origen &rarr; Destino)</th>
+                            <th>Motivo / Observación</th>
+                            <th>Usuario</th>
+                            <th>Líneas</th>
+                            <th class="col-actions">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in pagedMovements)
+                        {
+                            <tr>
+                                <td class="col-date">@m.MovementDate.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>
+                                    <span class="badge @GetModeBadgeClass(m.MovementTypeMode)">
+                                        @m.MovementTypeCode - @m.MovementTypeDescription
+                                    </span>
+                                </td>
+                                <td class="col-flow">
+                                    <span class="wh-tag">@(m.OriginWarehouseName ?? "(Ninguno)")</span>
+                                    <i class="bi bi-arrow-right flow-arrow"></i>
+                                    <span class="wh-tag">@(m.DestinationWarehouseName ?? "(Ninguno)")</span>
+                                </td>
+                                <td class="col-obs" title="@m.Observation">
+                                    @(string.IsNullOrWhiteSpace(m.Observation) ? "-" : m.Observation)
+                                    @if (m.ReferenceId.HasValue || !string.IsNullOrEmpty(m.ReferenceSource))
+                                    {
+                                        <div class="ref-subtext">Ref: @m.ReferenceSource #@m.ReferenceId</div>
+                                    }
+                                </td>
+                                <td class="col-user">@m.UserName</td>
+                                <td>
+                                    <span class="details-badge">@m.DetailsCount item(s)</span>
+                                </td>
+                                <td class="col-actions">
+                                    <button class="action-btn btn-view" @onclick="() => OpenView(m)" title="Ver detalle">
+                                        <i class="bi bi-eye-fill"></i>
+                                    </button>
+                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(m)" title="Editar">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <button class="action-btn btn-delete" @onclick="() => OpenDelete(m)" title="Eliminar">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (TotalPages > 1)
+            {
+                <div class="pagination-bar">
+                    <span class="pagination-info">
+                        Página @currentPage de @TotalPages
+                    </span>
+                    <div class="pagination-buttons">
+                        <button class="page-nav-btn" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage <= 1)">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        @for (int p = 1; p <= TotalPages; p++)
+                        {
+                            var pageNumber = p;
+                            <button class="page-num-btn @(currentPage == pageNumber ? "active" : "")" 
+                                    @onclick="() => ChangePage(pageNumber)">
+                                @pageNumber
+                            </button>
+                        }
+                        <button class="page-nav-btn" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage >= TotalPages)">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<!-- Modal Crear / Editar -->
+@if (showModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box modal-xl">
+        <div class="modal-header">
+            <span class="modal-title">@(isEditing ? "Editar movimiento" : "Nuevo movimiento de inventario")</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Fecha</label>
+                    <div class="input-box">
+                        <i class="bi bi-calendar3 input-icon"></i>
+                        <input class="form-input" type="datetime-local" @bind="formDate" disabled="@isEditing" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Tipo de Movimiento <span class="required">*</span></label>
+                    <div class="input-box">
+                        <i class="bi bi-arrow-left-right input-icon"></i>
+                        <select class="form-input" value="@formMovementTypeId" @onchange="OnMovementTypeChanged" disabled="@isEditing">
+                            <option value="0">Seleccione un tipo...</option>
+                            @foreach (var mt in movementTypes)
+                            {
+                                <option value="@mt.IdMovementType">@mt.Code - @mt.Description (@mt.Mode)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Almacén Origen</label>
+                    <div class="input-box">
+                        <i class="bi bi-building input-icon"></i>
+                        <select class="form-input" value="@(formOriginWarehouseId ?? 0)" @onchange="OnOriginWarehouseChanged" disabled="@(isEditing || isOriginDisabled)">
+                            <option value="0">(Ninguno)</option>
+                            @foreach (var w in warehouses)
+                            {
+                                <option value="@w.IdWarehouse">@w.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Almacén Destino</label>
+                    <div class="input-box">
+                        <i class="bi bi-building input-icon"></i>
+                        <select class="form-input" @bind="formDestWarehouseId" disabled="@(isEditing || isDestDisabled)">
+                            <option value="">(Ninguno)</option>
+                            @foreach (var w in warehouses)
+                            {
+                                <option value="@w.IdWarehouse">@w.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Motivo u Observación</label>
+                <div class="input-box textarea-box">
+                    <textarea class="form-input form-textarea" rows="2" placeholder="Ej: Salida por venta, reposición de stock, ajuste mensual..."
+                              @bind="formObservation"></textarea>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Id Referencia</label>
+                    <div class="input-box">
+                        <i class="bi bi-hash input-icon"></i>
+                        <input class="form-input" type="number" placeholder="Ej: 104" @bind="formReferenceId" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fuente de Referencia</label>
+                    <div class="input-box">
+                        <i class="bi bi-tag input-icon"></i>
+                        <input class="form-input" type="text" placeholder="Ej: VENTA, COMPRA, AJUSTE" @bind="formReferenceSource" />
+                    </div>
+                </div>
+            </div>
+
+            @if (!isEditing)
+            {
+                <div class="items-card">
+                    <div class="items-header">
+                        <div>
+                            <span class="items-title">Líneas de Producto</span>
+                            <span class="items-subtitle">Selecciona el producto para autocompletar precio, IVA y stock por lote en la sucursal</span>
+                        </div>
+                        <button type="button" class="btn-secondary-sm" @onclick="AddDetailRow">
+                            <i class="bi bi-plus-circle"></i> Agregar fila
+                        </button>
+                    </div>
+
+                    <div class="items-table-wrapper">
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 200px;">Producto</th>
+                                    <th style="min-width: 170px;">Lote en Sucursal</th>
+                                    <th style="width: 85px;" class="text-center">Stock Disp.</th>
+                                    <th style="width: 90px;">Cantidad</th>
+                                    <th style="width: 110px;">Valor Unit.</th>
+                                    <th style="width: 75px;" class="text-center">IVA</th>
+                                    <th style="width: 110px;" class="text-end">Subtotal</th>
+                                    <th style="width: 35px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in formDetails)
+                                {
+                                    var availableLots = GetLotsForProductAndWarehouse(row.IdProduct, formOriginWarehouseId);
+                                    <tr>
+                                        <td>
+                                            <select class="table-input" value="@row.IdProduct" @onchange="(e) => OnProductSelected(row, e)">
+                                                @if (CurrentMovementMode != "E" && (!formOriginWarehouseId.HasValue || formOriginWarehouseId.Value <= 0))
+                                                {
+                                                    <option value="0">Primero seleccione el Almacén Origen</option>
+                                                }
+                                                else
+                                                {
+                                                    var availableProducts = GetAvailableProductsForOrigin().ToList();
+                                                    if (availableProducts.Count == 0)
+                                                    {
+                                                        <option value="0">Sin productos disponibles en esta sucursal</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="0">Seleccionar producto...</option>
+                                                        @foreach (var p in availableProducts)
+                                                        {
+                                                            <option value="@p.IdProduct">
+                                                                @p.Code - @p.Name @(CurrentMovementMode != "E" ? $"(Disp: {p.Stock})" : "")
+                                                            </option>
+                                                        }
+                                                    }
+                                                }
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select class="table-input" value="@(row.IdLot ?? 0)" @onchange="(e) => OnLotSelected(row, e)">
+                                                <option value="0">Sin Lote</option>
+                                                @foreach (var l in availableLots)
+                                                {
+                                                    <option value="@l.IdLot">@l.LotNumber (Stock: @l.Quantity)</option>
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="stock-pill @(row.AvailableStock > 0 ? "stock-ok" : "stock-zero")">
+                                                @row.AvailableStock
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <input type="number" class="table-input text-end" min="1" max="@(row.AvailableStock > 0 && CurrentMovementMode != "E" ? row.AvailableStock : int.MaxValue)" 
+                                                   @bind="row.Quantity" @bind:event="oninput" />
+                                        </td>
+                                        <td>
+                                            <input type="number" class="table-input text-end" step="0.01" min="0" 
+                                                   @bind="row.UnitCost" @bind:event="oninput" />
+                                        </td>
+                                        <td class="text-center">
+                                            @if (row.HasIva)
+                                            {
+                                                <span class="badge-iva iva-yes" title="Aplica IVA">SÍ</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge-iva iva-no" title="Sin IVA">NO</span>
+                                            }
+                                        </td>
+                                        <td class="text-end font-semibold">
+                                            $@((row.Quantity * row.UnitCost).ToString("N2"))
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn-row-del" @onclick="() => RemoveDetailRow(row)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th colspan="3" class="text-end">Total Items:</th>
+                                    <th class="text-end font-semibold">@formDetails.Sum(x => x.Quantity)</th>
+                                    <th colspan="2" class="text-end">Total Estimado:</th>
+                                    <th class="text-end font-semibold text-primary">
+                                        $@(formDetails.Sum(x => x.Quantity * x.UnitCost).ToString("N2"))
+                                    </th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert-error">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>@errorMessage</span>
+                </div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span>Guardando...</span>
+                }
+                else
+                {
+                    <span>Guardar movimiento</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+<!-- Modal Ver Detalle -->
+@if (showViewModal && selectedMovement != null)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box modal-lg">
+        <div class="modal-header">
+            <span class="modal-title">Detalle de Movimiento #@selectedMovement.IdInventoryMovement</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="view-grid">
+                <div><strong>Fecha:</strong> @selectedMovement.MovementDate.ToString("dd/MM/yyyy HH:mm")</div>
+                <div><strong>Tipo:</strong> @selectedMovement.MovementTypeCode - @selectedMovement.MovementTypeDescription</div>
+                <div><strong>Origen:</strong> @(selectedMovement.OriginWarehouseName ?? "(Ninguno)")</div>
+                <div><strong>Destino:</strong> @(selectedMovement.DestinationWarehouseName ?? "(Ninguno)")</div>
+                <div><strong>Usuario:</strong> @selectedMovement.UserName</div>
+                <div><strong>Referencia:</strong> @selectedMovement.ReferenceSource #@selectedMovement.ReferenceId</div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(selectedMovement.Observation))
+            {
+                <div class="view-obs">
+                    <strong>Motivo:</strong> @selectedMovement.Observation
+                </div>
+            }
+
+            <h4 class="view-subtitle">Productos del Movimiento</h4>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Lote</th>
+                            <th class="text-end">Cantidad</th>
+                            <th class="text-end">Costo Unit.</th>
+                            <th class="text-end">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var d in selectedMovement.Details)
+                        {
+                            <tr>
+                                <td>@d.ProductCode</td>
+                                <td>@d.ProductName</td>
+                                <td>@(d.LotNumber ?? "-")</td>
+                                <td class="text-end">@d.Quantity</td>
+                                <td class="text-end">$@d.UnitCost.ToString("N2")</td>
+                                <td class="text-end font-semibold">$@d.Subtotal.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="3" class="text-end">Total:</th>
+                            <th class="text-end">@selectedMovement.TotalQuantity</th>
+                            <th></th>
+                            <th class="text-end">$@selectedMovement.TotalCost.ToString("N2")</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cerrar</button>
+        </div>
+    </div>
+}
+
+<!-- Modal Confirmar Eliminar -->
+@if (showDeleteModal && selectedMovement != null)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box modal-sm">
+        <div class="modal-header">
+            <span class="modal-title">Confirmar eliminación</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <p class="delete-msg">¿Deseas eliminar el movimiento <strong>#@selectedMovement.IdInventoryMovement</strong>?</p>
+            <p class="delete-submsg">Motivo: @selectedMovement.Observation</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+                @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<InventoryMovementDto> movements = new();
+    private List<MovementType> movementTypes = new();
+    private List<Warehouse> warehouses = new();
+    private List<Product> products = new();
+    private List<Lot> lots = new();
+
+    private string searchTerm = string.Empty;
+    private string selectedTypeFilter = string.Empty;
+    private int selectedWarehouseFilter = 0;
+
+    private int currentPage = 1;
+    private int pageSize = 10;
+
+    private bool showModal;
+    private bool showViewModal;
+    private bool showDeleteModal;
+    private bool isEditing;
+    private bool isSaving;
+    private string errorMessage = string.Empty;
+
+    private InventoryMovementDto? selectedMovement;
+
+    // Formulario
+    private DateTime formDate = DateTime.Now;
+    private int formMovementTypeId;
+    private int? formOriginWarehouseId;
+    private int? formDestWarehouseId;
+    private string formObservation = string.Empty;
+    private int? formReferenceId;
+    private string? formReferenceSource = string.Empty;
+    private List<CreateInventoryMovementDetailDto> formDetails = new();
+
+    private bool isOriginDisabled => CurrentMovementMode == "E";
+    private bool isDestDisabled => CurrentMovementMode == "S";
+
+    private string CurrentMovementMode
+    {
+        get
+        {
+            var mt = movementTypes.FirstOrDefault(m => m.IdMovementType == formMovementTypeId);
+            return mt?.Mode.ToUpperInvariant() ?? string.Empty;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        movements = (await MovementRepo.GetMovementsAsync()).ToList();
+        movementTypes = MovementTypeRepo.GetMovementTypes().ToList();
+        warehouses = WarehouseRepo.GetWarehouses().ToList();
+        products = ProductRepo.GetProducts().ToList();
+        lots = LotRepo.GetLots().ToList();
+    }
+
+    private List<InventoryMovementDto> filteredMovements
+    {
+        get
+        {
+            var q = movements.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.Trim().ToLower();
+                q = q.Where(m =>
+                    (m.Observation != null && m.Observation.ToLower().Contains(term)) ||
+                    (m.UserName != null && m.UserName.ToLower().Contains(term)) ||
+                    (m.MovementTypeCode != null && m.MovementTypeCode.ToLower().Contains(term)) ||
+                    (m.MovementTypeDescription != null && m.MovementTypeDescription.ToLower().Contains(term)));
+            }
+
+            if (!string.IsNullOrEmpty(selectedTypeFilter))
+            {
+                q = q.Where(m => m.MovementTypeCode == selectedTypeFilter);
+            }
+
+            if (selectedWarehouseFilter > 0)
+            {
+                q = q.Where(m => m.IdOriginWarehouse == selectedWarehouseFilter || m.IdDestinationWarehouse == selectedWarehouseFilter);
+            }
+
+            return q.ToList();
+        }
+    }
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling((double)filteredMovements.Count / pageSize));
+
+    private List<InventoryMovementDto> pagedMovements
+    {
+        get
+        {
+            return filteredMovements
+                .Skip((currentPage - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+        }
+    }
+
+    private void ChangePage(int newPage)
+    {
+        if (newPage >= 1 && newPage <= TotalPages)
+            currentPage = newPage;
+    }
+
+    private string GetModeBadgeClass(string mode) => mode switch
+    {
+        "E" => "badge-active",
+        "S" => "badge-inactive",
+        "T" => "badge-transfer",
+        _ => "badge-default"
+    };
+
+    private void OnMovementTypeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int id))
+        {
+            formMovementTypeId = id;
+            var mode = CurrentMovementMode;
+            if (mode == "E") formOriginWarehouseId = null;
+            if (mode == "S") formDestWarehouseId = null;
+            RecalculateRowStocks();
+        }
+    }
+
+    private void OnOriginWarehouseChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int whId))
+        {
+            formOriginWarehouseId = whId > 0 ? whId : null;
+            
+            // Si el producto actual de alguna fila ya no existe en el nuevo almacén origen, resetear la fila
+            if (CurrentMovementMode != "E" && formOriginWarehouseId.HasValue)
+            {
+                var validProductIds = GetAvailableProductsForOrigin().Select(p => p.IdProduct).ToHashSet();
+                foreach (var row in formDetails)
+                {
+                    if (row.IdProduct > 0 && !validProductIds.Contains(row.IdProduct))
+                    {
+                        row.IdProduct = 0;
+                        row.IdLot = null;
+                        row.AvailableStock = 0;
+                        row.UnitCost = 0;
+                        row.HasIva = false;
+                    }
+                }
+            }
+
+            RecalculateRowStocks();
+        }
+    }
+
+    private IEnumerable<Lot> GetLotsForProductAndWarehouse(int productId, int? warehouseId)
+    {
+        if (productId <= 0) return Enumerable.Empty<Lot>();
+
+        var q = lots.Where(l => l.IdProduct == productId);
+        // Si hay un almacén de origen especificado (Salida o Transferencia), filtrar solo los lotes de esa sucursal
+        if (warehouseId.HasValue && warehouseId.Value > 0)
+        {
+            q = q.Where(l => l.IdWarehouse == warehouseId.Value);
+        }
+        return q;
+    }
+
+    private IEnumerable<ProductStockDisplay> GetAvailableProductsForOrigin()
+    {
+        // Si es una Entrada ('E'), puede ingresar cualquier producto activo del catálogo
+        if (CurrentMovementMode == "E")
+        {
+            return products.Where(p => p.IsActive).Select(p => new ProductStockDisplay
+            {
+                IdProduct = p.IdProduct,
+                Code = p.Code,
+                Name = p.Name,
+                Stock = 0,
+                SuggestedPrice = p.SuggestedPrice,
+                Iva = p.Iva
+            });
+        }
+
+        // Si es Salida ('S') o Transferencia ('T'), depende del Almacén Origen seleccionado
+        if (!formOriginWarehouseId.HasValue || formOriginWarehouseId.Value <= 0)
+        {
+            return Enumerable.Empty<ProductStockDisplay>();
+        }
+
+        int originId = formOriginWarehouseId.Value;
+
+        // Obtenemos los lotes de este almacén con stock > 0
+        var originLots = lots.Where(l => l.IdWarehouse == originId && l.Quantity > 0).ToList();
+
+        // Agrupamos por IdProduct y cruzamos con la lista de productos
+        var result = new List<ProductStockDisplay>();
+        foreach (var group in originLots.GroupBy(l => l.IdProduct))
+        {
+            var product = products.FirstOrDefault(p => p.IdProduct == group.Key);
+            if (product != null && product.IsActive)
+            {
+                result.Add(new ProductStockDisplay
+                {
+                    IdProduct = product.IdProduct,
+                    Code = product.Code,
+                    Name = product.Name,
+                    Stock = group.Sum(l => l.Quantity),
+                    SuggestedPrice = product.SuggestedPrice,
+                    Iva = product.Iva
+                });
+            }
+        }
+
+        return result.OrderBy(p => p.Name);
+    }
+
+    public class ProductStockDisplay
+    {
+        public int IdProduct { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public int Stock { get; set; }
+        public decimal SuggestedPrice { get; set; }
+        public bool Iva { get; set; }
+    }
+
+    private void OnProductSelected(CreateInventoryMovementDetailDto row, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int pId))
+        {
+            row.IdProduct = pId;
+            row.IdLot = null;
+
+            var prod = products.FirstOrDefault(p => p.IdProduct == pId);
+            if (prod != null)
+            {
+                row.UnitCost = prod.SuggestedPrice;
+                row.HasIva = prod.Iva;
+                row.ProductCode = prod.Code;
+                row.ProductName = prod.Name;
+            }
+            else
+            {
+                row.UnitCost = 0;
+                row.HasIva = false;
+                row.AvailableStock = 0;
+            }
+
+            UpdateStockForRow(row);
+        }
+    }
+
+    private void OnLotSelected(CreateInventoryMovementDetailDto row, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int lotId))
+        {
+            row.IdLot = lotId > 0 ? lotId : null;
+            UpdateStockForRow(row);
+        }
+    }
+
+    private void UpdateStockForRow(CreateInventoryMovementDetailDto row)
+    {
+        if (row.IdProduct <= 0)
+        {
+            row.AvailableStock = 0;
+            return;
+        }
+
+        if (row.IdLot.HasValue && row.IdLot.Value > 0)
+        {
+            var lot = lots.FirstOrDefault(l => l.IdLot == row.IdLot.Value);
+            row.AvailableStock = lot?.Quantity ?? 0;
+        }
+        else
+        {
+            // Suma de stock de lotes del producto en el almacén de origen (si aplica)
+            var prodLots = GetLotsForProductAndWarehouse(row.IdProduct, formOriginWarehouseId);
+            row.AvailableStock = prodLots.Sum(l => l.Quantity);
+        }
+    }
+
+    private void RecalculateRowStocks()
+    {
+        foreach (var row in formDetails)
+        {
+            // Si el lote actual no pertenece a la nueva sucursal origen, limpiarlo
+            if (row.IdLot.HasValue && formOriginWarehouseId.HasValue)
+            {
+                var lot = lots.FirstOrDefault(l => l.IdLot == row.IdLot.Value);
+                if (lot == null || lot.IdWarehouse != formOriginWarehouseId.Value)
+                {
+                    row.IdLot = null;
+                }
+            }
+            UpdateStockForRow(row);
+        }
+    }
+
+    private async Task OpenCreate()
+    {
+        isEditing = false;
+        selectedMovement = null;
+        formDate = DateTime.Now;
+        formMovementTypeId = movementTypes.FirstOrDefault()?.IdMovementType ?? 0;
+        formOriginWarehouseId = null;
+        formDestWarehouseId = null;
+        formObservation = string.Empty;
+        formReferenceId = null;
+        formReferenceSource = string.Empty;
+        formDetails = new() { new CreateInventoryMovementDetailDto { Quantity = 1 } };
+        errorMessage = string.Empty;
+
+        // Recargar datos frescos de la BD para tener los lotes y productos al día
+        await LoadData();
+
+        showModal = true;
+    }
+
+    private void OpenEdit(InventoryMovementDto m)
+    {
+        isEditing = true;
+        selectedMovement = m;
+        formDate = m.MovementDate;
+        formMovementTypeId = m.IdMovementType;
+        formOriginWarehouseId = m.IdOriginWarehouse;
+        formDestWarehouseId = m.IdDestinationWarehouse;
+        formObservation = m.Observation;
+        formReferenceId = m.ReferenceId;
+        formReferenceSource = m.ReferenceSource;
+        errorMessage = string.Empty;
+        showModal = true;
+    }
+
+    private async Task OpenView(InventoryMovementDto m)
+    {
+        selectedMovement = await MovementRepo.GetMovementByIdAsync(m.IdInventoryMovement) ?? m;
+        showViewModal = true;
+    }
+
+    private void OpenDelete(InventoryMovementDto m)
+    {
+        selectedMovement = m;
+        showDeleteModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        showViewModal = false;
+        showDeleteModal = false;
+        errorMessage = string.Empty;
+    }
+
+    private void AddDetailRow()
+    {
+        formDetails.Add(new CreateInventoryMovementDetailDto { Quantity = 1 });
+    }
+
+    private void RemoveDetailRow(CreateInventoryMovementDetailDto row)
+    {
+        if (formDetails.Count > 1)
+            formDetails.Remove(row);
+    }
+
+    private async Task Save()
+    {
+        errorMessage = string.Empty;
+
+        if (formMovementTypeId <= 0)
+        {
+            errorMessage = "Debe seleccionar un tipo de movimiento.";
+            return;
+        }
+
+        var mode = CurrentMovementMode;
+        if (mode == "E" && !formDestWarehouseId.HasValue)
+        {
+            errorMessage = "Para una entrada debe seleccionar el Almacén Destino.";
+            return;
+        }
+        if (mode == "S" && !formOriginWarehouseId.HasValue)
+        {
+            errorMessage = "Para una salida debe seleccionar el Almacén Origen.";
+            return;
+        }
+        if (mode == "T")
+        {
+            if (!formOriginWarehouseId.HasValue || !formDestWarehouseId.HasValue)
+            {
+                errorMessage = "Para una transferencia debe seleccionar ambos almacenes.";
+                return;
+            }
+            if (formOriginWarehouseId == formDestWarehouseId)
+            {
+                errorMessage = "El almacén origen y destino no pueden ser el mismo.";
+                return;
+            }
+        }
+
+        isSaving = true;
+        try
+        {
+            if (isEditing && selectedMovement != null)
+            {
+                var dto = new UpdateInventoryMovementDto
+                {
+                    Observation = formObservation.Trim(),
+                    ReferenceId = formReferenceId,
+                    ReferenceSource = formReferenceSource?.Trim()
+                };
+                await MovementRepo.UpdateMovementAsync(selectedMovement.IdInventoryMovement, dto);
+            }
+            else
+            {
+                if (formDetails.Count == 0 || formDetails.Any(d => d.IdProduct <= 0 || d.Quantity <= 0))
+                {
+                    errorMessage = "Cada línea debe tener un producto seleccionado y cantidad mayor a 0.";
+                    isSaving = false;
+                    return;
+                }
+
+                // Validación de stock para salidas o transferencias
+                if (mode == "S" || mode == "T")
+                {
+                    foreach (var det in formDetails)
+                    {
+                        if (det.IdLot.HasValue && det.Quantity > det.AvailableStock)
+                        {
+                            errorMessage = $"La cantidad ({det.Quantity}) supera el stock disponible ({det.AvailableStock}) del lote seleccionado.";
+                            isSaving = false;
+                            return;
+                        }
+                    }
+                }
+
+                var dto = new CreateInventoryMovementDto
+                {
+                    MovementDate = formDate,
+                    IdMovementType = formMovementTypeId,
+                    IdOriginWarehouse = formOriginWarehouseId,
+                    IdDestinationWarehouse = formDestWarehouseId,
+                    Observation = formObservation.Trim(),
+                    ReferenceId = formReferenceId,
+                    ReferenceSource = formReferenceSource?.Trim(),
+                    Details = formDetails
+                };
+                await MovementRepo.CreateMovementAsync(dto);
+            }
+
+            await LoadData();
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (selectedMovement == null) return;
+
+        isSaving = true;
+        try
+        {
+            await MovementRepo.DeleteMovementAsync(selectedMovement.IdInventoryMovement);
+            await LoadData();
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

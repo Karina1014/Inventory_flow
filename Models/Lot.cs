@@ -25,5 +25,10 @@ public class Lot
 
     public DateTime ExpirationDate { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
     public DateTime CreationDate { get; set; } = DateTime.Now;
+
+    [NotMapped]
+    public bool IsExpired => ExpirationDate < DateTime.Now;
 }
