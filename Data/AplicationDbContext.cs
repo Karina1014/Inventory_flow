@@ -16,5 +16,5 @@ public class AplicationDbContext: DbContext
     public DbSet<Category> Categories {get;set;}
     public DbSet<Product> Products {get;set;}
     public DbSet<Lot> Lots {get;set;}
-    public DbSet<InventoryMovement> InventoryMovements {get;set;}
+    public DbSet<MovementType> MovementTypes {get;set;}
 }

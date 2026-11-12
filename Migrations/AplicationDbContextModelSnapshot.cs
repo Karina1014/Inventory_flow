@@ -46,34 +46,6 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("Categories");
                 });
 
-            modelBuilder.Entity("Inventory_Flow.Models.InventoryMovement", b =>
-                {
-                    b.Property<int>("IdInventoryMovement")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdInventoryMovement"));
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreationDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Mode")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("IdInventoryMovement");
-
-                    b.ToTable("InventoryMovements");
-                });
-
             modelBuilder.Entity("Inventory_Flow.Models.Lot", b =>
                 {
                     b.Property<int>("IdLot")
@@ -108,6 +80,34 @@ namespace Inventory_Flow.Migrations
                     b.HasIndex("IdWarehouse");
 
                     b.ToTable("Lots");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.MovementType", b =>
+                {
+                    b.Property<int>("IdMovementType")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdMovementType"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("IdMovementType");
+
+                    b.ToTable("MovementTypes");
                 });
 
             modelBuilder.Entity("Inventory_Flow.Models.Product", b =>

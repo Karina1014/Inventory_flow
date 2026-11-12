@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Inventory_Flow.Models.Dtos;
 
-public class UpdateInventoryMovementDto
+public class CreateMovementTypeDto
 {
     [Required(ErrorMessage = "El Campo Código es requerido")]
     public string Code { get; set; } = string.Empty;

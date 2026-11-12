@@ -1,14 +1,12 @@
-using System.ComponentModel.DataAnnotations;
+using System;
 
 namespace Inventory_Flow.Models.Dtos;
 
-public class CreateInventoryMovementDto
+public class MovementTypeResponseDto
 {
-    [Required(ErrorMessage = "El Campo Código es requerido")]
+    public int IdMovementType { get; set; }
     public string Code { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "El Campo Modo es requerido")]
     public string Mode { get; set; } = string.Empty;
-
     public string Description { get; set; } = string.Empty;
+    public DateTime CreationDate { get; set; }
 }

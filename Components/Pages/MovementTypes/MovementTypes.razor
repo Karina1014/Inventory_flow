@@ -1,10 +1,10 @@
-@page "/movements"
+@page "/movementtypes"
 @layout MainLayout
 @rendermode InteractiveServer
 @using Inventory_Flow.Models
 @using Inventory_Flow.Models.Dtos
 @using Inventory_Flow.Repository.IRepository
-@inject IInventoryMovementRepository MovementRepo
+@inject IMovementTypeRepository MovementRepo
 
 <div class="page-container">
     <div class="page-header">
@@ -21,10 +21,10 @@
     <div class="panel">
         <div class="panel-header">
             <span class="panel-title">Listado de movimientos</span>
-            <span class="record-count">@movements.Count registros</span>
+            <span class="record-count">@movementTypes.Count registros</span>
         </div>
 
-        @if (movements.Count == 0)
+        @if (movementTypes.Count == 0)
         {
             <div class="empty-state">
                 <i class="bi bi-arrow-left-right"></i>
@@ -46,10 +46,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var m in movements)
+                        @foreach (var m in movementTypes)
                         {
                             <tr>
-                                @* <td class="col-id">@m.IdInventoryMovement</td> *@
+                                @* <td class="col-id">@m.IdMovementType</td> *@
                                 <td class="col-code">@m.Code</td>
                                 <td>
                                     <span class="badge">@m.Mode</span>
@@ -147,7 +147,7 @@
             <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body">
-            <p class="delete-msg">¿Deseas eliminar el movimiento <strong>@selectedMovement?.Code</strong>? Esta acción no se puede deshacer.</p>
+            <p class="delete-msg">¿Deseas eliminar el movimiento <strong>@selectedMovementType?.Code</strong>? Esta acción no se puede deshacer.</p>
         </div>
         <div class="modal-footer">
             <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
@@ -159,7 +159,7 @@
 }
 
 @code {
-    private List<InventoryMovement> movements = new();
+    private List<MovementType> movementTypes = new();
 
     private bool showModal;
     private bool showDeleteModal;
@@ -172,18 +172,18 @@
     private string formDescription = string.Empty;
     private string errorMessage = string.Empty;
 
-    private InventoryMovement? selectedMovement;
+    private MovementType? selectedMovementType;
 
     protected override void OnInitialized()
     {
-        LoadMovements();
+        LoadMovementTypes();
     }
 
-    private void LoadMovements()
+    private void LoadMovementTypes()
     {
         try
         {
-            movements = MovementRepo.GetInventoryMovements().ToList();
+            movementTypes = MovementRepo.GetMovementTypes().ToList();
         }
         catch
         {
@@ -199,13 +199,13 @@
         errorMessage = string.Empty;
         showValidation = false;
         isEditing = false;
-        selectedMovement = null;
+        selectedMovementType = null;
         showModal = true;
     }
 
-    private void OpenEdit(InventoryMovement m)
+    private void OpenEdit(MovementType m)
     {
-        selectedMovement = m;
+        selectedMovementType = m;
         formCode = m.Code;
         formMode = m.Mode;
         formDescription = m.Description;
@@ -215,9 +215,9 @@
         showModal = true;
     }
 
-    private void OpenDelete(InventoryMovement m)
+    private void OpenDelete(MovementType m)
     {
-        selectedMovement = m;
+        selectedMovementType = m;
         showDeleteModal = true;
     }
 
@@ -241,19 +241,19 @@
 
         try
         {
-            if (isEditing && selectedMovement != null)
+            if (isEditing && selectedMovementType != null)
             {
-                var dto = new UpdateInventoryMovementDto
+                var dto = new UpdateMovementTypeDto
                 {
                     Code = formCode.Trim(),
                     Mode = formMode.Trim(),
                     Description = formDescription?.Trim() ?? string.Empty
                 };
-                await MovementRepo.UpdateInventoryMovement(selectedMovement.IdInventoryMovement, dto);
+                await MovementRepo.UpdateMovementType(selectedMovementType.IdMovementType, dto);
             }
             else
             {
-                var dto = new CreateInventoryMovementDto
+                var dto = new CreateMovementTypeDto
                 {
                     Code = formCode.Trim(),
                     Mode = formMode.Trim(),
@@ -267,10 +267,10 @@
                     return;
                 }
 
-                await MovementRepo.CreateInventoryMovement(dto);
+                await MovementRepo.CreateMovementType(dto);
             }
 
-            LoadMovements();
+            LoadMovementTypes();
             CloseModal();
         }
         catch
@@ -282,13 +282,13 @@
 
     private void ConfirmDelete()
     {
-        if (selectedMovement == null) return;
+        if (selectedMovementType == null) return;
 
         isSaving = true;
         try
         {
-            MovementRepo.DeleteInventoryMovement(selectedMovement.IdInventoryMovement);
-            LoadMovements();
+            MovementRepo.DeleteMovementType(selectedMovementType.IdMovementType);
+            LoadMovementTypes();
             CloseModal();
         }
         catch
