@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Copyright>© 2026 Universidad Central del Ecuador</Copyright>
   </PropertyGroup>
 
   <ItemGroup>
