@@ -100,6 +100,9 @@
                     <div class="kpi-alert-bar">
                         <div class="kpi-alert-fill" style="width: @(metrics.LowStockProductsCount > 0 ? "100%" : "0%")"></div>
                     </div>
+                    <span class="kpi-hint kpi-hint-threshold">
+                        <i class="bi bi-sliders"></i> Umbral activo: @metrics.ActiveThreshold unidades
+                    </span>
                     <div class="kpi-footer-links">
                         <a href="lots" class="kpi-link-alert">Revisar reposición &rarr;</a>
                         <a href="thresholds" class="kpi-link-config">Ajustar umbral</a>
@@ -116,6 +119,9 @@
                     <div class="panel-header-title">
                         <i class="bi bi-bar-chart-fill text-primary"></i>
                         <span>Stock por categoría</span>
+                        <span class="category-threshold-note">
+                            Umbral activo: <strong>@metrics.ActiveThreshold</strong> u.
+                        </span>
                     </div>
                 </div>
                 <div class="panel-card-body">
@@ -131,13 +137,21 @@
                         <div class="categories-list">
                             @foreach (var cat in metrics.StockByCategory)
                             {
-                                <div class="category-row">
+                                <div class="category-row @(cat.IsLowStock ? "category-row-low" : string.Empty)">
                                     <div class="category-meta">
-                                        <span class="category-name">@cat.CategoryName</span>
-                                        <span class="category-units">@cat.TotalUnits.ToString("N0") unidades (@cat.Percentage%)</span>
+                                        <span class="category-name @(cat.IsLowStock ? "category-name-low" : string.Empty)">@cat.CategoryName</span>
+                                        <span class="category-units @(cat.IsLowStock ? "category-units-low" : string.Empty)">
+                                            @cat.TotalUnits.ToString("N0") unidades (@cat.Percentage%)
+                                            @if (cat.IsLowStock)
+                                            {
+                                                <span class="category-low-tag">
+                                                    <i class="bi bi-exclamation-triangle-fill"></i> bajo umbral
+                                                </span>
+                                            }
+                                        </span>
                                     </div>
-                                    <div class="progress-bar-bg">
-                                        <div class="progress-bar-fill" style="width: @cat.Percentage%"></div>
+                                    <div class="progress-bar-bg @(cat.IsLowStock ? "progress-bar-bg-low" : string.Empty)">
+                                        <div class="progress-bar-fill @(cat.IsLowStock ? "progress-bar-fill-low" : string.Empty)" style="width: @cat.Percentage%"></div>
                                     </div>
                                 </div>
                             }

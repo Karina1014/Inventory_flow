@@ -9,6 +9,7 @@ public class CategoryStockDto
     public string CategoryName { get; set; } = string.Empty;
     public int TotalUnits { get; set; }
     public double Percentage { get; set; }
+    public bool IsLowStock { get; set; }
 }
 
 public class RecentActivityDto
@@ -32,6 +33,9 @@ public class DashboardMetricsDto
     public int LowStockProductsCount { get; set; }
     public int TotalProductsCount { get; set; }
     public int TotalLotsCount { get; set; }
+
+    /// <summary>Umbral de stock vigente (IsActive = true) usado para las alertas.</summary>
+    public int ActiveThreshold { get; set; }
 
     public List<CategoryStockDto> StockByCategory { get; set; } = new();
     public List<RecentActivityDto> RecentActivities { get; set; } = new();

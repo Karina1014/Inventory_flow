@@ -50,6 +50,7 @@ public class DashboardRepository : IDashboardRepository
         var currentThresholdEntity = await _thresholdRepository.GetCurrentThresholdAsync();
 
         int thresholdValue = currentThresholdEntity?.Threshold ?? 5;
+        metrics.ActiveThreshold = thresholdValue;
 
         // Productos con bajo stock (suma de stock en todos los lotes <= umbral dinámico o sin stock)
         var productStocks = activeLots
@@ -79,14 +80,16 @@ public class DashboardRepository : IDashboardRepository
                 .Where(l => l.Product != null && l.Product.IdCategory == cat.IdCategory)
                 .Sum(l => l.Quantity);
 
-            if (unitsInCat > 0 || grandTotalUnits == 0)
+            // Se listan las categorías con stock y también las que están en o por debajo del umbral activo
+            if (unitsInCat > 0 || grandTotalUnits == 0 || unitsInCat <= thresholdValue)
             {
                 categoryStockList.Add(new CategoryStockDto
                 {
                     IdCategory = cat.IdCategory,
                     CategoryName = cat.Name,
                     TotalUnits = unitsInCat,
-                    Percentage = grandTotalUnits > 0 ? Math.Round((double)unitsInCat / grandTotalUnits * 100, 1) : 0
+                    Percentage = grandTotalUnits > 0 ? Math.Round((double)unitsInCat / grandTotalUnits * 100, 1) : 0,
+                    IsLowStock = unitsInCat <= thresholdValue
                 });
             }
         }

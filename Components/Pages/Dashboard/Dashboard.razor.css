@@ -326,6 +326,70 @@
     font-size: 0.78rem;
     color: #64748b;
     font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* Categorías en o por debajo del umbral activo */
+.category-row-low {
+    border-left: 3px solid #dc2626;
+    padding-left: 0.6rem;
+}
+
+.category-name-low {
+    color: #b91c1c;
+}
+
+.category-units-low {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+.category-low-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
+}
+
+.category-threshold-note {
+    margin-left: auto;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 0.15rem 0.5rem;
+    border-radius: 20px;
+}
+
+.category-threshold-note strong {
+    color: #0f172a;
+}
+
+.progress-bar-bg-low {
+    background: #fee2e2;
+}
+
+.progress-bar-fill-low {
+    background: #dc2626;
+}
+
+/* Umbral activo en la tarjeta de bajo stock */
+.kpi-hint-threshold {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: #dc2626;
+    font-weight: 600;
+    margin-bottom: 0.45rem;
 }
 
 .progress-bar-bg {
