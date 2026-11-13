@@ -1,0 +1,264 @@
+@page "/users"
+@layout MainLayout
+@using Inventory_Flow.Models
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository
+@using Inventory_Flow.Repository.IRepository
+@using RoleModel = Inventory_Flow.Models.Role
+@inject IUserRepository UserRepo
+@inject IRoleRepository RoleRepo
+
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="title">Usuarios</h1>
+            <p class="subtitle">Gestión de las cuentas de acceso al sistema</p>
+        </div>
+        <button class="btn-primary" @onclick="OpenCreate">
+            <i class="bi bi-person-plus-fill"></i>
+            Nuevo usuario
+        </button>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Listado de usuarios</span>
+            <span class="record-count">@users.Count registros</span>
+        </div>
+
+        @if (users.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="bi bi-people"></i>
+                <span>No hay usuarios registrados</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Nombre</th>
+                            <th>Usuario</th>
+                            <th>Contraseña</th>
+                            <th>Rol</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var user in users)
+                        {
+                            <tr>
+                                <td class="col-id">@user.IdUser</td>
+                                <td class="col-name">@user.Name</td>
+                                <td>@user.Username</td>
+                                <td class="col-password">
+                                    <span class="password-dots"><i class="bi bi-lock-fill"></i> ••••••••</span>
+                                </td>
+                                <td>
+                                    <span class="badge-role">@(user.Role?.Name ?? "Sin rol")</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (showModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title">Nuevo usuario</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Nombre completo <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-person-fill input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Ej: Janneth Simbaña"
+                           @bind="formName" @bind:event="oninput" />
+                </div>
+                @if (showValidation && string.IsNullOrWhiteSpace(formName))
+                {
+                    <span class="field-error">El nombre es requerido.</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Usuario <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-person-badge input-icon"></i>
+                    <input class="form-input" type="text" placeholder="Ej: janneth.simbana"
+                           @bind="formUserName" @bind:event="oninput" />
+                </div>
+                @if (showValidation && string.IsNullOrWhiteSpace(formUserName))
+                {
+                    <span class="field-error">El usuario es requerido.</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Contraseña <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-shield-lock-fill input-icon"></i>
+                    <input class="form-input" type="@(showPassword ? "text" : "password")"
+                           placeholder="Mínimo 6 caracteres"
+                           @bind="formPassword" @bind:event="oninput" />
+                    <button type="button" class="btn-eye" @onclick="() => showPassword = !showPassword">
+                        <i class="bi @(showPassword ? "bi-eye-slash-fill" : "bi-eye-fill")"></i>
+                    </button>
+                </div>
+                @if (showValidation && string.IsNullOrWhiteSpace(formPassword))
+                {
+                    <span class="field-error">La contraseña es requerida.</span>
+                }
+                else if (showValidation && formPassword.Trim().Length < 6)
+                {
+                    <span class="field-error">La contraseña debe tener al menos 6 caracteres.</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Rol <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-shield-check input-icon"></i>
+                    <select class="form-input" @bind="formIdRole">
+                        <option value="0">Seleccione un rol</option>
+                        @foreach (var role in roles)
+                        {
+                            <option value="@role.IdRole">@role.Name</option>
+                        }
+                    </select>
+                </div>
+                @if (showValidation && formIdRole == 0)
+                {
+                    <span class="field-error">El rol es requerido.</span>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert-error">@errorMessage</div>
+            }
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span>Guardando...</span>
+                }
+                else
+                {
+                    <span>Guardar</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<User> users = new();
+    private List<RoleModel> roles = new();
+
+    private bool showModal;
+    private bool isSaving;
+    private bool showValidation;
+    private bool showPassword;
+
+    private string formName = string.Empty;
+    private string formUserName = string.Empty;
+    private string formPassword = string.Empty;
+    private int formIdRole;
+
+    private string errorMessage = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        try
+        {
+            users = UserRepo.GetUsers().ToList();
+            roles = RoleRepo.GetRoles().OrderBy(r => r.Name).ToList();
+        }
+        catch
+        {
+            errorMessage = "No se pudieron cargar los usuarios.";
+        }
+    }
+
+    private void OpenCreate()
+    {
+        formName = string.Empty;
+        formUserName = string.Empty;
+        formPassword = string.Empty;
+        formIdRole = 0;
+        errorMessage = string.Empty;
+        showValidation = false;
+        showPassword = false;
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        isSaving = false;
+        errorMessage = string.Empty;
+    }
+
+    private async Task Save()
+    {
+        showValidation = true;
+        errorMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(formName)
+            || string.IsNullOrWhiteSpace(formUserName)
+            || string.IsNullOrWhiteSpace(formPassword)
+            || formPassword.Trim().Length < 6
+            || formIdRole == 0)
+        {
+            return;
+        }
+
+        var userName = formUserName.Trim();
+
+        if (!UserRepo.IsUniqueUser(userName))
+        {
+            errorMessage = $"Ya existe un usuario con el nombre \"{userName}\".";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            await UserRepo.Register(new CreateUserDto
+            {
+                UserName = userName,
+                Name = formName.Trim(),
+                Password = formPassword,
+                IdRole = formIdRole
+            });
+
+            LoadData();
+            CloseModal();
+        }
+        catch
+        {
+            errorMessage = "Ocurrió un error al guardar el usuario. Intenta nuevamente.";
+            isSaving = false;
+        }
+    }
+}
