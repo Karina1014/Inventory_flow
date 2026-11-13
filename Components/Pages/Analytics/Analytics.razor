@@ -1,0 +1,328 @@
+@page "/analytics"
+@layout MainLayout
+
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="title">Analítica IA</h1>
+            <p class="subtitle">Interpretación de KPIs y recomendaciones del inventario</p>
+        </div>
+        <button class="btn-secondary" @onclick="ResetForm">
+            <i class="bi bi-plus-lg"></i>
+            <span>Nuevo análisis</span>
+        </button>
+    </div>
+
+    <div class="demo-note">
+        <i class="bi bi-info-circle"></i>
+        <span>Vista de ejemplo · los indicadores y el análisis son datos simulados.</span>
+    </div>
+
+    <!-- Parámetros del análisis (valores fijos editables) -->
+    <div class="panel form-panel">
+        <div class="panel-header">
+            <span class="panel-title">Parámetros del análisis</span>
+            <span class="record-count">Valores por defecto: puedes ajustarlos</span>
+        </div>
+
+        <div class="form-body">
+            <div class="form-grid grid-3">
+                <div class="form-group">
+                    <label class="form-label">Inicio</label>
+                    <input type="date" class="form-input" @bind="startDate" @bind:format="yyyy-MM-dd" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fin</label>
+                    <input type="date" class="form-input" @bind="endDate" @bind:format="yyyy-MM-dd" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Sucursal</label>
+                    <select class="form-input" @bind="warehouse">
+                        @foreach (var option in warehouseOptions)
+                        {
+                            <option value="@option">@option</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-grid grid-4">
+                <div class="form-group">
+                    <label class="form-label">Rotación</label>
+                    <input type="number" step="0.1" class="form-input" @bind="rotation" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quiebre (%)</label>
+                    <input type="number" step="0.1" class="form-input" @bind="stockoutPercent" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Sobre stock (%)</label>
+                    <input type="number" step="0.1" class="form-input" @bind="overstockPercent" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Envejecido (%)</label>
+                    <input type="number" step="0.1" class="form-input" @bind="agingPercent" />
+                </div>
+            </div>
+
+            <div class="form-grid grid-2">
+                <div class="form-group">
+                    <label class="form-label">Margen (%)</label>
+                    <input type="number" step="0.1" class="form-input" @bind="marginPercent" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Demanda</label>
+                    <select class="form-input" @bind="demandTrend">
+                        <option value="Estable">Estable</option>
+                        <option value="Creciente">Creciente</option>
+                        <option value="Decreciente">Decreciente</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn-primary" @onclick="Analyze" disabled="@isLoading">
+                    @if (isLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span>Analizando...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-stars"></i>
+                        <span>Analizar</span>
+                    }
+                </button>
+                <span class="form-hint">
+                    Período de @TotalDays días · @warehouse
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Indicadores del período (datos de ejemplo) -->
+    <div class="real-kpis">
+        @foreach (var kpi in RealKpis)
+        {
+            <div class="real-kpi-card">
+                <span class="real-kpi-label">@kpi.Label</span>
+                <span class="real-kpi-value">@kpi.Value</span>
+                <span class="real-kpi-hint">@kpi.Hint</span>
+            </div>
+        }
+    </div>
+
+    @if (showResult)
+    {
+        <div class="panel summary-panel">
+            <div class="panel-header">
+                <span class="panel-title">Resumen ejecutivo</span>
+                <span class="record-count">Modelo de ejemplo · @DateTime.Now.ToString("dd/MM/yyyy HH:mm")</span>
+            </div>
+            <div class="summary-body">
+                <i class="bi bi-chat-quote-fill summary-icon"></i>
+                <p class="summary-text">@executiveSummary</p>
+            </div>
+        </div>
+
+        <div class="kpi-chips">
+            @foreach (var kpi in demoKpis)
+            {
+                <div class="kpi-chip @kpi.StatusClass">
+                    <span class="kpi-chip-name">@kpi.Name</span>
+                    <span class="kpi-chip-value">@kpi.Value</span>
+                    <span class="kpi-chip-target">Objetivo: @kpi.Target</span>
+                </div>
+            }
+        </div>
+
+        <div class="analytics-columns">
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">Hallazgos</span>
+                    <span class="record-count">@demoFindings.Count</span>
+                </div>
+                <div class="findings-list">
+                    @foreach (var finding in demoFindings)
+                    {
+                        <div class="finding-item">
+                            <span class="sev-badge @finding.SeverityClass">@finding.Severity</span>
+                            <div class="finding-body">
+                                <span class="finding-type">@finding.Type</span>
+                                <p class="finding-message">@finding.Message</p>
+                                <span class="finding-evidence">@finding.Evidence</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">Recomendaciones</span>
+                    <span class="record-count">@demoRecommendations.Count</span>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Acción</th>
+                                <th>Objetivo</th>
+                                <th>Cantidad</th>
+                                <th>Prioridad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var rec in demoRecommendations)
+                            {
+                                <tr>
+                                    <td>@rec.Action</td>
+                                    <td class="col-name">@rec.Target</td>
+                                    <td>@rec.QuantityLabel</td>
+                                    <td><span class="sev-badge @rec.PriorityClass">@rec.Priority</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="panel empty-result">
+            <i class="bi bi-stars"></i>
+            <span class="empty-result-title">Aún no hay análisis</span>
+            <span class="empty-result-text">
+                Ajusta los parámetros y presiona <strong>Analizar</strong> para obtener el resumen, los hallazgos y las recomendaciones.
+            </span>
+        </div>
+    }
+</div>
+
+@code {
+    // Parámetros del formulario: todos con valor fijo, nunca nulos
+    private readonly List<string> warehouseOptions = new()
+    {
+        "Sede Principal",
+        "Sucursal Norte",
+        "Sucursal Sur"
+    };
+
+    private DateTime startDate = DateTime.Today.AddDays(-30);
+    private DateTime endDate = DateTime.Today;
+    private string warehouse = "Sede Principal";
+    private decimal rotation = 1.5m;
+    private decimal stockoutPercent = 5m;
+    private decimal overstockPercent = 10m;
+    private decimal agingPercent = 15m;
+    private decimal marginPercent = 25m;
+    private string demandTrend = "Estable";
+
+    private bool isLoading;
+    private bool showResult;
+
+    private int TotalDays => Math.Max((endDate.Date - startDate.Date).Days, 1);
+
+    private const string executiveSummary =
+        "El inventario está sobreabastecido: el sobre stock real (27,1 %) más que duplica el objetivo del 10 % y " +
+        "40 de 59 productos activos están en o por debajo del umbral de 30 unidades. La rotación fue nula en el " +
+        "período y hay 2 lotes vencidos con stock que conviene dar de baja antes de valorizar el inventario.";
+
+    private List<RealKpi> RealKpis => new()
+    {
+        new("Valor del inventario", "$ 12.268,50", "4.102 unidades"),
+        new("Productos bajo stock", "40", "Umbral activo 30 u."),
+        new("Quiebre real", "1,7%", $"Supuesto {stockoutPercent:0.#}%"),
+        new("Sobre stock real", "27,1%", $"Supuesto {overstockPercent:0.#}%"),
+        new("Vencidos / por vencer", "2 / 0", "Ventana 30 días"),
+        new("Movimientos", "3", "0 salidas · 3 transferencias")
+    };
+
+    private readonly List<DemoFinding> demoFindings = new()
+    {
+        new("Sobre stock", "Alta",
+            "16 productos superan el triple del umbral vigente y concentran 1.240 unidades sin rotación reciente.",
+            "Sobre stock real 27,1 % vs objetivo 10 %."),
+        new("Caducidad", "Alta",
+            "2 lotes con stock ya vencieron y siguen sumando al valor del inventario.",
+            "2 lotes vencidos · 0 lotes por vencer en 30 días."),
+        new("Stock", "Media",
+            "40 productos están en o por debajo del umbral, incluyendo 1 sin ninguna unidad disponible.",
+            "40 de 59 productos activos · umbral 30 u."),
+        new("Rotación", "Media",
+            "No se registraron salidas en el período: la rotación real es 0 frente a 1,5 esperada.",
+            "0 unidades de salida · 3 transferencias."),
+        new("Margen", "Baja",
+            "Sin ventas en el período no es posible medir el margen contra el objetivo de 25 %.",
+            "0 salidas registradas.")
+    };
+
+    private readonly List<DemoRecommendation> demoRecommendations = new()
+    {
+        new("Dar de baja los lotes vencidos y ajustar el inventario", "2 lotes vencidos", "—", "Alta"),
+        new("Reabastecer los productos en el umbral", "40 productos bajo stock", "240 u.", "Alta"),
+        new("Liquidar o redistribuir el excedente", "16 productos con sobre stock", "1.240 u.", "Media"),
+        new("Registrar las salidas del período", "Módulo de movimientos", "—", "Media"),
+        new("Revisar precios de los productos de mayor valor", "Insumos clínicos", "—", "Baja")
+    };
+
+    private readonly List<DemoKpi> demoKpis = new()
+    {
+        new("Rotación", "0,0", "1,5", "chip-critico"),
+        new("Quiebre", "1,7 %", "5 %", "chip-ok"),
+        new("Sobre stock", "27,1 %", "10 %", "chip-critico"),
+        new("Envejecido", "0 %", "15 %", "chip-ok"),
+        new("Margen", "s/d", "25 %", "chip-atencion")
+    };
+
+    private async Task Analyze()
+    {
+        isLoading = true;
+        showResult = false;
+
+        // Simulación: esta vista no llama al backend
+        await Task.Delay(700);
+
+        isLoading = false;
+        showResult = true;
+    }
+
+    private void ResetForm()
+    {
+        startDate = DateTime.Today.AddDays(-30);
+        endDate = DateTime.Today;
+        warehouse = warehouseOptions[0];
+        rotation = 1.5m;
+        stockoutPercent = 5m;
+        overstockPercent = 10m;
+        agingPercent = 15m;
+        marginPercent = 25m;
+        demandTrend = "Estable";
+        showResult = false;
+    }
+
+    private record RealKpi(string Label, string Value, string Hint);
+
+    private record DemoFinding(string Type, string Severity, string Message, string Evidence)
+    {
+        public string SeverityClass => Severity switch
+        {
+            "Alta" => "sev-alta",
+            "Media" => "sev-media",
+            _ => "sev-baja"
+        };
+    }
+
+    private record DemoRecommendation(string Action, string Target, string QuantityLabel, string Priority)
+    {
+        public string PriorityClass => Priority switch
+        {
+            "Alta" => "sev-alta",
+            "Media" => "sev-media",
+            _ => "sev-baja"
+        };
+    }
+
+    private record DemoKpi(string Name, string Value, string Target, string StatusClass);
+}
