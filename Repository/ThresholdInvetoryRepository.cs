@@ -31,10 +31,10 @@ public class ThresholdInvetoryRepository : IThresholdInvetoryRepository
 
     public async Task<ThresholdInvetory?> GetCurrentThresholdAsync()
     {
-        // Se busca el umbral que esté marcado como IsActive = true
         return await _db.ThresholdInvetories
             .Where(t => t.IsActive)
             .OrderByDescending(t => t.UpdatedAt)
+            .ThenByDescending(t => t.IdThresholdInvetory)
             .FirstOrDefaultAsync();
     }
 

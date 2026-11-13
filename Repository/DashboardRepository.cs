@@ -12,10 +12,12 @@ namespace Inventory_Flow.Repository;
 public class DashboardRepository : IDashboardRepository
 {
     private readonly AplicationDbContext _db;
+    private readonly IThresholdInvetoryRepository _thresholdRepository;
 
-    public DashboardRepository(AplicationDbContext db)
+    public DashboardRepository(AplicationDbContext db, IThresholdInvetoryRepository thresholdRepository)
     {
         _db = db;
+        _thresholdRepository = thresholdRepository;
     }
 
     public async Task<DashboardMetricsDto> GetDashboardMetricsAsync()
@@ -43,11 +45,9 @@ public class DashboardRepository : IDashboardRepository
         metrics.TodayMovementsCount = await _db.InventoryMovements
             .CountAsync(m => m.MovementDate >= today && m.MovementDate < tomorrow);
 
-        // 5. Umbral de bajo stock dinámico desde ThresholdInvetories con IsActive = true (por defecto 5 si no hay)
-        var currentThresholdEntity = await _db.ThresholdInvetories
-            .Where(t => t.IsActive)
-            .OrderByDescending(t => t.UpdatedAt)
-            .FirstOrDefaultAsync();
+        // 5. Umbral de bajo stock dinámico: se toma el umbral activo (vigente) del listado
+        //    de ThresholdInvetory a través de su repositorio (por defecto 5 si no hay activo)
+        var currentThresholdEntity = await _thresholdRepository.GetCurrentThresholdAsync();
 
         int thresholdValue = currentThresholdEntity?.Threshold ?? 5;
 
