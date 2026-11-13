@@ -1,9 +1,9 @@
 @page "/"
 @page "/login"
 @layout LoginLayout
-@rendermode InteractiveServer
 @inject IUserRepository UserRepository
 @inject NavigationManager NavigationManager
+@inject Inventory_Flow.Services.CurrentUserService CurrentUserService
 @using Inventory_Flow.Models.Dtos
 @using Inventory_Flow.Repository
 
@@ -94,6 +94,13 @@
             }
             else
             {
+                if (response.User != null)
+                {
+                    CurrentUserService.SetUser(
+                        response.User.Name ?? response.User.UserName,
+                        response.User.UserName,
+                        response.User.Role ?? string.Empty);
+                }
                 NavigationManager.NavigateTo("/dashboard");
             }
         }

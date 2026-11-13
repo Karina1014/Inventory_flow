@@ -1,5 +1,7 @@
 @inherits LayoutComponentBase
 @inject NavigationManager NavigationManager
+@inject Inventory_Flow.Services.CurrentUserService CurrentUserService
+@implements IDisposable
 
 <div class="app-layout">
     <aside class="sidebar">
@@ -8,35 +10,11 @@
             <span class="brand-subtitle">Inventario</span>
         </div>
 
-        <div class="user-box">
-            <div class="avatar">
-                <i class="bi bi-person-fill"></i>
-            </div>
-            <div class="user-meta">
-                <span class="name">Karina Simbaña</span>
-                <span class="role">Admin</span>
-            </div>
-        </div>
-
         <nav class="nav-links">
             <NavLink class="nav-item" href="dashboard" Match="NavLinkMatch.All">
                 <i class="bi bi-grid-fill"></i>
                 <span>Dashboard</span>
             </NavLink>
-
-            <details class="nav-group" open>
-                <summary class="nav-group-title">
-                    <span>Operaciones</span>
-                    <i class="bi bi-chevron-down nav-group-chevron"></i>
-                </summary>
-
-                <div class="nav-submenu">
-                    <NavLink class="nav-item nav-subitem" href="movements">
-                        <i class="bi bi-arrow-left-right"></i>
-                        <span>Movimientos</span>
-                    </NavLink>
-                </div>
-            </details>
 
             <details class="nav-group" open>
                 <summary class="nav-group-title">
@@ -74,28 +52,57 @@
                         <i class="bi bi-sliders"></i>
                         <span>Umbral de Stock</span>
                     </NavLink>
+                    <NavLink class="nav-item nav-subitem" href="lots">
+                        <i class="bi bi-boxes"></i>
+                        <span>Lotes</span>
+                    </NavLink>
                 </div>
             </details>
 
-            <NavLink class="nav-item" href="lots">
-                <i class="bi bi-boxes"></i>
-                <span>Lotes</span>
-            </NavLink>
-        </nav>
+            <details class="nav-group" open>
+                <summary class="nav-group-title">
+                    <span>Operaciones</span>
+                    <i class="bi bi-chevron-down nav-group-chevron"></i>
+                </summary>
 
-        <div class="sidebar-bottom">
-            <NavLink class="btn-logout" href="login">
-                <i class="bi bi-box-arrow-right"></i>
-                <span>Salir</span>
-            </NavLink>
-        </div>
+                <div class="nav-submenu">
+                    <NavLink class="nav-item nav-subitem" href="movements">
+                        <i class="bi bi-arrow-left-right"></i>
+                        <span>Movimientos</span>
+                    </NavLink>
+                </div>
+            </details>
+        </nav>
     </aside>
 
     <div class="main-wrapper">
         <header class="topbar">
-            <span class="page-title">Panel de Control</span>
-            <div class="topbar-user">
-                <span class="user-badge">En línea</span>
+            <div class="topbar-left">
+                <span class="page-title">Panel de Control</span>
+            </div>
+
+            <div class="topbar-right">
+                <!-- Tarjeta de Usuario estilizada con clases estándar -->
+                <div class="user-profile-badge">
+                    <div class="user-avatar-circle">
+                        @(GetInitials(CurrentUserService.Name))
+                    </div>
+                    <div class="user-text-meta">
+                        <span class="user-display-name">@CurrentUserService.Name</span>
+                        <div class="user-status-line">
+                            <span class="online-dot"></span>
+                            <span class="user-role-label">@GetRoleLabel(CurrentUserService.Role)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-v-divider"></div>
+
+                <!-- Botón Salir Corporativo -->
+                <button type="button" class="btn-logout-header" @onclick="Logout" title="Cerrar sesión">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Salir</span>
+                </button>
             </div>
         </header>
 
@@ -104,3 +111,45 @@
         </main>
     </div>
 </div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        CurrentUserService.OnChange += StateHasChanged;
+
+        // Redirigir al login si el usuario no está autenticado
+        if (!CurrentUserService.IsAuthenticated)
+        {
+            NavigationManager.NavigateTo("/login", replace: true);
+        }
+    }
+
+    private void Logout()
+    {
+        CurrentUserService.Clear();
+        NavigationManager.NavigateTo("/login");
+    }
+
+    private string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "??";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+        {
+            return $"{char.ToUpper(parts[0][0])}{char.ToUpper(parts[1][0])}";
+        }
+        return name.Substring(0, Math.Min(2, name.Length)).ToUpper();
+    }
+
+    private string GetRoleLabel(string role) => role switch
+    {
+        "Admin"    => "Administrador",
+        "AppUser"  => "Usuario",
+        _          => string.IsNullOrWhiteSpace(role) ? "Sin rol" : role
+    };
+
+    public void Dispose()
+    {
+        CurrentUserService.OnChange -= StateHasChanged;
+    }
+}

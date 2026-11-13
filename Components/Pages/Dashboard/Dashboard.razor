@@ -1,10 +1,10 @@
 @page "/dashboard"
 @layout MainLayout
-@rendermode InteractiveServer
 @using Inventory_Flow.Models.Dtos
 @using Inventory_Flow.Repository.IRepository
 @inject IDashboardRepository DashboardRepo
 @inject NavigationManager NavigationManager
+@inject Inventory_Flow.Services.CurrentUserService CurrentUserService
 
 <div class="dashboard-container">
     @if (isLoading)
@@ -22,7 +22,7 @@
         <div class="welcome-banner">
             <div class="banner-content">
                 <span class="banner-pill">Panel de control</span>
-                <h1 class="banner-greeting">@GreetingText, Karina 👋</h1>
+                <h1 class="banner-greeting">@GreetingText, @(CurrentUserService.Name) 👋</h1>
                 <p class="banner-subtitle">Este es el resumen de tu inventario, movimientos y stock al día de hoy.</p>
                 <div class="banner-actions">
                     <button class="btn-banner btn-banner-white" @onclick='() => NavigationManager.NavigateTo("products")'>
