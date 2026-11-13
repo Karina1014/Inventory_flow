@@ -259,6 +259,28 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("Roles");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.ThresholdInvetory", b =>
+                {
+                    b.Property<int>("IdThresholdInvetory")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdThresholdInvetory"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Threshold")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("IdThresholdInvetory");
+
+                    b.ToTable("ThresholdInvetories");
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.User", b =>
                 {
                     b.Property<int>("IdUser")

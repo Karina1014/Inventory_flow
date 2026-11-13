@@ -19,6 +19,7 @@ public class AplicationDbContext: DbContext
     public DbSet<MovementType> MovementTypes {get;set;}
     public DbSet<InventoryMovement> InventoryMovements {get;set;}
     public DbSet<InventoryMovementDetail> InventoryMovementDetails {get;set;}
+    public DbSet<ThresholdInvetory> ThresholdInvetories { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

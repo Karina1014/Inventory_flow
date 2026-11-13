@@ -43,7 +43,14 @@ public class DashboardRepository : IDashboardRepository
         metrics.TodayMovementsCount = await _db.InventoryMovements
             .CountAsync(m => m.MovementDate >= today && m.MovementDate < tomorrow);
 
-        // 5. Productos con bajo stock (suma de stock en todos los lotes <= 5 unidades o sin stock)
+        // 5. Umbral de bajo stock dinámico desde ThresholdInvetories (por defecto 5 si la tabla está vacía)
+        var currentThresholdEntity = await _db.ThresholdInvetories
+            .OrderByDescending(t => t.IdThresholdInvetory)
+            .FirstOrDefaultAsync();
+
+        int thresholdValue = currentThresholdEntity?.Threshold ?? 5;
+
+        // Productos con bajo stock (suma de stock en todos los lotes <= umbral dinámico o sin stock)
         var productStocks = activeLots
             .GroupBy(l => l.IdProduct)
             .ToDictionary(g => g.Key, g => g.Sum(l => l.Quantity));
@@ -53,7 +60,7 @@ public class DashboardRepository : IDashboardRepository
         foreach (var prod in activeProducts)
         {
             int currentStock = productStocks.TryGetValue(prod.IdProduct, out int qty) ? qty : 0;
-            if (currentStock <= 5)
+            if (currentStock <= thresholdValue)
             {
                 lowStockCount++;
             }
