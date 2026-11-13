@@ -3,9 +3,11 @@
 @using Inventory_Flow.Models
 @using Inventory_Flow.Models.Dtos
 @using Inventory_Flow.Repository.IRepository
+@using Inventory_Flow.Services
 @inject ILotRepository LotRepo
 @inject IProductRepository ProductRepo
 @inject IWarehouseRepository WarehouseRepo
+@inject IConfiguration Configuration
 
 <div class="page-container">
     <div class="page-header">
@@ -22,14 +24,25 @@
     <div class="panel">
         <div class="panel-header">
             <span class="panel-title">Listado de lotes</span>
-            <span class="record-count">@lots.Count registros</span>
+            <div class="expiry-filters">
+                <button class="filter-pill @(expFilter == "all" ? "filter-pill-active" : "")" @onclick='() => expFilter = "all"'>
+                    Todos (@lots.Count)
+                </button>
+                <button class="filter-pill @(expFilter == "soon" ? "filter-pill-active" : "")" @onclick='() => expFilter = "soon"'>
+                    Por vencer (@CountExpiringSoon())
+                </button>
+                <button class="filter-pill @(expFilter == "expired" ? "filter-pill-active" : "")" @onclick='() => expFilter = "expired"'>
+                    Vencidos (@CountExpired())
+                </button>
+                <span class="record-count">@FilteredLots.Count() registros</span>
+            </div>
         </div>
 
-        @if (lots.Count == 0)
+        @if (!FilteredLots.Any())
         {
             <div class="empty-state">
                 <i class="bi bi-boxes"></i>
-                <span>No hay lotes registrados</span>
+                <span>@(lots.Count == 0 ? "No hay lotes registrados" : "No hay lotes en este filtro")</span>
             </div>
         }
         else
@@ -44,20 +57,38 @@
                             <th>N° Lote</th>
                             <th>Cantidad</th>
                             <th>Caducidad</th>
+                            <th>Estado</th>
                             <th>Creado</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var l in lots)
+                        @foreach (var l in FilteredLots)
                         {
-                            <tr>
+                            <tr class="@RowClass(l)">
                                 <td class="col-id">@l.IdLot</td>
                                 <td class="col-name">@GetProductName(l.IdProduct)</td>
                                 <td>@GetWarehouseName(l.IdWarehouse)</td>
                                 <td>@l.LotNumber</td>
                                 <td>@l.Quantity</td>
-                                <td class="col-date">@l.ExpirationDate.ToString("dd/MM/yyyy")</td>
+                                <td class="col-date">
+                                    @l.ExpirationDate.ToString("dd/MM/yyyy")
+                                    <span class="exp-days">@GetDaysLabel(l)</span>
+                                </td>
+                                <td>
+                                    @if (IsExpired(l))
+                                    {
+                                        <span class="badge badge-expired"><i class="bi bi-x-circle-fill"></i> Vencido</span>
+                                    }
+                                    else if (IsExpiringSoon(l))
+                                    {
+                                        <span class="badge badge-soon"><i class="bi bi-hourglass-split"></i> Por vencer</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-valid"><i class="bi bi-check-circle-fill"></i> Vigente</span>
+                                    }
+                                </td>
                                 <td class="col-date">@l.CreationDate.ToString("dd/MM/yyyy")</td>
                                 <td class="col-actions">
                                     <button class="action-btn btn-edit" @onclick="() => OpenEdit(l)" title="Editar">
@@ -217,9 +248,38 @@
 
     private Lot? selectedLot;
 
+    private int alertDays = LotExpiration.DefaultAlertDays;
+    private string expFilter = "all";
+
     protected override void OnInitialized()
     {
+        alertDays = LotExpiration.GetAlertDays(Configuration);
         LoadData();
+    }
+
+    private IEnumerable<Lot> FilteredLots => expFilter switch
+    {
+        "soon" => lots.Where(IsExpiringSoon),
+        "expired" => lots.Where(IsExpired),
+        _ => lots
+    };
+
+    private int CountExpiringSoon() => lots.Count(IsExpiringSoon);
+    private int CountExpired() => lots.Count(IsExpired);
+
+    private bool IsExpired(Lot l) => LotExpiration.DaysToExpire(l.ExpirationDate) < 0;
+
+    private bool IsExpiringSoon(Lot l) =>
+        !IsExpired(l) && LotExpiration.DaysToExpire(l.ExpirationDate) <= alertDays;
+
+    private string RowClass(Lot l) => IsExpired(l) ? "row-expired" : IsExpiringSoon(l) ? "row-soon" : string.Empty;
+
+    private string GetDaysLabel(Lot l)
+    {
+        var days = LotExpiration.DaysToExpire(l.ExpirationDate);
+        if (days < 0) return $"venció hace {Math.Abs(days)} d";
+        if (days == 0) return "vence hoy";
+        return $"en {days} d";
     }
 
     private void LoadData()

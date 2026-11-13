@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Inventory_Flow.Data;
 using Inventory_Flow.Models.Dtos;
 using Inventory_Flow.Repository.IRepository;
+using Inventory_Flow.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inventory_Flow.Repository;
@@ -13,11 +14,13 @@ public class DashboardRepository : IDashboardRepository
 {
     private readonly AplicationDbContext _db;
     private readonly IThresholdInvetoryRepository _thresholdRepository;
+    private readonly IConfiguration _configuration;
 
-    public DashboardRepository(AplicationDbContext db, IThresholdInvetoryRepository thresholdRepository)
+    public DashboardRepository(AplicationDbContext db, IThresholdInvetoryRepository thresholdRepository, IConfiguration configuration)
     {
         _db = db;
         _thresholdRepository = thresholdRepository;
+        _configuration = configuration;
     }
 
     public async Task<DashboardMetricsDto> GetDashboardMetricsAsync()
@@ -69,7 +72,31 @@ public class DashboardRepository : IDashboardRepository
         }
         metrics.LowStockProductsCount = lowStockCount;
 
-        // 6. Stock por Categoría (con porcentaje respecto al total)
+        // 6. Lotes próximos a caducar (ventana configurable, 30 días por defecto)
+        var alertDays = LotExpiration.GetAlertDays(_configuration);
+        metrics.ExpirationAlertDays = alertDays;
+
+        var expiringLots = await _db.Lots
+            .Include(l => l.Product)
+            .Include(l => l.Warehouse)
+            .Where(l => l.Quantity > 0 && l.ExpirationDate < DateTime.Today.AddDays(alertDays + 1))
+            .OrderBy(l => l.ExpirationDate)
+            .ToListAsync();
+
+        metrics.ExpiredLotsCount = expiringLots.Count(l => l.ExpirationDate.Date < DateTime.Today);
+        metrics.ExpiringLotsCount = expiringLots.Count(l => l.ExpirationDate.Date >= DateTime.Today);
+        metrics.ExpiringSoonLots = expiringLots.Take(5).Select(l => new ExpiringLotDto
+        {
+            IdLot = l.IdLot,
+            ProductName = l.Product?.Name ?? "Producto",
+            LotNumber = l.LotNumber,
+            WarehouseName = l.Warehouse?.Name ?? "-",
+            ExpirationDate = l.ExpirationDate,
+            DaysToExpire = LotExpiration.DaysToExpire(l.ExpirationDate),
+            Quantity = l.Quantity
+        }).ToList();
+
+        // 7. Stock por Categoría (con porcentaje respecto al total)
         var categories = await _db.Categories.ToListAsync();
         var categoryStockList = new List<CategoryStockDto>();
         int grandTotalUnits = activeLots.Sum(l => l.Quantity);
@@ -95,7 +122,7 @@ public class DashboardRepository : IDashboardRepository
         }
         metrics.StockByCategory = categoryStockList.OrderByDescending(c => c.TotalUnits).ToList();
 
-        // 7. Actividad Reciente (Últimos 6 movimientos)
+        // 8. Actividad Reciente (Últimos 6 movimientos)
         var recentMovements = await _db.InventoryMovements
             .Include(m => m.MovementType)
             .Include(m => m.User)

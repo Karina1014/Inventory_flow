@@ -173,6 +173,79 @@
     color: #b91c1c;
 }
 
+/* Estado de caducidad */
+.badge-expired {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.badge-soon {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.badge-valid {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.badge i {
+    margin-right: 0.25rem;
+}
+
+.exp-days {
+    display: block;
+    font-size: 0.72rem;
+    color: #94a3b8;
+}
+
+.data-table tbody tr.row-expired td {
+    background: #fff5f5;
+}
+
+.data-table tbody tr.row-expired td:first-child {
+    box-shadow: inset 3px 0 0 #dc2626;
+}
+
+.data-table tbody tr.row-soon td {
+    background: #fffbeb;
+}
+
+.data-table tbody tr.row-soon td:first-child {
+    box-shadow: inset 3px 0 0 #f59e0b;
+}
+
+/* Filtros de caducidad */
+.expiry-filters {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-pill {
+    padding: 0.3rem 0.7rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    background: #ffffff;
+    color: #64748b;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.filter-pill:hover {
+    border-color: #cbd5e1;
+    color: #334155;
+}
+
+.filter-pill-active {
+    background: #0077b6;
+    border-color: #0077b6;
+    color: #ffffff;
+}
+
 .action-btn {
     display: inline-flex;
     align-items: center;

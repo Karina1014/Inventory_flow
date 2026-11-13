@@ -24,6 +24,28 @@ public class LotRepository : ILotRepository
             .ToList();
     }
 
+    public ICollection<Lot> GetExpiringLots(int days)
+    {
+        var limit = DateTime.Today.AddDays(days + 1);
+        return _db.Lots
+            .Include(l => l.Product)
+            .Include(l => l.Warehouse)
+            .Where(l => l.Quantity > 0 && l.ExpirationDate < limit)
+            .OrderBy(l => l.ExpirationDate)
+            .ToList();
+    }
+
+    public ICollection<Lot> GetExpiredLots()
+    {
+        var today = DateTime.Today;
+        return _db.Lots
+            .Include(l => l.Product)
+            .Include(l => l.Warehouse)
+            .Where(l => l.Quantity > 0 && l.ExpirationDate < today)
+            .OrderBy(l => l.ExpirationDate)
+            .ToList();
+    }
+
     public Lot? GetLot(int IdLot)
     {
         return _db.Lots.FirstOrDefault(l => l.IdLot == IdLot);

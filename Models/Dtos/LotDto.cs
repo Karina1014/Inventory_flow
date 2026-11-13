@@ -11,4 +11,9 @@ public class LotDto
     public int Quantity { get; set; }
     public DateTime ExpirationDate { get; set; }
     public DateTime CreationDate { get; set; }
+
+    /// Días restantes hasta la caducidad (negativo si ya venció)
+    public int DaysToExpire { get; set; }
+    public bool IsExpired { get; set; }
+    public bool IsExpiringSoon { get; set; }
 }

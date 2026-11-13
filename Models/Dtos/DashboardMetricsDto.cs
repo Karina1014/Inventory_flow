@@ -25,6 +25,17 @@ public class RecentActivityDto
     public bool IsAlert { get; set; }
 }
 
+public class ExpiringLotDto
+{
+    public int IdLot { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public string LotNumber { get; set; } = string.Empty;
+    public string WarehouseName { get; set; } = string.Empty;
+    public DateTime ExpirationDate { get; set; }
+    public int DaysToExpire { get; set; }
+    public int Quantity { get; set; }
+}
+
 public class DashboardMetricsDto
 {
     public decimal TotalInventoryValue { get; set; }
@@ -36,6 +47,13 @@ public class DashboardMetricsDto
 
     /// <summary>Umbral de stock vigente (IsActive = true) usado para las alertas.</summary>
     public int ActiveThreshold { get; set; }
+
+    /// <summary>Ventana de aviso de caducidad en días.</summary>
+    public int ExpirationAlertDays { get; set; }
+    public int ExpiringLotsCount { get; set; }
+    public int ExpiredLotsCount { get; set; }
+
+    public List<ExpiringLotDto> ExpiringSoonLots { get; set; } = new();
 
     public List<CategoryStockDto> StockByCategory { get; set; } = new();
     public List<RecentActivityDto> RecentActivities { get; set; } = new();

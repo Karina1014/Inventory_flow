@@ -8,7 +8,7 @@
 .sidebar {
     width: 240px;
     min-width: 240px;
-    background-color: #03045e;
+    background: linear-gradient(180deg, #0077b6 0%, #033f63 100%);
     color: #ffffff;
     display: flex;
     flex-direction: column;
@@ -50,14 +50,15 @@
 ::deep .nav-item {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.6rem 0.85rem;
-    border-radius: 6px;
-    color: #cbd5e1;
+    gap: 0.7rem;
+    padding: 0.62rem 0.9rem;
+    border-radius: 8px;
+    border-left: 3px solid transparent;
+    color: rgba(255, 255, 255, 0.9);
     text-decoration: none;
     font-size: 0.88rem;
     font-weight: 500;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 ::deep .nav-item i {
@@ -66,12 +67,13 @@
 }
 
 ::deep .nav-item:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.1);
     color: #ffffff;
 }
 
 ::deep .nav-item.active {
-    background: #0077b6;
+    background: rgba(255, 255, 255, 0.16);
+    border-left-color: #38b6ff;
     color: #ffffff;
     font-weight: 600;
 }
@@ -121,7 +123,7 @@
 }
 
 ::deep .nav-subitem {
-    padding: 0.5rem 0.75rem;
+    padding: 0.52rem 0.75rem;
     font-size: 0.84rem;
 }
 
@@ -259,6 +261,7 @@
     .app-layout {
         flex-direction: column;
     }
+
     .sidebar {
         width: 100%;
         height: auto;

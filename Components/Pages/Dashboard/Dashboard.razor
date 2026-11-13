@@ -18,25 +18,20 @@
     }
     else
     {
-        <!-- 1. Banner Principal de Bienvenida -->
+        <!-- 1. Encabezado de bienvenida (compacto) -->
         <div class="welcome-banner">
             <div class="banner-content">
-                <span class="banner-pill">Panel de control</span>
                 <h1 class="banner-greeting">@GreetingText, @(CurrentUserService.Name) 👋</h1>
-                <p class="banner-subtitle">Este es el resumen de tu inventario, movimientos y stock al día de hoy.</p>
-                <div class="banner-actions">
-                    <button class="btn-banner btn-banner-white" @onclick='() => NavigationManager.NavigateTo("products")'>
-                        <i class="bi bi-box-seam"></i> Ver productos
-                    </button>
-                    <button class="btn-banner btn-banner-ghost" @onclick='() => NavigationManager.NavigateTo("movements")'>
-                        <i class="bi bi-arrow-left-right"></i> Registrar movimiento
-                    </button>
-                </div>
+                <p class="banner-subtitle">Resumen de inventario, movimientos y stock de hoy.</p>
             </div>
-            <div class="banner-graphic">
-                <div class="graphic-circle">
-                    <i class="bi bi-graph-up-arrow"></i>
-                </div>
+
+            <div class="banner-actions">
+                <button class="btn-banner btn-banner-white" @onclick='() => NavigationManager.NavigateTo("products")'>
+                    <i class="bi bi-box-seam"></i> Ver productos
+                </button>
+                <button class="btn-banner btn-banner-ghost" @onclick='() => NavigationManager.NavigateTo("movements")'>
+                    <i class="bi bi-arrow-left-right"></i> Registrar movimiento
+                </button>
             </div>
         </div>
 
@@ -108,6 +103,71 @@
                         <a href="thresholds" class="kpi-link-config">Ajustar umbral</a>
                     </div>
                 </div>
+            </div>
+
+            <!-- Lotes por Caducar -->
+            <div class="kpi-card @(metrics.ExpiringLotsCount > 0 || metrics.ExpiredLotsCount > 0 ? "kpi-card-warning" : "")">
+                <div class="kpi-header">
+                    <div class="kpi-icon icon-amber">
+                        <i class="bi bi-calendar-x"></i>
+                    </div>
+                </div>
+                <div class="kpi-body">
+                    <span class="kpi-title">Lotes por caducar</span>
+                    <span class="kpi-value @(metrics.ExpiringLotsCount > 0 ? "text-warning-emphasis" : "")">@metrics.ExpiringLotsCount</span>
+                    <span class="kpi-hint">Próximos @metrics.ExpirationAlertDays días</span>
+                    <div class="kpi-footer-links">
+                        <a href="lots" class="kpi-link-warning">Ver lotes &rarr;</a>
+                        <span class="kpi-hint">@metrics.ExpiredLotsCount vencidos</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lotes próximos a caducar -->
+        <div class="panel-card">
+            <div class="panel-card-header">
+                <div class="panel-header-title">
+                    <i class="bi bi-calendar-x text-danger"></i>
+                    <span>Próximos a caducar</span>
+                    <span class="category-threshold-note">
+                        Ventana: <strong>@metrics.ExpirationAlertDays</strong> días
+                    </span>
+                </div>
+            </div>
+            <div class="panel-card-body">
+                @if (metrics.ExpiringSoonLots.Count == 0)
+                {
+                    <div class="empty-analytics">
+                        <i class="bi bi-check2-circle"></i>
+                        <span>No hay lotes próximos a caducar en los siguientes @metrics.ExpirationAlertDays días</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="expiry-list">
+                        @foreach (var lot in metrics.ExpiringSoonLots)
+                        {
+                            <div class="expiry-item @(lot.DaysToExpire < 0 ? "expiry-item-expired" : "")">
+                                <div class="expiry-icon @(lot.DaysToExpire < 0 ? "expiry-icon-expired" : "expiry-icon-soon")">
+                                    <i class="bi @(lot.DaysToExpire < 0 ? "bi-x-octagon-fill" : "bi-hourglass-split")"></i>
+                                </div>
+                                <div class="expiry-info">
+                                    <div class="expiry-title">
+                                        <strong>@lot.ProductName</strong>
+                                        <span class="expiry-lot">Lote @lot.LotNumber</span>
+                                    </div>
+                                    <span class="expiry-meta">
+                                        @lot.WarehouseName · @lot.Quantity u. · vence @lot.ExpirationDate.ToString("dd/MM/yyyy")
+                                    </span>
+                                </div>
+                                <span class="expiry-days @(lot.DaysToExpire < 0 ? "expiry-days-expired" : "")">
+                                    @GetExpiryLabel(lot.DaysToExpire)
+                                </span>
+                            </div>
+                        }
+                    </div>
+                }
             </div>
         </div>
 
@@ -219,6 +279,13 @@
 @code {
     private DashboardMetricsDto metrics = new();
     private bool isLoading = true;
+
+    private static string GetExpiryLabel(int days) => days switch
+    {
+        < 0 => $"Vencido hace {Math.Abs(days)} d",
+        0 => "Vence hoy",
+        _ => $"En {days} d"
+    };
 
     private string GreetingText
     {
