@@ -1,0 +1,257 @@
+.page-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.subtitle {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 0.25rem 0 0 0;
+}
+
+/* Resumen */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.85rem;
+}
+
+.summary-card {
+    background: #ffffff;
+    border: 1px solid #eef2f7;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.summary-label {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.summary-value {
+    font-size: 1.3rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: #0f172a;
+}
+
+.summary-hint {
+    font-size: 0.72rem;
+    color: #94a3b8;
+}
+
+/* Panel */
+.panel {
+    background: #ffffff;
+    border: 1px solid #eef2f7;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.panel-header {
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.panel-title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.filters {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.filter-input {
+    padding: 0.4rem 0.65rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    color: #1e293b;
+    background: #ffffff;
+    outline: none;
+}
+
+.filter-input:focus {
+    border-color: #0077b6;
+    box-shadow: 0 0 0 3px rgba(0, 119, 182, 0.12);
+}
+
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: #475569;
+    cursor: pointer;
+    user-select: none;
+}
+
+.record-count {
+    font-size: 0.78rem;
+    color: #94a3b8;
+}
+
+/* Tabla */
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+}
+
+.data-table thead tr {
+    background: #f8fafc;
+}
+
+.data-table th {
+    padding: 0.7rem 1rem;
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.data-table td {
+    padding: 0.7rem 1rem;
+    color: #1e293b;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+
+.col-name {
+    font-weight: 500;
+}
+
+.col-code {
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.col-date {
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.col-number {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Fila por sucursal */
+.group-row td {
+    background: #f1f8fc;
+    color: #0b4a6f;
+    font-size: 0.86rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.group-row i {
+    margin-right: 0.35rem;
+    color: #0077b6;
+}
+
+.group-meta {
+    margin-left: 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #64748b;
+}
+
+/* Subtotal por producto */
+.subtotal-row td {
+    background: #fcfdff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #475569;
+    font-style: italic;
+}
+
+/* Vencidos */
+.row-expired td {
+    background: #fff5f5;
+}
+
+.row-expired td:first-child {
+    box-shadow: inset 3px 0 0 #dc2626;
+}
+
+.exp-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    margin-left: 0.35rem;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-size: 0.66rem;
+    font-weight: 700;
+    padding: 0.08rem 0.35rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+/* Total general */
+.data-table tfoot td {
+    padding: 0.8rem 1rem;
+    font-weight: 700;
+    color: #0f172a;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+}
+
+/* Vacío */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 3rem 1rem;
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+
+.empty-state i {
+    font-size: 2rem;
+    color: #cbd5e1;
+}

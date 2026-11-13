@@ -1,0 +1,203 @@
+@page "/stockreport"
+@layout MainLayout
+@using Inventory_Flow.Models
+@using Inventory_Flow.Repository.IRepository
+@inject ILotRepository LotRepo
+@inject IWarehouseRepository WarehouseRepo
+
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="title">Reporte de Stock</h1>
+            <p class="subtitle">Existencias por sucursal, producto y lote</p>
+        </div>
+    </div>
+
+    <!-- Resumen -->
+    <div class="summary-cards">
+        <div class="summary-card">
+            <span class="summary-label">Sucursales</span>
+            <span class="summary-value">@WarehouseCount</span>
+            <span class="summary-hint">Con existencias</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-label">Productos</span>
+            <span class="summary-value">@ProductCount</span>
+            <span class="summary-hint">Distintos con stock</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-label">Lotes</span>
+            <span class="summary-value">@LotCount</span>
+            <span class="summary-hint">Con cantidad registrada</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-label">Unidades</span>
+            <span class="summary-value">@TotalUnits.ToString("N0")</span>
+            <span class="summary-hint">Total en stock</span>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Detalle de existencias</span>
+            <div class="filters">
+                <select class="filter-input" @bind="warehouseFilter" @bind:after="OnFilterChanged">
+                    <option value="0">Todas las sucursales</option>
+                    @foreach (var w in warehouses)
+                    {
+                        <option value="@w.IdWarehouse">@w.Name</option>
+                    }
+                </select>
+                <label class="checkbox-label">
+                    <input type="checkbox" @bind="includeEmpty" @bind:after="OnFilterChanged" />
+                    <span>Incluir lotes sin stock</span>
+                </label>
+                <span class="record-count">@FilteredLots.Count lotes</span>
+            </div>
+        </div>
+
+        @if (groups.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="bi bi-inboxes"></i>
+                <span>No hay existencias para los filtros seleccionados</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Código</th>
+                            <th>Lote</th>
+                            <th>Caducidad</th>
+                            <th class="col-number">Cantidad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var group in groups)
+                        {
+                            <tr class="group-row">
+                                <td colspan="4">
+                                    <i class="bi bi-building"></i>
+                                    <strong>@group.WarehouseName</strong>
+                                    <span class="group-meta">
+                                        @group.ProductCount productos · @group.Lots.Count lotes
+                                    </span>
+                                </td>
+                                <td class="col-number"><strong>@group.TotalUnits.ToString("N0")</strong></td>
+                            </tr>
+
+                            @foreach (var product in group.Products)
+                            {
+                                @foreach (var lot in product.Lots)
+                                {
+                                    <tr class="@(IsExpired(lot) ? "row-expired" : string.Empty)">
+                                        <td class="col-name">@product.ProductName</td>
+                                        <td class="col-code">@product.ProductCode</td>
+                                        <td>@lot.LotNumber</td>
+                                        <td class="col-date">
+                                            @lot.ExpirationDate.ToString("dd/MM/yyyy")
+                                            @if (IsExpired(lot))
+                                            {
+                                                <span class="exp-tag"><i class="bi bi-exclamation-triangle-fill"></i> vencido</span>
+                                            }
+                                        </td>
+                                        <td class="col-number">@lot.Quantity.ToString("N0")</td>
+                                    </tr>
+                                }
+                                <tr class="subtotal-row">
+                                    <td colspan="4">Subtotal @product.ProductName (@product.Lots.Count lotes)</td>
+                                    <td class="col-number">@product.TotalUnits.ToString("N0")</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4">Total general</td>
+                            <td class="col-number">@TotalUnits.ToString("N0")</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Lot> lots = new();
+    private List<Warehouse> warehouses = new();
+    private List<StockGroup> groups = new();
+
+    private int warehouseFilter = 0;
+    private bool includeEmpty;
+
+    private int WarehouseCount => groups.Count;
+    private int ProductCount => groups.Sum(g => g.ProductCount);
+    private int LotCount => groups.Sum(g => g.Lots.Count);
+    private int TotalUnits => groups.Sum(g => g.TotalUnits);
+
+    private List<Lot> FilteredLots => lots
+        .Where(l => warehouseFilter == 0 || l.IdWarehouse == warehouseFilter)
+        .Where(l => includeEmpty || l.Quantity > 0)
+        .ToList();
+
+    protected override void OnInitialized()
+    {
+        warehouses = WarehouseRepo.GetWarehouses().ToList();
+        lots = LotRepo.GetLots().ToList();
+        BuildGroups();
+    }
+
+    private void OnFilterChanged() => BuildGroups();
+
+    private void BuildGroups()
+    {
+        groups = FilteredLots
+            .GroupBy(l => new { l.IdWarehouse, WarehouseName = l.Warehouse?.Name ?? "Sin sucursal" })
+            .Select(warehouseGroup => new StockGroup
+            {
+                WarehouseName = warehouseGroup.Key.WarehouseName,
+                Lots = warehouseGroup.ToList(),
+                Products = warehouseGroup
+                    .GroupBy(l => new
+                    {
+                        l.IdProduct,
+                        ProductName = l.Product?.Name ?? "Producto",
+                        ProductCode = l.Product?.Code ?? "-"
+                    })
+                    .OrderBy(p => p.Key.ProductName)
+                    .Select(productGroup => new ProductStock
+                    {
+                        ProductName = productGroup.Key.ProductName,
+                        ProductCode = productGroup.Key.ProductCode,
+                        Lots = productGroup.OrderBy(l => l.ExpirationDate).ToList()
+                    })
+                    .ToList()
+            })
+            .OrderBy(g => g.WarehouseName)
+            .ToList();
+    }
+
+    private static bool IsExpired(Lot lot) => lot.ExpirationDate.Date < DateTime.Today;
+
+    private class StockGroup
+    {
+        public string WarehouseName { get; set; } = string.Empty;
+        public List<Lot> Lots { get; set; } = new();
+        public List<ProductStock> Products { get; set; } = new();
+        public int ProductCount => Products.Count;
+        public int TotalUnits => Lots.Sum(l => l.Quantity);
+    }
+
+    private class ProductStock
+    {
+        public string ProductName { get; set; } = string.Empty;
+        public string ProductCode { get; set; } = string.Empty;
+        public List<Lot> Lots { get; set; } = new();
+        public int TotalUnits => Lots.Sum(l => l.Quantity);
+    }
+}

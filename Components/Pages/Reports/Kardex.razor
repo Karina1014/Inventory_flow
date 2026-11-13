@@ -1,0 +1,248 @@
+@page "/kardex"
+@layout MainLayout
+@using Inventory_Flow.Models
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository.IRepository
+@inject IInventoryMovementRepository MovementRepo
+@inject IProductRepository ProductRepo
+@inject IMovementTypeRepository MovementTypeRepo
+
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="title">Kardex</h1>
+            <p class="subtitle">Movimientos de inventario por producto</p>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="panel">
+        <div class="form-body">
+            <div class="form-grid grid-3">
+                <div class="form-group">
+                    <label class="form-label">Producto</label>
+                    <select class="form-input" @bind="productFilter">
+                        <option value="0">Todos</option>
+                        @foreach (var p in products)
+                        {
+                            <option value="@p.IdProduct">@p.Code · @p.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Desde</label>
+                    <input type="date" class="form-input" @bind="startDate" @bind:format="yyyy-MM-dd" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Hasta</label>
+                    <input type="date" class="form-input" @bind="endDate" @bind:format="yyyy-MM-dd" />
+                </div>
+            </div>
+
+            <div class="form-grid grid-3">
+                <div class="form-group">
+                    <label class="form-label">Tipo de movimiento</label>
+                    <select class="form-input" @bind="movementTypeFilter">
+                        <option value="0">Todos</option>
+                        @foreach (var t in movementTypes)
+                        {
+                            <option value="@t.IdMovementType">@t.Description</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-actions span-2">
+                    <button class="btn-primary" @onclick="ApplyFilters">
+                        <i class="bi bi-funnel"></i>
+                        <span>Aplicar filtros</span>
+                    </button>
+                    <button class="btn-secondary" @onclick="ClearFilters">
+                        <span>Limpiar</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Totales -->
+    <div class="summary-cards">
+        <div class="summary-card">
+            <span class="summary-label">Movimientos</span>
+            <span class="summary-value">@MovementCount</span>
+            <span class="summary-hint">En el rango aplicado</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-label">Entradas</span>
+            <span class="summary-value">@TotalEntry.ToString("N0")</span>
+            <span class="summary-hint">Unidades</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-label">Salidas</span>
+            <span class="summary-value">@TotalExit.ToString("N0")</span>
+            <span class="summary-hint">Unidades</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-label">Costo total</span>
+            <span class="summary-value">$ @TotalCost.ToString("N2")</span>
+            <span class="summary-hint">Costo histórico de las líneas</span>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Detalle de movimientos</span>
+            <span class="record-count">@rows.Count registros</span>
+        </div>
+
+        @if (rows.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="bi bi-inboxes"></i>
+                <span>No hay registros para mostrar</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Tipo movimiento</th>
+                            <th>Modo</th>
+                            <th>Almacén origen</th>
+                            <th>Almacén destino</th>
+                            <th class="col-number">Entrada</th>
+                            <th class="col-number">Salida</th>
+                            <th class="col-number">Costo unit.</th>
+                            <th class="col-number">Costo total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in rows)
+                        {
+                            <tr>
+                                <td class="col-date">@row.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="col-code">@row.Codigo</td>
+                                <td class="col-name">@row.Producto</td>
+                                <td>@row.Tipo</td>
+                                <td>
+                                    <span class="mode-badge @ModeClass(row.Modo)">@ModeLabel(row.Modo)</span>
+                                </td>
+                                <td>@row.AlmacenOrigen</td>
+                                <td>@row.AlmacenDestino</td>
+                                <td class="col-number col-entry">@(row.Entrada > 0 ? row.Entrada.ToString("N0") : "—")</td>
+                                <td class="col-number col-exit">@(row.Salida > 0 ? row.Salida.ToString("N0") : "—")</td>
+                                <td class="col-number">@row.CostoUnitario.ToString("N2")</td>
+                                <td class="col-number">@row.CostoTotal.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="7">Total</td>
+                            <td class="col-number">@TotalEntry.ToString("N0")</td>
+                            <td class="col-number">@TotalExit.ToString("N0")</td>
+                            <td class="col-number"></td>
+                            <td class="col-number">@TotalCost.ToString("N2")</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<InventoryMovementDto> movements = new();
+    private List<Product> products = new();
+    private List<MovementType> movementTypes = new();
+    private List<KardexRow> rows = new();
+
+    private int productFilter = 0;
+    private int movementTypeFilter = 0;
+    private DateTime startDate = DateTime.Today.AddDays(-30);
+    private DateTime endDate = DateTime.Today;
+
+    private int MovementCount => rows.Select(r => r.IdMovimiento).Distinct().Count();
+    private int TotalEntry => rows.Sum(r => r.Entrada);
+    private int TotalExit => rows.Sum(r => r.Salida);
+    private decimal TotalCost => rows.Sum(r => r.CostoTotal);
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = ProductRepo.GetProducts().OrderBy(p => p.Name).ToList();
+        movementTypes = MovementTypeRepo.GetMovementTypes().OrderBy(t => t.Description).ToList();
+        movements = (await MovementRepo.GetMovementsAsync()).ToList();
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        var desde = startDate.Date;
+        var hasta = endDate.Date.AddDays(1);
+
+        rows = movements
+            .Where(m => m.MovementDate >= desde && m.MovementDate < hasta)
+            .Where(m => productFilter == 0 || m.Details.Any(d => d.IdProduct == productFilter))
+            .Where(m => movementTypeFilter == 0 || m.IdMovementType == movementTypeFilter)
+            .OrderBy(m => m.MovementDate)
+            .ThenBy(m => m.IdInventoryMovement)
+            .SelectMany(m => m.Details
+                .Where(d => productFilter == 0 || d.IdProduct == productFilter)
+                .Select(d => new KardexRow(
+                    m.IdInventoryMovement,
+                    m.MovementDate,
+                    d.ProductCode,
+                    d.ProductName,
+                    string.IsNullOrWhiteSpace(m.MovementTypeDescription) ? m.MovementTypeCode : m.MovementTypeDescription,
+                    (m.MovementTypeMode ?? string.Empty).ToUpperInvariant(),
+                    string.IsNullOrWhiteSpace(m.OriginWarehouseName) ? "—" : m.OriginWarehouseName,
+                    string.IsNullOrWhiteSpace(m.DestinationWarehouseName) ? "—" : m.DestinationWarehouseName,
+                    (m.MovementTypeMode ?? string.Empty).ToUpperInvariant() == "E" ? d.Quantity : 0,
+                    (m.MovementTypeMode ?? string.Empty).ToUpperInvariant() == "S" ? d.Quantity : 0,
+                    d.UnitCost,
+                    d.Subtotal)))
+            .ToList();
+    }
+
+    private void ClearFilters()
+    {
+        productFilter = 0;
+        movementTypeFilter = 0;
+        startDate = DateTime.Today.AddDays(-30);
+        endDate = DateTime.Today;
+        ApplyFilters();
+    }
+
+    private static string ModeLabel(string mode) => mode switch
+    {
+        "E" => "Entrada",
+        "S" => "Salida",
+        "T" => "Transferencia",
+        _ => mode
+    };
+
+    private static string ModeClass(string mode) => mode switch
+    {
+        "E" => "mode-entry",
+        "S" => "mode-exit",
+        "T" => "mode-transfer",
+        _ => "mode-neutral"
+    };
+
+    private record KardexRow(
+        int IdMovimiento,
+        DateTime Fecha,
+        string Codigo,
+        string Producto,
+        string Tipo,
+        string Modo,
+        string AlmacenOrigen,
+        string AlmacenDestino,
+        int Entrada,
+        int Salida,
+        decimal CostoUnitario,
+        decimal CostoTotal);
+}
