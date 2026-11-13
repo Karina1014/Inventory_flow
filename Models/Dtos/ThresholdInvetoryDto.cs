@@ -6,6 +6,7 @@ public class ThresholdInvetoryDto
 {
     public int IdThresholdInvetory { get; set; }
     public int Threshold { get; set; }
+    public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

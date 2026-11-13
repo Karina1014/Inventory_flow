@@ -1,0 +1,309 @@
+@page "/thresholds"
+@layout MainLayout
+@rendermode InteractiveServer
+@using Inventory_Flow.Models
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository.IRepository
+@inject IThresholdInvetoryRepository ThresholdRepo
+
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="title">Umbral de Inventario</h1>
+            <p class="subtitle">Configuración del stock mínimo para alertas y reposición</p>
+        </div>
+        <button class="btn-primary" @onclick="OpenCreate">
+            <i class="bi bi-plus-lg"></i>
+            Nuevo umbral
+        </button>
+    </div>
+
+    <!-- Tarjeta de Umbral Actual Vigente -->
+    <div class="current-threshold-card">
+        <div class="threshold-badge-icon">
+            <i class="bi bi-shield-exclamation"></i>
+        </div>
+        <div class="threshold-meta">
+            <span class="threshold-label">Umbral activo vigente</span>
+            <div class="threshold-number-row">
+                <span class="threshold-value">@(currentThreshold?.Threshold ?? 5)</span>
+                <span class="threshold-unit">unidades</span>
+            </div>
+            <span class="threshold-description">
+                Los productos con stock igual o menor a este valor se marcarán automáticamente en rojo en el Dashboard para su reposición.
+            </span>
+        </div>
+        <button class="btn-secondary-edit" @onclick="OpenCurrentEdit">
+            <i class="bi bi-pencil-fill"></i> Modificar valor
+        </button>
+    </div>
+
+    <!-- Panel de Historial de Cambios -->
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Listado de umbrales</span>
+            <span class="record-count">@thresholds.Count registros</span>
+        </div>
+
+        @if (thresholds.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="bi bi-clock-history"></i>
+                <span>No hay registros de umbral configurados</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Valor Umbral</th>
+                            <th>Estado</th>
+                            <th>Fecha de Registro</th>
+                            <th>Última Actualización</th>
+                            <th class="col-actions">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in thresholds)
+                        {
+                            <tr>
+                                <td class="col-id">@t.IdThresholdInvetory</td>
+                                <td class="col-threshold">
+                                    <strong>@t.Threshold</strong> unidades
+                                </td>
+                                <td>
+                                    @if (t.IsActive)
+                                    {
+                                        <span class="badge badge-active">Activo (Vigente)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-inactive">Inactivo</span>
+                                    }
+                                </td>
+                                <td class="col-date">@t.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="col-date">@t.UpdatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="col-actions">
+                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(t)" title="Editar">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    @if (!t.IsActive)
+                                    {
+                                        <button class="action-btn btn-delete" @onclick="() => OpenDelete(t)" title="Eliminar">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Modal Crear / Editar -->
+@if (showModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title">@(isEditing ? "Editar umbral" : "Nuevo umbral")</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Cantidad mínima para alerta de bajo stock <span class="required">*</span></label>
+                <div class="input-box">
+                    <i class="bi bi-box-seam input-icon"></i>
+                    <input class="form-input" type="number" min="0" placeholder="Ej: 5, 10, 12..."
+                           @bind="formThreshold" @bind:event="oninput" />
+                </div>
+                <span class="field-hint">Al guardar activo, este valor gobernará las alertas del Dashboard.</span>
+            </div>
+
+            <div class="form-group toggle-group">
+                <label class="form-label">Estado</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" @bind="formIsActive" />
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">@(formIsActive ? "Activo (Vigente)" : "Inactivo")</span>
+                </label>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert-error">@errorMessage</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span>Guardando...</span>
+                }
+                else
+                {
+                    <span>Guardar</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+<!-- Modal Confirmar Eliminar -->
+@if (showDeleteModal && selectedThreshold != null)
+{
+    <div class="modal-backdrop" @onclick="CloseModal"></div>
+    <div class="modal-box modal-sm">
+        <div class="modal-header">
+            <span class="modal-title">Confirmar eliminación</span>
+            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <p class="delete-msg">¿Deseas eliminar el umbral inactivo de <strong>@selectedThreshold.Threshold unidades</strong>?</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+                @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ThresholdInvetory> thresholds = new();
+    private ThresholdInvetory? currentThreshold;
+    private ThresholdInvetory? selectedThreshold;
+
+    private int formThreshold = 5;
+    private bool formIsActive = true;
+    private bool showModal;
+    private bool showDeleteModal;
+    private bool isEditing;
+    private bool isSaving;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        thresholds = (await ThresholdRepo.GetThresholdsAsync()).ToList();
+        currentThreshold = await ThresholdRepo.GetCurrentThresholdAsync();
+    }
+
+    private void OpenCreate()
+    {
+        isEditing = false;
+        selectedThreshold = null;
+        formThreshold = currentThreshold?.Threshold ?? 5;
+        formIsActive = true;
+        errorMessage = string.Empty;
+        showModal = true;
+    }
+
+    private void OpenCurrentEdit()
+    {
+        if (currentThreshold != null)
+        {
+            OpenEdit(currentThreshold);
+        }
+        else
+        {
+            OpenCreate();
+        }
+    }
+
+    private void OpenEdit(ThresholdInvetory t)
+    {
+        isEditing = true;
+        selectedThreshold = t;
+        formThreshold = t.Threshold;
+        formIsActive = t.IsActive;
+        errorMessage = string.Empty;
+        showModal = true;
+    }
+
+    private void OpenDelete(ThresholdInvetory t)
+    {
+        selectedThreshold = t;
+        showDeleteModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        showDeleteModal = false;
+        errorMessage = string.Empty;
+        isSaving = false;
+    }
+
+    private async Task Save()
+    {
+        if (formThreshold < 0)
+        {
+            errorMessage = "El umbral no puede ser menor a 0.";
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            if (isEditing && selectedThreshold != null)
+            {
+                var dto = new UpdateThresholdInvetoryDto 
+                { 
+                    Threshold = formThreshold,
+                    IsActive = formIsActive 
+                };
+                await ThresholdRepo.UpdateThresholdAsync(selectedThreshold.IdThresholdInvetory, dto);
+            }
+            else
+            {
+                var dto = new CreateThresholdInvetoryDto 
+                { 
+                    Threshold = formThreshold,
+                    IsActive = formIsActive 
+                };
+                await ThresholdRepo.CreateThresholdAsync(dto);
+            }
+
+            await LoadData();
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            isSaving = false;
+        }
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (selectedThreshold == null) return;
+
+        isSaving = true;
+        try
+        {
+            await ThresholdRepo.DeleteThresholdAsync(selectedThreshold.IdThresholdInvetory);
+            await LoadData();
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            isSaving = false;
+        }
+    }
+}

@@ -31,14 +31,29 @@ public class ThresholdInvetoryRepository : IThresholdInvetoryRepository
 
     public async Task<ThresholdInvetory?> GetCurrentThresholdAsync()
     {
-        return await _db.ThresholdInvetories.OrderByDescending(t => t.IdThresholdInvetory).FirstOrDefaultAsync();
+        // Se busca el umbral que esté marcado como IsActive = true
+        return await _db.ThresholdInvetories
+            .Where(t => t.IsActive)
+            .OrderByDescending(t => t.UpdatedAt)
+            .FirstOrDefaultAsync();
     }
 
     public async Task<ThresholdInvetory> CreateThresholdAsync(CreateThresholdInvetoryDto dto)
     {
+        // Si el nuevo se crea activo, desactivamos los anteriores para que solo haya uno vigente
+        if (dto.IsActive)
+        {
+            var activeThresholds = await _db.ThresholdInvetories.Where(t => t.IsActive).ToListAsync();
+            foreach (var item in activeThresholds)
+            {
+                item.IsActive = false;
+            }
+        }
+
         var threshold = new ThresholdInvetory
         {
             Threshold = dto.Threshold,
+            IsActive = dto.IsActive,
             CreatedAt = DateTime.Now,
             UpdatedAt = DateTime.Now
         };
@@ -53,7 +68,18 @@ public class ThresholdInvetoryRepository : IThresholdInvetoryRepository
         var threshold = await _db.ThresholdInvetories.FindAsync(id)
             ?? throw new KeyNotFoundException($"Umbral con Id {id} no encontrado.");
 
+        // Si se activa este umbral, desactivamos los otros para mantener integridad
+        if (dto.IsActive && !threshold.IsActive)
+        {
+            var activeThresholds = await _db.ThresholdInvetories.Where(t => t.IsActive && t.IdThresholdInvetory != id).ToListAsync();
+            foreach (var item in activeThresholds)
+            {
+                item.IsActive = false;
+            }
+        }
+
         threshold.Threshold = dto.Threshold;
+        threshold.IsActive = dto.IsActive;
         threshold.UpdatedAt = DateTime.Now;
 
         _db.ThresholdInvetories.Update(threshold);
@@ -71,4 +97,3 @@ public class ThresholdInvetoryRepository : IThresholdInvetoryRepository
         return true;
     }
 }
-

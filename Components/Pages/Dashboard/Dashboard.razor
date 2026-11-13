@@ -90,6 +90,9 @@
                     <div class="kpi-icon icon-red">
                         <i class="bi bi-exclamation-triangle"></i>
                     </div>
+                    <a href="thresholds" class="kpi-config-btn" title="Configurar umbral de stock">
+                        <i class="bi bi-gear-fill"></i>
+                    </a>
                 </div>
                 <div class="kpi-body">
                     <span class="kpi-title">Productos bajo stock</span>
@@ -97,7 +100,10 @@
                     <div class="kpi-alert-bar">
                         <div class="kpi-alert-fill" style="width: @(metrics.LowStockProductsCount > 0 ? "100%" : "0%")"></div>
                     </div>
-                    <a href="lots" class="kpi-link-alert">Revisar reposición &rarr;</a>
+                    <div class="kpi-footer-links">
+                        <a href="lots" class="kpi-link-alert">Revisar reposición &rarr;</a>
+                        <a href="thresholds" class="kpi-link-config">Ajustar umbral</a>
+                    </div>
                 </div>
             </div>
         </div>

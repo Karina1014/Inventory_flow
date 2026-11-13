@@ -270,6 +270,9 @@ namespace Inventory_Flow.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
                     b.Property<int>("Threshold")
                         .HasColumnType("int");
 

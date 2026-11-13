@@ -218,6 +218,37 @@
     text-decoration: underline;
 }
 
+.kpi-config-btn {
+    color: #94a3b8;
+    font-size: 0.95rem;
+    padding: 0.2rem;
+    border-radius: 4px;
+    transition: color 0.15s;
+    text-decoration: none;
+}
+
+.kpi-config-btn:hover {
+    color: #0f172a;
+}
+
+.kpi-footer-links {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.kpi-link-config {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    text-decoration: none;
+}
+
+.kpi-link-config:hover {
+    color: #0077b6;
+    text-decoration: underline;
+}
+
 /* 3. Analytics Grid (Inferior) */
 .analytics-grid {
     display: grid;

@@ -43,9 +43,10 @@ public class DashboardRepository : IDashboardRepository
         metrics.TodayMovementsCount = await _db.InventoryMovements
             .CountAsync(m => m.MovementDate >= today && m.MovementDate < tomorrow);
 
-        // 5. Umbral de bajo stock dinámico desde ThresholdInvetories (por defecto 5 si la tabla está vacía)
+        // 5. Umbral de bajo stock dinámico desde ThresholdInvetories con IsActive = true (por defecto 5 si no hay)
         var currentThresholdEntity = await _db.ThresholdInvetories
-            .OrderByDescending(t => t.IdThresholdInvetory)
+            .Where(t => t.IsActive)
+            .OrderByDescending(t => t.UpdatedAt)
             .FirstOrDefaultAsync();
 
         int thresholdValue = currentThresholdEntity?.Threshold ?? 5;
