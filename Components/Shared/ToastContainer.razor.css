@@ -1,0 +1,159 @@
+.toast-notification-wrapper {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.25rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    pointer-events: none;
+    max-width: 420px;
+    width: calc(100vw - 2.5rem);
+}
+
+.toast-item {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    padding: 0.95rem 1.15rem;
+    border-radius: 14px;
+    border: 1px solid transparent;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+    animation: toastSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.2s ease;
+    backdrop-filter: blur(6px);
+}
+
+@keyframes toastSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Éxito - Verde Pastel MedVet (como en la captura de referencia) */
+.toast-success {
+    background-color: #ecfdf5;
+    border-color: #a7f3d0;
+}
+
+.toast-success .toast-icon-box {
+    color: #059669;
+}
+
+.toast-success .toast-title {
+    color: #065f46;
+}
+
+.toast-success .toast-message {
+    color: #374151;
+}
+
+/* Error - Rojo Pastel */
+.toast-error {
+    background-color: #fef2f2;
+    border-color: #fecaca;
+}
+
+.toast-error .toast-icon-box {
+    color: #dc2626;
+}
+
+.toast-error .toast-title {
+    color: #991b1b;
+}
+
+.toast-error .toast-message {
+    color: #374151;
+}
+
+/* Advertencia - Amarillo Pastel */
+.toast-warning {
+    background-color: #fffbeb;
+    border-color: #fde68a;
+}
+
+.toast-warning .toast-icon-box {
+    color: #d97706;
+}
+
+.toast-warning .toast-title {
+    color: #92400e;
+}
+
+.toast-warning .toast-message {
+    color: #374151;
+}
+
+/* Info - Azul Pastel */
+.toast-info {
+    background-color: #eff6ff;
+    border-color: #bfdbfe;
+}
+
+.toast-info .toast-icon-box {
+    color: #2563eb;
+}
+
+.toast-info .toast-title {
+    color: #1e40af;
+}
+
+.toast-info .toast-message {
+    color: #374151;
+}
+
+.toast-icon-box {
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.toast-body-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.toast-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.toast-message {
+    font-size: 0.84rem;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.toast-close-btn {
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    opacity: 0.6;
+    font-size: 1.2rem;
+    line-height: 1;
+    padding: 0;
+    margin-left: 0.5rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.toast-close-btn:hover {
+    opacity: 1;
+    color: #111827;
+}

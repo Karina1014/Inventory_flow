@@ -3,6 +3,7 @@
 @inject IUserRepository UserRepository
 @inject NavigationManager NavigationManager
 @inject Inventory_Flow.Services.CurrentUserService CurrentUserService
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
 @using Inventory_Flow.Models.Dtos
 @using Inventory_Flow.Repository
 
@@ -30,15 +31,6 @@
     }
     else if (profile != null)
     {
-        @if (!string.IsNullOrEmpty(statusMessage))
-        {
-            <div class="alert @statusMessageClass alert-dismissible fade show py-2 px-3 small d-flex align-items-center mb-3" role="alert">
-                <i class="bi @statusMessageIcon me-2 fs-6"></i>
-                <div class="flex-grow-1">@statusMessage</div>
-                <button type="button" class="btn-close py-2" @onclick="ClearStatusMessage"></button>
-            </div>
-        }
-
         <div class="profile-layout-grid">
             <!-- Columna Izquierda: Tarjeta Compacta de Usuario y Sucursal -->
             <div class="profile-side-col">
@@ -270,10 +262,6 @@
     private bool showNew = false;
     private bool showConfirm = false;
 
-    private string? statusMessage;
-    private string statusMessageClass = "alert-success";
-    private string statusMessageIcon = "bi-check-circle-fill";
-
     protected override async Task OnInitializedAsync()
     {
         if (!CurrentUserService.IsAuthenticated)
@@ -303,7 +291,7 @@
         }
         catch (Exception)
         {
-            SetStatus("Error al cargar la información del perfil.", isError: true);
+            ToastService.Error("Error al cargar la información del perfil.", "Error de carga");
         }
         finally
         {
@@ -314,7 +302,6 @@
     private async Task HandleUpdateProfile()
     {
         isSavingProfile = true;
-        ClearStatusMessage();
 
         try
         {
@@ -328,16 +315,16 @@
                     profile.Email = updateDto.Email;
                     profile.Phone = updateDto.Phone;
                 }
-                SetStatus("Datos personales actualizados correctamente.", isError: false);
+                ToastService.Success("Datos personales actualizados correctamente.", "Perfil actualizado");
             }
             else
             {
-                SetStatus("No fue posible actualizar el perfil.", isError: true);
+                ToastService.Error("No fue posible actualizar el perfil.", "Error");
             }
         }
         catch (Exception ex)
         {
-            SetStatus($"Error: {ex.Message}", isError: true);
+            ToastService.Error($"Error: {ex.Message}", "Error al actualizar");
         }
         finally
         {
@@ -348,7 +335,6 @@
     private async Task HandleChangePassword()
     {
         isSavingPassword = true;
-        ClearStatusMessage();
 
         try
         {
@@ -356,33 +342,21 @@
             if (success)
             {
                 passwordDto = new ChangePasswordDto();
-                SetStatus(message, isError: false);
+                ToastService.Success(message, "Seguridad");
             }
             else
             {
-                SetStatus(message, isError: true);
+                ToastService.Error(message, "Error de validación");
             }
         }
         catch (Exception ex)
         {
-            SetStatus($"Error: {ex.Message}", isError: true);
+            ToastService.Error($"Error: {ex.Message}", "Error al cambiar contraseña");
         }
         finally
         {
             isSavingPassword = false;
         }
-    }
-
-    private void SetStatus(string message, bool isError)
-    {
-        statusMessage = message;
-        statusMessageClass = isError ? "alert-danger" : "alert-success";
-        statusMessageIcon = isError ? "bi-exclamation-triangle-fill" : "bi-check-circle-fill";
-    }
-
-    private void ClearStatusMessage()
-    {
-        statusMessage = null;
     }
 
     private string GetInitials(string? name)

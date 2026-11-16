@@ -4,6 +4,7 @@
 @inject IUserRepository UserRepository
 @inject NavigationManager NavigationManager
 @inject Inventory_Flow.Services.CurrentUserService CurrentUserService
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
 @using Inventory_Flow.Models.Dtos
 @using Inventory_Flow.Repository
 
@@ -91,6 +92,7 @@
             if (string.IsNullOrEmpty(response.Token))
             {
                 errorMessage = response.Message ?? "Credenciales incorrectas.";
+                ToastService.Error(errorMessage, "Error de acceso");
             }
             else
             {
@@ -106,6 +108,8 @@
                         response.User.Email,
                         response.User.Phone);
                 }
+                var userGreeting = response.User?.UserName ?? "usuario";
+                ToastService.Success($"Bienvenido de nuevo, {userGreeting}.", "Sesión iniciada");
                 NavigationManager.NavigateTo("/dashboard");
             }
         }

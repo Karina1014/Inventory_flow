@@ -1,0 +1,102 @@
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
+@using Inventory_Flow.Services
+@implements IDisposable
+
+<div class="toast-notification-wrapper" aria-live="polite">
+    @foreach (var toast in toasts)
+    {
+        <div class="toast-item @GetToastClass(toast.Type)" role="alert">
+            <div class="toast-icon-box">
+                <i class="bi @GetToastIcon(toast.Type)"></i>
+            </div>
+            
+            <div class="toast-body-box">
+                @if (!string.IsNullOrWhiteSpace(toast.Title))
+                {
+                    <div class="toast-title">@toast.Title</div>
+                }
+                <div class="toast-message">@toast.Message</div>
+            </div>
+
+            <button type="button" class="toast-close-btn" @onclick="() => RemoveToast(toast.Id)" aria-label="Cerrar">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly List<ToastNotificationItem> toasts = new();
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnShow += HandleToastReceived;
+
+        // Cargar toasts que fueron emitidos antes de montar este componente (ej: al iniciar sesión antes de navegar)
+        var pending = ToastService.GetActiveToasts();
+        foreach (var toast in pending)
+        {
+            if (!toasts.Any(t => t.Id == toast.Id))
+            {
+                toasts.Add(toast);
+                _ = AutoDismissAsync(toast);
+            }
+        }
+    }
+
+    private void HandleToastReceived(ToastNotificationItem item)
+    {
+        InvokeAsync(() =>
+        {
+            if (!toasts.Any(t => t.Id == item.Id))
+            {
+                toasts.Add(item);
+                StateHasChanged();
+                _ = AutoDismissAsync(item);
+            }
+        });
+    }
+
+    private async Task AutoDismissAsync(ToastNotificationItem item)
+    {
+        await Task.Delay(item.DurationSeconds * 1000);
+        await InvokeAsync(() =>
+        {
+            RemoveToast(item.Id);
+        });
+    }
+
+    private void RemoveToast(Guid id)
+    {
+        var existing = toasts.FirstOrDefault(t => t.Id == id);
+        if (existing != null)
+        {
+            toasts.Remove(existing);
+            ToastService.Dismiss(id);
+            StateHasChanged();
+        }
+    }
+
+    private string GetToastClass(ToastType type) => type switch
+    {
+        ToastType.Success => "toast-success",
+        ToastType.Error   => "toast-error",
+        ToastType.Warning => "toast-warning",
+        ToastType.Info    => "toast-info",
+        _                 => "toast-info"
+    };
+
+    private string GetToastIcon(ToastType type) => type switch
+    {
+        ToastType.Success => "bi-check-circle",
+        ToastType.Error   => "bi-exclamation-triangle",
+        ToastType.Warning => "bi-exclamation-circle",
+        ToastType.Info    => "bi-info-circle",
+        _                 => "bi-bell"
+    };
+
+    public void Dispose()
+    {
+        ToastService.OnShow -= HandleToastReceived;
+    }
+}

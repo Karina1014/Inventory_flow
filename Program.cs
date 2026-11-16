@@ -18,6 +18,7 @@ builder.Services.AddDbContext<AplicationDbContext>(options =>
 
 // 2. Registro del Repositorio (Inyección de dependencias)
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<Inventory_Flow.Services.IToastNotificationService, Inventory_Flow.Services.ToastNotificationService>();
 builder.Services.AddScoped<Inventory_Flow.Services.IUserContextService, Inventory_Flow.Services.UserContextService>();
 builder.Services.AddScoped<Inventory_Flow.Services.CurrentUserService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
