@@ -295,7 +295,13 @@ namespace Inventory_Flow.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Email")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int?>("IdRole")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IdWarehouse")
                         .HasColumnType("int");
 
                     b.Property<bool>("IsActive")
@@ -305,6 +311,9 @@ namespace Inventory_Flow.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Password")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Phone")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -317,6 +326,8 @@ namespace Inventory_Flow.Migrations
                     b.HasKey("IdUser");
 
                     b.HasIndex("IdRole");
+
+                    b.HasIndex("IdWarehouse");
 
                     b.ToTable("Users");
                 });
@@ -438,7 +449,14 @@ namespace Inventory_Flow.Migrations
                         .WithMany()
                         .HasForeignKey("IdRole");
 
+                    b.HasOne("Inventory_Flow.Models.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("IdWarehouse")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Role");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("Inventory_Flow.Models.InventoryMovement", b =>

@@ -11,4 +11,9 @@ public class UserDto
     public string? Role {get;set;} 
     public bool IsActive{get;set;}
 
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
+    public int? IdWarehouse { get; set; }
+    public string? WarehouseName { get; set; }
+
 }

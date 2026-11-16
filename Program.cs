@@ -17,6 +17,8 @@ builder.Services.AddDbContext<AplicationDbContext>(options =>
     options.UseSqlServer(dbConnectionString));
 
 // 2. Registro del Repositorio (Inyección de dependencias)
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<Inventory_Flow.Services.IUserContextService, Inventory_Flow.Services.UserContextService>();
 builder.Services.AddScoped<Inventory_Flow.Services.CurrentUserService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
@@ -103,6 +105,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseCors("AllowSpecificOrigin");
+app.UseAuthentication();
 app.UseAuthorization();
 app.UseStaticFiles();
 app.UseAntiforgery();

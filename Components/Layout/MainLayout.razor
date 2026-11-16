@@ -100,6 +100,11 @@
                     </NavLink>
                   </div>
             </details>
+
+            <NavLink class="nav-item mt-2" href="profile">
+                <i class="bi bi-person-circle"></i>
+                <span>Mi Perfil</span>
+            </NavLink>
         </nav>
 
         <div class="sidebar-footer">
@@ -115,27 +120,42 @@
             </div>
 
             <div class="topbar-right">
-                <!-- Tarjeta de Usuario estilizada con clases estándar -->
-                <div class="user-profile-badge">
-                    <div class="user-avatar-circle">
+                <div class="user-dropdown-container position-relative">
+                    <!-- Solo el Círculo de Usuario con indicador de estado -->
+                    <button type="button" class="topbar-avatar-btn" @onclick="ToggleDropdown" aria-label="Menú de usuario" style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #0077b6 0%, #033f63 100%); color: #ffffff; border: 2px solid #ffffff; display: flex; align-items: center; justify-content: center; font-size: 0.84rem; font-weight: 700; box-shadow: 0 2px 6px rgba(0, 119, 182, 0.25); cursor: pointer; padding: 0; outline: none; position: relative;">
                         @(GetInitials(CurrentUserService.Name))
-                    </div>
-                    <div class="user-text-meta">
-                        <span class="user-display-name">@CurrentUserService.Name</span>
-                        <div class="user-status-line">
-                            <span class="online-dot"></span>
-                            <span class="user-role-label">@GetRoleLabel(CurrentUserService.Role)</span>
+                        <span class="avatar-status-dot" style="position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%; background-color: #22c55e; border: 2px solid #ffffff;"></span>
+                    </button>
+
+                    @if (isDropdownOpen)
+                    {
+                        <!-- Telón transparente para cerrar al hacer clic afuera -->
+                        <div class="dropdown-backdrop" @onclick="CloseDropdown" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1040; background: transparent;"></div>
+
+                        <!-- Submenú Desplegable Flotante Estilizado con Bootstrap y CSS -->
+                        <div class="user-menu-dropdown dropdown-menu show shadow-lg border" style="position: absolute; right: 0; top: calc(100% + 8px); min-width: 220px; z-index: 1050; border-radius: 12px; padding: 0.5rem 0; overflow: hidden; background: #ffffff;">
+                            <div class="px-3 py-2 bg-light border-bottom mb-1">
+                                <div class="fw-bold text-dark text-truncate" style="font-size: 0.88rem;">@CurrentUserService.Name</div>
+                                <div class="d-flex align-items-center gap-1 mt-1">
+                                    <span class="online-dot"></span>
+                                    <span class="text-muted fw-semibold" style="font-size: 0.74rem;">@GetRoleLabel(CurrentUserService.Role)</span>
+                                </div>
+                            </div>
+
+                            <NavLink href="profile" class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-dark text-decoration-none" @onclick="CloseDropdown">
+                                <i class="bi bi-person-circle fs-6 text-primary"></i>
+                                <span style="font-size: 0.85rem; font-weight: 500;">Mi Perfil</span>
+                            </NavLink>
+
+                            <hr class="dropdown-divider my-1 opacity-25" />
+
+                            <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-danger border-0 bg-transparent w-100 text-start" @onclick="Logout">
+                                <i class="bi bi-box-arrow-right fs-6"></i>
+                                <span style="font-size: 0.85rem; font-weight: 500;">Cerrar sesión</span>
+                            </button>
                         </div>
-                    </div>
+                    }
                 </div>
-
-                <div class="header-v-divider"></div>
-
-                <!-- Botón Salir Corporativo -->
-                <button type="button" class="btn-logout-header" @onclick="Logout" title="Cerrar sesión">
-                    <i class="bi bi-box-arrow-right"></i>
-                    <span>Salir</span>
-                </button>
             </div>
         </header>
 
@@ -146,6 +166,11 @@
 </div>
 
 @code {
+    private bool isDropdownOpen;
+
+    private void ToggleDropdown() => isDropdownOpen = !isDropdownOpen;
+    private void CloseDropdown() => isDropdownOpen = false;
+
     protected override void OnInitialized()
     {
         CurrentUserService.OnChange += StateHasChanged;
@@ -159,6 +184,7 @@
 
     private void Logout()
     {
+        isDropdownOpen = false;
         CurrentUserService.Clear();
         NavigationManager.NavigateTo("/login");
     }

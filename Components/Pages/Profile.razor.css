@@ -1,0 +1,347 @@
+.profile-layout-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+/* Columna Lateral Compacta */
+.profile-side-col {
+    display: flex;
+    flex-direction: column;
+}
+
+.user-card-panel {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.user-card-body {
+    padding: 1.5rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.profile-avatar-circle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0077b6 0%, #033f63 100%);
+    color: #ffffff;
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 8px rgba(0, 119, 182, 0.25);
+    margin-bottom: 0.75rem;
+}
+
+.profile-user-fullname {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.profile-username-tag {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-top: 0.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.profile-role-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 16px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.profile-divider {
+    width: 100%;
+    height: 1px;
+    background: #f1f5f9;
+    margin: 1rem 0;
+}
+
+/* Sucursal Asignada Compacta */
+.branch-info-card {
+    width: 100%;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.75rem;
+    text-align: left;
+}
+
+.branch-info-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+}
+
+.branch-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.readonly-tag {
+    font-size: 0.64rem;
+    font-weight: 600;
+    padding: 0.1rem 0.4rem;
+    border-radius: 10px;
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.branch-global-badge {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    background: #e0f2fe;
+    border-radius: 6px;
+    color: #0369a1;
+    font-size: 0.78rem;
+}
+
+.branch-name-text {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
+}
+
+.branch-address-text {
+    font-size: 0.74rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+}
+
+/* Paneles y Formularios Compactos */
+.profile-main-col {
+    display: flex;
+    flex-direction: column;
+}
+
+.panel {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.panel-header {
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #ffffff;
+}
+
+.panel-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+}
+
+.panel-subtitle-tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.panel-body {
+    padding: 1rem 1rem 0.85rem 1rem;
+}
+
+/* Inputs Compactos Profesionales (Altura 36px) */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.65rem;
+}
+
+.form-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #374151;
+    margin: 0;
+}
+
+.required {
+    color: #dc2626;
+}
+
+.input-box {
+    display: flex;
+    align-items: center;
+    height: 36px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #ffffff;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    padding: 0 0.5rem;
+}
+
+.input-box:focus-within {
+    border-color: #0077b6;
+    box-shadow: 0 0 0 2px rgba(0, 119, 182, 0.12);
+}
+
+.input-icon {
+    color: #94a3b8;
+    font-size: 0.85rem;
+    margin-right: 0.45rem;
+    flex-shrink: 0;
+}
+
+.form-input {
+    flex: 1;
+    height: 100%;
+    border: none;
+    outline: none;
+    font-size: 0.82rem;
+    color: #1e293b;
+    background: transparent;
+    padding: 0;
+}
+
+.btn-eye {
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 0.88rem;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    display: flex;
+    align-items: center;
+}
+
+.btn-eye:hover {
+    color: #0077b6;
+}
+
+.field-error {
+    font-size: 0.72rem;
+    color: #dc2626;
+    margin-top: 0.15rem;
+}
+
+.field-hint {
+    font-size: 0.7rem;
+    color: #64748b;
+    margin-top: 0.15rem;
+    display: block;
+}
+
+.field-hint code {
+    background: #f1f5f9;
+    padding: 0.05rem 0.25rem;
+    border-radius: 3px;
+    color: #0077b6;
+    font-weight: 600;
+    font-size: 0.72rem;
+}
+
+.password-req-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.72rem;
+    color: #475569;
+    margin-top: 0.4rem;
+    display: flex;
+    align-items: center;
+}
+
+.panel-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.75rem;
+    padding-top: 0.65rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+/* Botones Compactos */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.95rem;
+    background: #0077b6;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #005f8e;
+}
+
+.btn-primary:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.btn-danger-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.95rem;
+    background: #ffffff;
+    color: #dc2626;
+    border: 1px solid #fca5a5;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-danger-outline:hover:not(:disabled) {
+    background: #fef2f2;
+    border-color: #ef4444;
+}
+
+.btn-danger-outline:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+    .profile-layout-grid {
+        grid-template-columns: 1fr;
+    }
+}

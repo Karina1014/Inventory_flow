@@ -1,0 +1,398 @@
+@page "/profile"
+@layout MainLayout
+@inject IUserRepository UserRepository
+@inject NavigationManager NavigationManager
+@inject Inventory_Flow.Services.CurrentUserService CurrentUserService
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository
+
+<PageTitle>Mi Perfil - MedVet Inventario</PageTitle>
+
+<div class="page-container">
+    <!-- Encabezado Compacto -->
+    <div class="page-header">
+        <div>
+            <h1 class="title">
+                <i class="bi bi-person-circle me-2 text-primary"></i>Mi Perfil
+            </h1>
+            <p class="subtitle">Gestiona tu información personal, credenciales y consulta tu sucursal asignada</p>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="panel">
+            <div class="d-flex flex-column align-items-center justify-content-center py-4">
+                <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+                <span class="text-muted small">Cargando perfil...</span>
+            </div>
+        </div>
+    }
+    else if (profile != null)
+    {
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <div class="alert @statusMessageClass alert-dismissible fade show py-2 px-3 small d-flex align-items-center mb-3" role="alert">
+                <i class="bi @statusMessageIcon me-2 fs-6"></i>
+                <div class="flex-grow-1">@statusMessage</div>
+                <button type="button" class="btn-close py-2" @onclick="ClearStatusMessage"></button>
+            </div>
+        }
+
+        <div class="profile-layout-grid">
+            <!-- Columna Izquierda: Tarjeta Compacta de Usuario y Sucursal -->
+            <div class="profile-side-col">
+                <div class="panel user-card-panel">
+                    <div class="user-card-body">
+                        <div class="profile-avatar-circle">
+                            @GetInitials(profile.Name)
+                        </div>
+
+                        <h2 class="profile-user-fullname">@profile.Name</h2>
+                        <span class="profile-username-tag">@@@profile.Username</span>
+
+                        <span class="profile-role-pill">
+                            <i class="bi bi-shield-check me-1"></i>@profile.Role
+                        </span>
+
+                        <div class="profile-divider"></div>
+
+                        <!-- Sucursal Asignada Compacta (Solo Lectura) -->
+                        <div class="branch-info-card">
+                            <div class="branch-info-header">
+                                <span class="branch-label">
+                                    <i class="bi bi-building-fill text-primary me-1"></i>Sucursal
+                                </span>
+                                <span class="readonly-tag">Solo Lectura</span>
+                            </div>
+
+                            @if (CurrentUserService.IsAdmin)
+                            {
+                                <div class="branch-global-badge">
+                                    <i class="bi bi-globe2 me-2"></i>
+                                    <div>
+                                        <div class="fw-bold">Acceso Global</div>
+                                        <div class="small opacity-75">Supervisión en todas las sucursales</div>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="branch-name-text">
+                                    @(string.IsNullOrWhiteSpace(profile.WarehouseName) ? "Sin sucursal asignada" : profile.WarehouseName)
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(profile.WarehouseAddress))
+                                {
+                                    <div class="branch-address-text">
+                                        <i class="bi bi-geo-alt-fill me-1"></i>@profile.WarehouseAddress
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Formularios Compactos y Estilizados -->
+            <div class="profile-main-col">
+                <!-- Panel 1: Datos Personales -->
+                <div class="panel mb-3">
+                    <div class="panel-header">
+                        <span class="panel-title">
+                            <i class="bi bi-person-vcard text-primary me-2"></i>Información Personal
+                        </span>
+                        <span class="panel-subtitle-tag">Datos de contacto</span>
+                    </div>
+
+                    <div class="panel-body">
+                        <EditForm Model="@updateDto" OnValidSubmit="HandleUpdateProfile">
+                            <DataAnnotationsValidator />
+
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="form-label">Nombre Completo <span class="required">*</span></label>
+                                        <div class="input-box">
+                                            <i class="bi bi-person input-icon"></i>
+                                            <InputText class="form-input" placeholder="Nombre completo" @bind-Value="updateDto.Name" />
+                                        </div>
+                                        <ValidationMessage For="@(() => updateDto.Name)" class="field-error" />
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="form-label">Correo Electrónico</label>
+                                        <div class="input-box">
+                                            <i class="bi bi-envelope input-icon"></i>
+                                            <InputText class="form-input" placeholder="correo@ejemplo.com" @bind-Value="updateDto.Email" />
+                                        </div>
+                                        <ValidationMessage For="@(() => updateDto.Email)" class="field-error" />
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="form-label">Teléfono / Celular</label>
+                                        <div class="input-box">
+                                            <i class="bi bi-telephone input-icon"></i>
+                                            <InputText class="form-input" placeholder="+593963124396" @bind-Value="updateDto.Phone" />
+                                        </div>
+                                        <span class="field-hint">
+                                            <i class="bi bi-info-circle me-1"></i>Prefijo internacional (ej: <code>+593963124396</code>)
+                                        </span>
+                                        <ValidationMessage For="@(() => updateDto.Phone)" class="field-error" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="panel-actions">
+                                <button type="submit" class="btn-primary" disabled="@isSavingProfile">
+                                    @if (isSavingProfile)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        <span>Guardando...</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-check-lg"></i>
+                                        <span>Guardar Cambios</span>
+                                    }
+                                </button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+
+                <!-- Panel 2: Seguridad y Contraseña -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title text-danger">
+                            <i class="bi bi-shield-lock me-2"></i>Seguridad y Contraseña
+                        </span>
+                        <span class="panel-subtitle-tag">Actualizar Clave</span>
+                    </div>
+
+                    <div class="panel-body">
+                        <EditForm Model="@passwordDto" OnValidSubmit="HandleChangePassword">
+                            <DataAnnotationsValidator />
+
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label class="form-label">Contraseña Actual <span class="required">*</span></label>
+                                        <div class="input-box">
+                                            <i class="bi bi-key input-icon"></i>
+                                            <input type="@(showCurrent ? "text" : "password")"
+                                                   class="form-input"
+                                                   placeholder="Contraseña actual"
+                                                   @bind="passwordDto.CurrentPassword" />
+                                            <button type="button" class="btn-eye" @onclick="() => showCurrent = !showCurrent">
+                                                <i class="bi @(showCurrent ? "bi-eye-slash" : "bi-eye")"></i>
+                                            </button>
+                                        </div>
+                                        <ValidationMessage For="@(() => passwordDto.CurrentPassword)" class="field-error" />
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label class="form-label">Nueva Contraseña <span class="required">*</span></label>
+                                        <div class="input-box">
+                                            <i class="bi bi-lock input-icon"></i>
+                                            <input type="@(showNew ? "text" : "password")"
+                                                   class="form-input"
+                                                   placeholder="Mínimo 8 caracteres"
+                                                   @bind="passwordDto.NewPassword" />
+                                            <button type="button" class="btn-eye" @onclick="() => showNew = !showNew">
+                                                <i class="bi @(showNew ? "bi-eye-slash" : "bi-eye")"></i>
+                                            </button>
+                                        </div>
+                                        <ValidationMessage For="@(() => passwordDto.NewPassword)" class="field-error" />
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label class="form-label">Confirmar Contraseña <span class="required">*</span></label>
+                                        <div class="input-box">
+                                            <i class="bi bi-lock-fill input-icon"></i>
+                                            <input type="@(showConfirm ? "text" : "password")"
+                                                   class="form-input"
+                                                   placeholder="Repite la contraseña"
+                                                   @bind="passwordDto.ConfirmPassword" />
+                                            <button type="button" class="btn-eye" @onclick="() => showConfirm = !showConfirm">
+                                                <i class="bi @(showConfirm ? "bi-eye-slash" : "bi-eye")"></i>
+                                            </button>
+                                        </div>
+                                        <ValidationMessage For="@(() => passwordDto.ConfirmPassword)" class="field-error" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="password-req-box">
+                                <i class="bi bi-shield-check text-primary me-2"></i>
+                                <span>Requisitos: mín. 8 caracteres, al menos 1 mayúscula, 1 minúscula, 1 número y 1 símbolo (@@$!%*?&).</span>
+                            </div>
+
+                            <div class="panel-actions">
+                                <button type="submit" class="btn-danger-outline" disabled="@isSavingPassword">
+                                    @if (isSavingPassword)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        <span>Actualizando...</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-arrow-repeat"></i>
+                                        <span>Actualizar Contraseña</span>
+                                    }
+                                </button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private UserProfileDto? profile;
+    private UpdateProfileDto updateDto = new();
+    private ChangePasswordDto passwordDto = new();
+
+    private bool isLoading = true;
+    private bool isSavingProfile = false;
+    private bool isSavingPassword = false;
+
+    private bool showCurrent = false;
+    private bool showNew = false;
+    private bool showConfirm = false;
+
+    private string? statusMessage;
+    private string statusMessageClass = "alert-success";
+    private string statusMessageIcon = "bi-check-circle-fill";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CurrentUserService.IsAuthenticated)
+        {
+            NavigationManager.NavigateTo("/login", replace: true);
+            return;
+        }
+
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        isLoading = true;
+        try
+        {
+            profile = await UserRepository.GetProfile(CurrentUserService.UserId);
+            if (profile != null)
+            {
+                updateDto = new UpdateProfileDto
+                {
+                    Name = profile.Name,
+                    Email = profile.Email,
+                    Phone = profile.Phone
+                };
+            }
+        }
+        catch (Exception)
+        {
+            SetStatus("Error al cargar la información del perfil.", isError: true);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleUpdateProfile()
+    {
+        isSavingProfile = true;
+        ClearStatusMessage();
+
+        try
+        {
+            var success = await UserRepository.UpdateProfile(CurrentUserService.UserId, updateDto);
+            if (success)
+            {
+                CurrentUserService.UpdateProfileData(updateDto.Name, updateDto.Email, updateDto.Phone);
+                if (profile != null)
+                {
+                    profile.Name = updateDto.Name ?? string.Empty;
+                    profile.Email = updateDto.Email;
+                    profile.Phone = updateDto.Phone;
+                }
+                SetStatus("Datos personales actualizados correctamente.", isError: false);
+            }
+            else
+            {
+                SetStatus("No fue posible actualizar el perfil.", isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Error: {ex.Message}", isError: true);
+        }
+        finally
+        {
+            isSavingProfile = false;
+        }
+    }
+
+    private async Task HandleChangePassword()
+    {
+        isSavingPassword = true;
+        ClearStatusMessage();
+
+        try
+        {
+            var (success, message) = await UserRepository.ChangePassword(CurrentUserService.UserId, passwordDto);
+            if (success)
+            {
+                passwordDto = new ChangePasswordDto();
+                SetStatus(message, isError: false);
+            }
+            else
+            {
+                SetStatus(message, isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Error: {ex.Message}", isError: true);
+        }
+        finally
+        {
+            isSavingPassword = false;
+        }
+    }
+
+    private void SetStatus(string message, bool isError)
+    {
+        statusMessage = message;
+        statusMessageClass = isError ? "alert-danger" : "alert-success";
+        statusMessageIcon = isError ? "bi-exclamation-triangle-fill" : "bi-check-circle-fill";
+    }
+
+    private void ClearStatusMessage()
+    {
+        statusMessage = null;
+    }
+
+    private string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "??";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+        {
+            return $"{char.ToUpper(parts[0][0])}{char.ToUpper(parts[1][0])}";
+        }
+        return name.Substring(0, Math.Min(2, name.Length)).ToUpper();
+    }
+}

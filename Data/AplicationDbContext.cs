@@ -45,5 +45,12 @@ public class AplicationDbContext: DbContext
             .WithMany()
             .HasForeignKey(d => d.IdProduct)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Relación User -> Warehouse (Restringir borrado para evitar inconsistencias)
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.Warehouse)
+            .WithMany()
+            .HasForeignKey(u => u.IdWarehouse)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

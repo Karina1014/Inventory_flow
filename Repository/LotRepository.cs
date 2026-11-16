@@ -15,35 +15,53 @@ public class LotRepository : ILotRepository
         _db = db;
     }
 
-    public ICollection<Lot> GetLots()
+    public ICollection<Lot> GetLots(int? warehouseId = null)
     {
-        return _db.Lots
+        var query = _db.Lots
             .Include(l => l.Product)
             .Include(l => l.Warehouse)
-            .OrderBy(l => l.ExpirationDate)
-            .ToList();
+            .AsNoTracking();
+
+        if (warehouseId.HasValue)
+        {
+            query = query.Where(l => l.IdWarehouse == warehouseId.Value);
+        }
+
+        return query.OrderBy(l => l.ExpirationDate).ToList();
     }
 
-    public ICollection<Lot> GetExpiringLots(int days)
+    public ICollection<Lot> GetExpiringLots(int days, int? warehouseId = null)
     {
         var limit = DateTime.Today.AddDays(days + 1);
-        return _db.Lots
+        var query = _db.Lots
             .Include(l => l.Product)
             .Include(l => l.Warehouse)
-            .Where(l => l.Quantity > 0 && l.ExpirationDate < limit)
-            .OrderBy(l => l.ExpirationDate)
-            .ToList();
+            .AsNoTracking()
+            .Where(l => l.Quantity > 0 && l.ExpirationDate < limit);
+
+        if (warehouseId.HasValue)
+        {
+            query = query.Where(l => l.IdWarehouse == warehouseId.Value);
+        }
+
+        return query.OrderBy(l => l.ExpirationDate).ToList();
     }
 
-    public ICollection<Lot> GetExpiredLots()
+    public ICollection<Lot> GetExpiredLots(int? warehouseId = null)
     {
         var today = DateTime.Today;
-        return _db.Lots
+        var query = _db.Lots
             .Include(l => l.Product)
             .Include(l => l.Warehouse)
-            .Where(l => l.Quantity > 0 && l.ExpirationDate < today)
-            .OrderBy(l => l.ExpirationDate)
-            .ToList();
+            .AsNoTracking()
+            .Where(l => l.Quantity > 0 && l.ExpirationDate < today);
+
+        if (warehouseId.HasValue)
+        {
+            query = query.Where(l => l.IdWarehouse == warehouseId.Value);
+        }
+
+        return query.OrderBy(l => l.ExpirationDate).ToList();
     }
 
     public Lot? GetLot(int IdLot)

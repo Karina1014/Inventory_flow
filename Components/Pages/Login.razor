@@ -97,9 +97,14 @@
                 if (response.User != null)
                 {
                     CurrentUserService.SetUser(
+                        response.User.IdUser,
                         response.User.Name ?? response.User.UserName,
                         response.User.UserName,
-                        response.User.Role ?? string.Empty);
+                        response.User.Role ?? string.Empty,
+                        response.User.IdWarehouse,
+                        response.User.WarehouseName,
+                        response.User.Email,
+                        response.User.Phone);
                 }
                 NavigationManager.NavigateTo("/dashboard");
             }

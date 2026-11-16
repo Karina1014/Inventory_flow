@@ -18,5 +18,11 @@ public class User
     
     [ForeignKey("IdRole")]
     public Role? Role { get; set; }
+
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
+    public int? IdWarehouse { get; set; }
+
+    [ForeignKey("IdWarehouse")]
+    public Warehouse? Warehouse { get; set; }
 }
-    
