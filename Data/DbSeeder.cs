@@ -38,95 +38,95 @@ public static class DbSeeder
         await db.SaveChangesAsync();
 
         // 2. Traer los roles con sus IDs reales
-        var adminRole = await db.Roles.FirstOrDefaultAsync(r => r.Name == "Administrador" || r.Name == "Admin");
+        var adminRole = await db.Roles.FirstOrDefaultAsync(r => r.IsAdmin || r.Name == "Administrador" || r.Name == "Admin");
         var bodegueroRole = await db.Roles.FirstOrDefaultAsync(r => r.Name == "Bodeguero");
         var bodegueroPrincipalRole = await db.Roles.FirstOrDefaultAsync(r => r.Name == "Bodeguero Principal");
         var asistenteRole = await db.Roles.FirstOrDefaultAsync(r => r.Name == "Asistente");
         var financieroRole = await db.Roles.FirstOrDefaultAsync(r => r.Name == "Financiero");
 
-        // 3. Menús asignados a cada rol
-        if (!await db.Menus.AnyAsync())
+        // 3. Menús asignados a cada rol (verificando individualmente por rol)
+        var menusToAdd = new List<Menu>();
+
+        // Menús para ADMINISTRADOR (Acceso total)
+        if (adminRole != null && !await db.Menus.AnyAsync(m => m.IdRole == adminRole.IdRole))
         {
-            var menus = new List<Menu>();
-
-            // Menús para ADMINISTRADOR (Acceso total)
-            if (adminRole != null)
+            menusToAdd.AddRange(new[]
             {
-                menus.AddRange(new[]
-                {
-                    new Menu { Name = "Dashboard", Category = "", Url = "/dashboard", Icon = "bi bi-grid-fill", Order = 1, IsActive = true, IdRole = adminRole.IdRole },
-                    new Menu { Name = "Sucursales", Category = "Administración", Url = "/warehouses", Icon = "bi bi-building", Order = 2, IsActive = true, IdRole = adminRole.IdRole },
-                    new Menu { Name = "Categorías", Category = "Administración", Url = "/categories", Icon = "bi bi-tags-fill", Order = 3, IsActive = true, IdRole = adminRole.IdRole },
-                    new Menu { Name = "Productos", Category = "Administración", Url = "/products", Icon = "bi bi-box-seam", Order = 4, IsActive = true, IdRole = adminRole.IdRole },
-                    new Menu { Name = "Tipos de movimientos", Category = "Administración", Url = "/movementtypes", Icon = "bi bi-arrow-left-right", Order = 5, IsActive = true, IdRole = adminRole.IdRole },
-                    new Menu { Name = "Roles", Category = "Administración", Url = "/roles", Icon = "bi bi-shield-lock-fill", Order = 6, IsActive = true, IdRole = adminRole.IdRole },
-                    new Menu { Name = "Usuarios", Category = "Administración", Url = "/users", Icon = "bi bi-people-fill", Order = 7, IsActive = true, IdRole = adminRole.IdRole },
-                    new Menu { Name = "Umbral de Stock", Category = "Administración", Url = "/thresholds", Icon = "bi bi-sliders", Order = 8, IsActive = true, IdRole = adminRole.IdRole },
-                    new Menu { Name = "Lotes", Category = "Administración", Url = "/lots", Icon = "bi bi-boxes", Order = 9, IsActive = true, IdRole = adminRole.IdRole },
-                    new Menu { Name = "Movimientos", Category = "Operaciones", Url = "/movements", Icon = "bi bi-arrow-left-right", Order = 10, IsActive = true, IdRole = adminRole.IdRole },
-                    new Menu { Name = "Análisis IA", Category = "Operaciones", Url = "/analytics", Icon = "bi bi-stars", Order = 11, IsActive = true, IdRole = adminRole.IdRole },
-                    new Menu { Name = "Reporte de stock", Category = "Reportes", Url = "/stockreport", Icon = "bi bi-clipboard-data", Order = 12, IsActive = true, IdRole = adminRole.IdRole },
-                    new Menu { Name = "Kardex", Category = "Reportes", Url = "/kardex", Icon = "bi bi-journal-text", Order = 13, IsActive = true, IdRole = adminRole.IdRole }
-                });
-            }
+                new Menu { Name = "Dashboard", Category = "", Url = "/dashboard", Icon = "bi bi-grid-fill", Order = 1, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Sucursales", Category = "Administración", Url = "/warehouses", Icon = "bi bi-building", Order = 2, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Categorías", Category = "Administración", Url = "/categories", Icon = "bi bi-tags-fill", Order = 3, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Productos", Category = "Administración", Url = "/products", Icon = "bi bi-box-seam", Order = 4, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Tipos de movimientos", Category = "Administración", Url = "/movementtypes", Icon = "bi bi-arrow-left-right", Order = 5, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Roles", Category = "Administración", Url = "/roles", Icon = "bi bi-shield-lock-fill", Order = 6, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Usuarios", Category = "Administración", Url = "/users", Icon = "bi bi-people-fill", Order = 7, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Umbral de Stock", Category = "Administración", Url = "/thresholds", Icon = "bi bi-sliders", Order = 8, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Lotes", Category = "Administración", Url = "/lots", Icon = "bi bi-boxes", Order = 9, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Movimientos", Category = "Operaciones", Url = "/movements", Icon = "bi bi-arrow-left-right", Order = 10, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Análisis IA", Category = "Operaciones", Url = "/analytics", Icon = "bi bi-stars", Order = 11, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Reporte de stock", Category = "Reportes", Url = "/stockreport", Icon = "bi bi-clipboard-data", Order = 12, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Kardex", Category = "Reportes", Url = "/kardex", Icon = "bi bi-journal-text", Order = 13, IsActive = true, IdRole = adminRole.IdRole }
+            });
+        }
 
-            // Menús para BODEGUERO PRINCIPAL
-            if (bodegueroPrincipalRole != null)
+        // Menús para BODEGUERO PRINCIPAL
+        if (bodegueroPrincipalRole != null && !await db.Menus.AnyAsync(m => m.IdRole == bodegueroPrincipalRole.IdRole))
+        {
+            menusToAdd.AddRange(new[]
             {
-                menus.AddRange(new[]
-                {
-                    new Menu { Name = "Dashboard", Category = "", Url = "/dashboard", Icon = "bi bi-grid-fill", Order = 1, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
-                    new Menu { Name = "Categorías", Category = "Catálogos", Url = "/categories", Icon = "bi bi-tags-fill", Order = 2, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
-                    new Menu { Name = "Productos", Category = "Catálogos", Url = "/products", Icon = "bi bi-box-seam", Order = 3, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
-                    new Menu { Name = "Lotes", Category = "Catálogos", Url = "/lots", Icon = "bi bi-boxes", Order = 4, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
-                    new Menu { Name = "Umbral de Stock", Category = "Catálogos", Url = "/thresholds", Icon = "bi bi-sliders", Order = 5, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
-                    new Menu { Name = "Movimientos", Category = "Operaciones", Url = "/movements", Icon = "bi bi-arrow-left-right", Order = 6, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
-                    new Menu { Name = "Análisis IA", Category = "Operaciones", Url = "/analytics", Icon = "bi bi-stars", Order = 7, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
-                    new Menu { Name = "Reporte de stock", Category = "Reportes", Url = "/stockreport", Icon = "bi bi-clipboard-data", Order = 8, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
-                    new Menu { Name = "Kardex", Category = "Reportes", Url = "/kardex", Icon = "bi bi-journal-text", Order = 9, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole }
-                });
-            }
+                new Menu { Name = "Dashboard", Category = "", Url = "/dashboard", Icon = "bi bi-grid-fill", Order = 1, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
+                new Menu { Name = "Categorías", Category = "Catálogos", Url = "/categories", Icon = "bi bi-tags-fill", Order = 2, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
+                new Menu { Name = "Productos", Category = "Catálogos", Url = "/products", Icon = "bi bi-box-seam", Order = 3, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
+                new Menu { Name = "Lotes", Category = "Catálogos", Url = "/lots", Icon = "bi bi-boxes", Order = 4, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
+                new Menu { Name = "Umbral de Stock", Category = "Catálogos", Url = "/thresholds", Icon = "bi bi-sliders", Order = 5, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
+                new Menu { Name = "Movimientos", Category = "Operaciones", Url = "/movements", Icon = "bi bi-arrow-left-right", Order = 6, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
+                new Menu { Name = "Análisis IA", Category = "Operaciones", Url = "/analytics", Icon = "bi bi-stars", Order = 7, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
+                new Menu { Name = "Reporte de stock", Category = "Reportes", Url = "/stockreport", Icon = "bi bi-clipboard-data", Order = 8, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole },
+                new Menu { Name = "Kardex", Category = "Reportes", Url = "/kardex", Icon = "bi bi-journal-text", Order = 9, IsActive = true, IdRole = bodegueroPrincipalRole.IdRole }
+            });
+        }
 
-            // Menús para BODEGUERO
-            if (bodegueroRole != null)
+        // Menús para BODEGUERO
+        if (bodegueroRole != null && !await db.Menus.AnyAsync(m => m.IdRole == bodegueroRole.IdRole))
+        {
+            menusToAdd.AddRange(new[]
             {
-                menus.AddRange(new[]
-                {
-                    new Menu { Name = "Dashboard", Category = "", Url = "/dashboard", Icon = "bi bi-grid-fill", Order = 1, IsActive = true, IdRole = bodegueroRole.IdRole },
-                    new Menu { Name = "Productos", Category = "Catálogos", Url = "/products", Icon = "bi bi-box-seam", Order = 2, IsActive = true, IdRole = bodegueroRole.IdRole },
-                    new Menu { Name = "Lotes", Category = "Catálogos", Url = "/lots", Icon = "bi bi-boxes", Order = 3, IsActive = true, IdRole = bodegueroRole.IdRole },
-                    new Menu { Name = "Movimientos", Category = "Operaciones", Url = "/movements", Icon = "bi bi-arrow-left-right", Order = 4, IsActive = true, IdRole = bodegueroRole.IdRole },
-                    new Menu { Name = "Reporte de stock", Category = "Reportes", Url = "/stockreport", Icon = "bi bi-clipboard-data", Order = 5, IsActive = true, IdRole = bodegueroRole.IdRole },
-                    new Menu { Name = "Kardex", Category = "Reportes", Url = "/kardex", Icon = "bi bi-journal-text", Order = 6, IsActive = true, IdRole = bodegueroRole.IdRole }
-                });
-            }
+                new Menu { Name = "Dashboard", Category = "", Url = "/dashboard", Icon = "bi bi-grid-fill", Order = 1, IsActive = true, IdRole = bodegueroRole.IdRole },
+                new Menu { Name = "Productos", Category = "Catálogos", Url = "/products", Icon = "bi bi-box-seam", Order = 2, IsActive = true, IdRole = bodegueroRole.IdRole },
+                new Menu { Name = "Lotes", Category = "Catálogos", Url = "/lots", Icon = "bi bi-boxes", Order = 3, IsActive = true, IdRole = bodegueroRole.IdRole },
+                new Menu { Name = "Movimientos", Category = "Operaciones", Url = "/movements", Icon = "bi bi-arrow-left-right", Order = 4, IsActive = true, IdRole = bodegueroRole.IdRole },
+                new Menu { Name = "Reporte de stock", Category = "Reportes", Url = "/stockreport", Icon = "bi bi-clipboard-data", Order = 5, IsActive = true, IdRole = bodegueroRole.IdRole },
+                new Menu { Name = "Kardex", Category = "Reportes", Url = "/kardex", Icon = "bi bi-journal-text", Order = 6, IsActive = true, IdRole = bodegueroRole.IdRole }
+            });
+        }
 
-            // Menús para ASISTENTE
-            if (asistenteRole != null)
+        // Menús para ASISTENTE
+        if (asistenteRole != null && !await db.Menus.AnyAsync(m => m.IdRole == asistenteRole.IdRole))
+        {
+            menusToAdd.AddRange(new[]
             {
-                menus.AddRange(new[]
-                {
-                    new Menu { Name = "Dashboard", Category = "", Url = "/dashboard", Icon = "bi bi-grid-fill", Order = 1, IsActive = true, IdRole = asistenteRole.IdRole },
-                    new Menu { Name = "Categorías", Category = "Catálogos", Url = "/categories", Icon = "bi bi-tags-fill", Order = 2, IsActive = true, IdRole = asistenteRole.IdRole },
-                    new Menu { Name = "Productos", Category = "Catálogos", Url = "/products", Icon = "bi bi-box-seam", Order = 3, IsActive = true, IdRole = asistenteRole.IdRole },
-                    new Menu { Name = "Reporte de stock", Category = "Reportes", Url = "/stockreport", Icon = "bi bi-clipboard-data", Order = 4, IsActive = true, IdRole = asistenteRole.IdRole }
-                });
-            }
+                new Menu { Name = "Dashboard", Category = "", Url = "/dashboard", Icon = "bi bi-grid-fill", Order = 1, IsActive = true, IdRole = asistenteRole.IdRole },
+                new Menu { Name = "Categorías", Category = "Catálogos", Url = "/categories", Icon = "bi bi-tags-fill", Order = 2, IsActive = true, IdRole = asistenteRole.IdRole },
+                new Menu { Name = "Productos", Category = "Catálogos", Url = "/products", Icon = "bi bi-box-seam", Order = 3, IsActive = true, IdRole = asistenteRole.IdRole },
+                new Menu { Name = "Reporte de stock", Category = "Reportes", Url = "/stockreport", Icon = "bi bi-clipboard-data", Order = 4, IsActive = true, IdRole = asistenteRole.IdRole }
+            });
+        }
 
-            // Menús para FINANCIERO
-            if (financieroRole != null)
+        // Menús para FINANCIERO
+        if (financieroRole != null && !await db.Menus.AnyAsync(m => m.IdRole == financieroRole.IdRole))
+        {
+            menusToAdd.AddRange(new[]
             {
-                menus.AddRange(new[]
-                {
-                    new Menu { Name = "Dashboard", Category = "", Url = "/dashboard", Icon = "bi bi-grid-fill", Order = 1, IsActive = true, IdRole = financieroRole.IdRole },
-                    new Menu { Name = "Movimientos", Category = "Operaciones", Url = "/movements", Icon = "bi bi-arrow-left-right", Order = 2, IsActive = true, IdRole = financieroRole.IdRole },
-                    new Menu { Name = "Reporte de stock", Category = "Reportes", Url = "/stockreport", Icon = "bi bi-clipboard-data", Order = 3, IsActive = true, IdRole = financieroRole.IdRole },
-                    new Menu { Name = "Kardex", Category = "Reportes", Url = "/kardex", Icon = "bi bi-journal-text", Order = 4, IsActive = true, IdRole = financieroRole.IdRole },
-                    new Menu { Name = "Análisis IA", Category = "Operaciones", Url = "/analytics", Icon = "bi bi-stars", Order = 5, IsActive = true, IdRole = financieroRole.IdRole }
-                });
-            }
+                new Menu { Name = "Dashboard", Category = "", Url = "/dashboard", Icon = "bi bi-grid-fill", Order = 1, IsActive = true, IdRole = financieroRole.IdRole },
+                new Menu { Name = "Movimientos", Category = "Operaciones", Url = "/movements", Icon = "bi bi-arrow-left-right", Order = 2, IsActive = true, IdRole = financieroRole.IdRole },
+                new Menu { Name = "Reporte de stock", Category = "Reportes", Url = "/stockreport", Icon = "bi bi-clipboard-data", Order = 3, IsActive = true, IdRole = financieroRole.IdRole },
+                new Menu { Name = "Kardex", Category = "Reportes", Url = "/kardex", Icon = "bi bi-journal-text", Order = 4, IsActive = true, IdRole = financieroRole.IdRole },
+                new Menu { Name = "Análisis IA", Category = "Operaciones", Url = "/analytics", Icon = "bi bi-stars", Order = 5, IsActive = true, IdRole = financieroRole.IdRole }
+            });
+        }
 
-            db.Menus.AddRange(menus);
+        if (menusToAdd.Count > 0)
+        {
+            db.Menus.AddRange(menusToAdd);
             await db.SaveChangesAsync();
         }
     }

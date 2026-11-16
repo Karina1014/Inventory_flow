@@ -14,6 +14,26 @@ public class MenuRepository : IMenuRepository
         _db = db;
     }
 
+    public async Task<ICollection<MenuDto>> GetMenusByUserId(int idUser)
+    {
+        return await _db.Menus
+            .Include(m => m.Role)
+            .Where(m => m.IsActive && _db.Users.Any(u => u.IdUser == idUser && u.IdRole == m.IdRole))
+            .OrderBy(m => m.Order)
+            .Select(m => new MenuDto
+            {
+                IdMenu = m.IdMenu,
+                Name = m.Name,
+                Url = m.Url,
+                Icon = m.Icon,
+                Category = m.Category,
+                Order = m.Order,
+                IdRole = m.IdRole,
+                RoleName = m.Role != null && m.Role.Name != null ? m.Role.Name : string.Empty
+            })
+            .ToListAsync();
+    }
+
     public async Task<ICollection<MenuDto>> GetMenusByRoleName(string roleName)
     {
         if (string.IsNullOrWhiteSpace(roleName))

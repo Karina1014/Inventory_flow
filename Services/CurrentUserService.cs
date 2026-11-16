@@ -32,11 +32,6 @@ public class CurrentUserService
         NotifyStateChanged();
     }
 
-    public void SetUser(int userId, string name, string username, string role, int? warehouseId = null, string? warehouseName = null, string? email = null, string? phone = null)
-    {
-        SetUser(userId, name, username, role, false, warehouseId, warehouseName, email, phone);
-    }
-
     public void UpdateProfileData(string? name, string? email, string? phone)
     {
         Name = string.IsNullOrWhiteSpace(name) ? Username : name;
