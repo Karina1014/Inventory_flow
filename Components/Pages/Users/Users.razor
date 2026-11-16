@@ -42,8 +42,11 @@
                             <th>#</th>
                             <th>Nombre</th>
                             <th>Usuario</th>
-                            <th>Contraseña</th>
                             <th>Rol</th>
+                            <th>Estado</th>
+                            <th>Creado</th>
+                            <th>Actualizado</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -53,11 +56,25 @@
                                 <td class="col-id">@user.IdUser</td>
                                 <td class="col-name">@user.Name</td>
                                 <td>@user.Username</td>
-                                <td class="col-password">
-                                    <span class="password-dots"><i class="bi bi-lock-fill"></i> ••••••••</span>
-                                </td>
                                 <td>
                                     <span class="badge-role">@(user.Role?.Name ?? "Sin rol")</span>
+                                </td>
+                                <td>
+                                    @if (user.IsActive)
+                                    {
+                                        <span class="badge-active">Activo</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-inactive">Inactivo</span>
+                                    }
+                                </td>
+                                <td class="col-date">@user.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="col-date">@user.UpdatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="col-actions">
+                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(user)" title="Editar">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
                                 </td>
                             </tr>
                         }
@@ -73,7 +90,7 @@
     <div class="modal-backdrop" @onclick="CloseModal"></div>
     <div class="modal-box">
         <div class="modal-header">
-            <span class="modal-title">Nuevo usuario</span>
+            <span class="modal-title">@(isEditing ? "Editar usuario" : "Nuevo usuario")</span>
             <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
         </div>
 
@@ -105,17 +122,23 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label">Contraseña <span class="required">*</span></label>
+                <label class="form-label">
+                    Contraseña
+                    @if (!isEditing)
+                    {
+                        <span class="required">*</span>
+                    }
+                </label>
                 <div class="input-box">
                     <i class="bi bi-shield-lock-fill input-icon"></i>
                     <input class="form-input" type="@(showPassword ? "text" : "password")"
-                           placeholder="Mínimo 6 caracteres"
+                           placeholder="@(isEditing ? "Dejar vacío para mantener la actual" : "Mínimo 6 caracteres")"
                            @bind="formPassword" @bind:event="oninput" />
                     <button type="button" class="btn-eye" @onclick="() => showPassword = !showPassword">
                         <i class="bi @(showPassword ? "bi-eye-slash-fill" : "bi-eye-fill")"></i>
                     </button>
                 </div>
-                @if (showValidation && string.IsNullOrWhiteSpace(formPassword))
+                @if (showValidation && !isEditing && string.IsNullOrWhiteSpace(formPassword))
                 {
                     <span class="field-error">La contraseña es requerida.</span>
                 }
@@ -141,6 +164,14 @@
                 {
                     <span class="field-error">El rol es requerido.</span>
                 }
+            </div>
+
+            <div class="form-group toggle-group">
+                <label class="form-label">Estado</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" @bind="formIsActive" />
+                    <span class="toggle-label">@(formIsActive ? "Activo" : "Inactivo")</span>
+                </label>
             </div>
 
             @if (!string.IsNullOrEmpty(errorMessage))
@@ -173,12 +204,15 @@
     private bool isSaving;
     private bool showValidation;
     private bool showPassword;
+    private bool isEditing;
 
     private string formName = string.Empty;
     private string formUserName = string.Empty;
     private string formPassword = string.Empty;
     private int formIdRole;
+    private bool formIsActive = true;
 
+    private User? selectedUser;
     private string errorMessage = string.Empty;
 
     protected override void OnInitialized()
@@ -201,10 +235,28 @@
 
     private void OpenCreate()
     {
+        isEditing = false;
+        selectedUser = null;
         formName = string.Empty;
         formUserName = string.Empty;
         formPassword = string.Empty;
         formIdRole = 0;
+        formIsActive = true;
+        errorMessage = string.Empty;
+        showValidation = false;
+        showPassword = false;
+        showModal = true;
+    }
+
+    private void OpenEdit(User user)
+    {
+        isEditing = true;
+        selectedUser = user;
+        formName = user.Name ?? string.Empty;
+        formUserName = user.Username ?? string.Empty;
+        formPassword = string.Empty;
+        formIdRole = user.IdRole ?? 0;
+        formIsActive = user.IsActive;
         errorMessage = string.Empty;
         showValidation = false;
         showPassword = false;
@@ -215,6 +267,7 @@
     {
         showModal = false;
         isSaving = false;
+        showValidation = false;
         errorMessage = string.Empty;
     }
 
@@ -223,18 +276,31 @@
         showValidation = true;
         errorMessage = string.Empty;
 
+        var password = formPassword.Trim();
+
         if (string.IsNullOrWhiteSpace(formName)
             || string.IsNullOrWhiteSpace(formUserName)
-            || string.IsNullOrWhiteSpace(formPassword)
-            || formPassword.Trim().Length < 6
             || formIdRole == 0)
         {
             return;
         }
 
-        var userName = formUserName.Trim();
+        // Al crear la contraseña es obligatoria; al editar, vacía significa "mantener la actual"
+        if (!isEditing && string.IsNullOrWhiteSpace(password))
+        {
+            return;
+        }
 
-        if (!UserRepo.IsUniqueUser(userName))
+        if (!string.IsNullOrWhiteSpace(password) && password.Length < 6)
+        {
+            return;
+        }
+
+        var userName = formUserName.Trim();
+        var usernameChanged = !isEditing
+            || !string.Equals(selectedUser?.Username, userName, StringComparison.OrdinalIgnoreCase);
+
+        if (usernameChanged && !UserRepo.IsUniqueUser(userName))
         {
             errorMessage = $"Ya existe un usuario con el nombre \"{userName}\".";
             return;
@@ -244,13 +310,27 @@
 
         try
         {
-            await UserRepo.Register(new CreateUserDto
+            if (isEditing && selectedUser != null)
             {
-                UserName = userName,
-                Name = formName.Trim(),
-                Password = formPassword,
-                IdRole = formIdRole
-            });
+                await UserRepo.UpdateUser(selectedUser.IdUser, new UpdateUserDto
+                {
+                    UserName = userName,
+                    Name = formName.Trim(),
+                    Password = string.IsNullOrWhiteSpace(password) ? null : password,
+                    IdRole = formIdRole,
+                    IsActive = formIsActive
+                });
+            }
+            else
+            {
+                await UserRepo.Register(new CreateUserDto
+                {
+                    UserName = userName,
+                    Name = formName.Trim(),
+                    Password = password,
+                    IdRole = formIdRole
+                });
+            }
 
             LoadData();
             CloseModal();

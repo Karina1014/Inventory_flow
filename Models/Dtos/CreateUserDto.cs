@@ -15,4 +15,6 @@ public class CreateUserDto
     public string? Password {get; set;}
     [Required(ErrorMessage = "El Campo IdRole es requerido")]
     public int IdRole {get; set;}
+    [Required(ErrorMessage = "El Campo Activo es requerido")]
+    public bool IsActive{get;set;}
 }

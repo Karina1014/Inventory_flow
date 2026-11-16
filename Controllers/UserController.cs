@@ -72,6 +72,39 @@ namespace Inventory_Flow.Controllers
       return CreatedAtRoute("GetUser", new { IdUser= result.IdUser }, result);
     }
 
+    [HttpPut("{IdUser:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateUser(int IdUser, [FromBody] UpdateUserDto updateUserDto)
+    {
+      if (updateUserDto == null || !ModelState.IsValid)
+      {
+        return BadRequest(ModelState);
+      }
+
+      var existing = _userRepository.GetUser(IdUser);
+      if (existing == null)
+      {
+        return NotFound($"El usuario con el id {IdUser} no existe");
+      }
+
+      var newUserName = updateUserDto.UserName?.Trim() ?? string.Empty;
+      if (string.IsNullOrWhiteSpace(newUserName))
+      {
+        return BadRequest("Username es requerido");
+      }
+
+      var usernameChanged = !string.Equals(existing.Username, newUserName, StringComparison.OrdinalIgnoreCase);
+      if (usernameChanged && !_userRepository.IsUniqueUser(newUserName))
+      {
+        return BadRequest("El usuario ya existe");
+      }
+
+      await _userRepository.UpdateUser(IdUser, updateUserDto);
+      return NoContent();
+    }
+
     [HttpPost("Login", Name = "LoginUser")]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

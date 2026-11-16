@@ -152,6 +152,86 @@
     letter-spacing: 0;
 }
 
+.col-date {
+    color: #64748b;
+    white-space: nowrap;
+    font-size: 0.8rem;
+}
+
+.col-actions {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.15s;
+}
+
+.btn-edit {
+    background: #e0f2fe;
+    color: #0077b6;
+}
+
+.btn-edit:hover {
+    background: #bae6fd;
+}
+
+.badge-active {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.badge-inactive {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.toggle-group {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.toggle-switch {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.toggle-switch input {
+    accent-color: #0077b6;
+    width: 16px;
+    height: 16px;
+}
+
+.toggle-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #374151;
+}
+
 .badge-role {
     display: inline-block;
     padding: 0.2rem 0.6rem;

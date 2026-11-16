@@ -101,16 +101,46 @@ public class UserRepository : IUserRepository
     public async Task<User> Register(CreateUserDto createUserDto)
     {
         var encriptedPassword = BCrypt.Net.BCrypt.HashPassword(createUserDto.Password);
+        
         var user = new User()
         {
             Username = createUserDto.UserName ?? "No Username",
             Name = createUserDto.Name,
             IdRole = createUserDto.IdRole,
-            Password = encriptedPassword
+            Password = encriptedPassword,
+            IsActive = true,
+            CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
         };
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
         return user;
 
+    }
+
+    public async Task<User> UpdateUser(int IdUser, UpdateUserDto updateUserDto)
+    {
+        var user = await _db.Users.FindAsync(IdUser)
+            ?? throw new KeyNotFoundException($"Usuario con Id {IdUser} no encontrado.");
+
+        user.Name = updateUserDto.Name;
+        user.Username = string.IsNullOrWhiteSpace(updateUserDto.UserName)
+            ? user.Username
+            : updateUserDto.UserName.Trim();
+        user.IdRole = updateUserDto.IdRole;
+        user.IsActive = updateUserDto.IsActive;
+
+        // La contraseña solo se re-encripta si llegó una nueva
+        if (!string.IsNullOrWhiteSpace(updateUserDto.Password))
+        {
+            user.Password = BCrypt.Net.BCrypt.HashPassword(updateUserDto.Password);
+        }
+
+        // CreatedAt no se toca: solo se marca la fecha del cambio
+        user.UpdatedAt = DateTime.Now;
+
+        _db.Users.Update(user);
+        await _db.SaveChangesAsync();
+        return user;
     }
 }

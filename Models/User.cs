@@ -10,7 +10,10 @@ public class User
     public int IdUser {get;set;}
     public string? Name {get;set;}
     public string Username { get; set; } = string.Empty;
-    public string? Password {get;set;}   
+    public string? Password {get;set;} 
+    public bool IsActive {get;set;}
+    public DateTime CreatedAt { get; set;} = DateTime.Now;
+    public DateTime UpdatedAt { get; set;} = DateTime.Now;
     public int? IdRole { get; set; }
     
     [ForeignKey("IdRole")]
