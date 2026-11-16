@@ -18,4 +18,6 @@ public class UpdateUserDto
     public int IdRole { get; set; }
 
     public bool IsActive { get; set; } = true;
+
+    public int IdWarehouse { get; set; }
 }

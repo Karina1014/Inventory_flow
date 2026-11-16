@@ -41,7 +41,14 @@ public class UserContextService : IUserContextService
 
     public string Role => Principal?.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
 
-    public bool IsAdmin => string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase);
+    public bool IsAdmin
+    {
+        get
+        {
+            var claimVal = Principal?.FindFirst("is_admin")?.Value;
+            return bool.TryParse(claimVal, out var isAdmin) && isAdmin;
+        }
+    }
 
     public int? WarehouseId
     {

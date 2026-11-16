@@ -37,6 +37,7 @@ public class RoleRepository : IRoleRepository
         {
             Name = createRoleDto.Name,
             Description = createRoleDto.Description,
+            IsAdmin = createRoleDto.IsAdmin,
             CreateDate = DateTime.UtcNow
         };
         _db.Roles.Add(role);
@@ -51,6 +52,7 @@ public class RoleRepository : IRoleRepository
 
         role.Name = updateRoleDto.Name;
         role.Description = updateRoleDto.Description;
+        role.IsAdmin = updateRoleDto.IsAdmin;
 
         _db.Roles.Update(role);
         await _db.SaveChangesAsync();

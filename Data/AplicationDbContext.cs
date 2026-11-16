@@ -20,6 +20,7 @@ public class AplicationDbContext: DbContext
     public DbSet<InventoryMovement> InventoryMovements {get;set;}
     public DbSet<InventoryMovementDetail> InventoryMovementDetails {get;set;}
     public DbSet<ThresholdInvetory> ThresholdInvetories { get; set; }
+    public DbSet<Menu>Menus {get;set;}
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -52,5 +53,12 @@ public class AplicationDbContext: DbContext
             .WithMany()
             .HasForeignKey(u => u.IdWarehouse)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Relación Menu -> Role
+        modelBuilder.Entity<Menu>()
+            .HasOne(m => m.Role)
+            .WithMany()
+            .HasForeignKey(m => m.IdRole)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

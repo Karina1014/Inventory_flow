@@ -11,4 +11,5 @@ public class Role
     public string? Description {get;set;}
     public DateTime CreateDate { get; set;} = DateTime.UtcNow;
 
+    public bool IsAdmin { get; set; } = false;
 }

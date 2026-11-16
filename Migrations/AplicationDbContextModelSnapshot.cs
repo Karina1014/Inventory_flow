@@ -167,6 +167,49 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("Lots");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.Menu", b =>
+                {
+                    b.Property<int>("IdMenu")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdMenu"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("IdRole")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("IdMenu");
+
+                    b.HasIndex("IdRole");
+
+                    b.ToTable("Menus");
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.MovementType", b =>
                 {
                     b.Property<int>("IdMovementType")
@@ -250,6 +293,9 @@ namespace Inventory_Flow.Migrations
 
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsAdmin")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Name")
                         .HasColumnType("nvarchar(max)");
@@ -430,6 +476,17 @@ namespace Inventory_Flow.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.Menu", b =>
+                {
+                    b.HasOne("Inventory_Flow.Models.Role", "Role")
+                        .WithMany()
+                        .HasForeignKey("IdRole")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
                 });
 
             modelBuilder.Entity("Inventory_Flow.Models.Product", b =>

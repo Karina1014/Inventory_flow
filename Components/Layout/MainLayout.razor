@@ -1,6 +1,8 @@
 @inherits LayoutComponentBase
 @inject NavigationManager NavigationManager
 @inject Inventory_Flow.Services.CurrentUserService CurrentUserService
+@inject Inventory_Flow.Repository.IRepository.IMenuRepository MenuRepo
+@using Inventory_Flow.Models.Dtos
 @implements IDisposable
 
 <ToastContainer />
@@ -13,95 +15,129 @@
         </div>
 
         <nav class="nav-links">
-            <NavLink class="nav-item" href="dashboard" Match="NavLinkMatch.All">
-                <i class="bi bi-grid-fill"></i>
-                <span>Dashboard</span>
-            </NavLink>
-
-            <details class="nav-group" open>
-                <summary class="nav-group-title">
-                    <span>Administración</span>
-                    <i class="bi bi-chevron-down nav-group-chevron"></i>
-                </summary>
-
-                <div class="nav-submenu">
-                    <NavLink class="nav-item nav-subitem" href="warehouses">
-                        <i class="bi bi-building"></i>
-                        <span>Sucursales</span>
+            @if (userMenus.Any())
+            {
+                @* Menús Raíz (sin categoría como Dashboard) *@
+                @foreach (var item in userMenus.Where(m => string.IsNullOrWhiteSpace(m.Category)))
+                {
+                    <NavLink class="nav-item" href="@item.Url.TrimStart('/')" Match="@(item.Url == "/dashboard" ? NavLinkMatch.All : NavLinkMatch.Prefix)">
+                        <i class="@item.Icon"></i>
+                        <span>@item.Name</span>
                     </NavLink>
+                }
 
-                    <NavLink class="nav-item nav-subitem" href="categories">
-                        <i class="bi bi-tags-fill"></i>
-                        <span>Categorías</span>
-                    </NavLink>
+                @* Menús Agrupados por Categoría *@
+                @foreach (var group in userMenus.Where(m => !string.IsNullOrWhiteSpace(m.Category)).GroupBy(m => m.Category))
+                {
+                    <details class="nav-group" open>
+                        <summary class="nav-group-title">
+                            <span>@group.Key</span>
+                            <i class="bi bi-chevron-down nav-group-chevron"></i>
+                        </summary>
 
-                    <NavLink class="nav-item nav-subitem" href="products">
-                        <i class="bi bi-box-seam"></i>
-                        <span>Productos</span>
-                    </NavLink>
+                        <div class="nav-submenu">
+                            @foreach (var sub in group)
+                            {
+                                <NavLink class="nav-item nav-subitem" href="@sub.Url.TrimStart('/')">
+                                    <i class="@sub.Icon"></i>
+                                    <span>@sub.Name</span>
+                                </NavLink>
+                            }
+                        </div>
+                    </details>
+                }
+            }
+            else
+            {
+                @* Menú Estático de Respaldo *@
+                <NavLink class="nav-item" href="dashboard" Match="NavLinkMatch.All">
+                    <i class="bi bi-grid-fill"></i>
+                    <span>Dashboard</span>
+                </NavLink>
 
-                    <NavLink class="nav-item nav-subitem" href="movementtypes">
-                        <i class="bi bi-arrow-left-right"></i>
-                        <span>Tipos de movimientos</span>
-                    </NavLink>
+                @if (CurrentUserService.IsAdmin)
+                {
+                    <details class="nav-group" open>
+                        <summary class="nav-group-title">
+                            <span>Administración</span>
+                            <i class="bi bi-chevron-down nav-group-chevron"></i>
+                        </summary>
 
-                    <NavLink class="nav-item nav-subitem" href="roles">
-                        <i class="bi bi-shield-lock-fill"></i>
-                        <span>Roles</span>
-                    </NavLink>
+                        <div class="nav-submenu">
+                            <NavLink class="nav-item nav-subitem" href="warehouses">
+                                <i class="bi bi-building"></i>
+                                <span>Sucursales</span>
+                            </NavLink>
+                            <NavLink class="nav-item nav-subitem" href="categories">
+                                <i class="bi bi-tags-fill"></i>
+                                <span>Categorías</span>
+                            </NavLink>
+                            <NavLink class="nav-item nav-subitem" href="products">
+                                <i class="bi bi-box-seam"></i>
+                                <span>Productos</span>
+                            </NavLink>
+                            <NavLink class="nav-item nav-subitem" href="movementtypes">
+                                <i class="bi bi-arrow-left-right"></i>
+                                <span>Tipos de movimientos</span>
+                            </NavLink>
+                            <NavLink class="nav-item nav-subitem" href="roles">
+                                <i class="bi bi-shield-lock-fill"></i>
+                                <span>Roles</span>
+                            </NavLink>
+                            <NavLink class="nav-item nav-subitem" href="users">
+                                <i class="bi bi-people-fill"></i>
+                                <span>Usuarios</span>
+                            </NavLink>
+                            <NavLink class="nav-item nav-subitem" href="thresholds">
+                                <i class="bi bi-sliders"></i>
+                                <span>Umbral de Stock</span>
+                            </NavLink>
+                            <NavLink class="nav-item nav-subitem" href="lots">
+                                <i class="bi bi-boxes"></i>
+                                <span>Lotes</span>
+                            </NavLink>
+                        </div>
+                    </details>
+                }
 
-                    <NavLink class="nav-item nav-subitem" href="users">
-                        <i class="bi bi-people-fill"></i>
-                        <span>Usuarios</span>
-                    </NavLink>
+                <details class="nav-group" open>
+                    <summary class="nav-group-title">
+                        <span>Operaciones</span>
+                        <i class="bi bi-chevron-down nav-group-chevron"></i>
+                    </summary>
 
-                    <NavLink class="nav-item nav-subitem" href="thresholds">
-                        <i class="bi bi-sliders"></i>
-                        <span>Umbral de Stock</span>
-                    </NavLink>
-                    <NavLink class="nav-item nav-subitem" href="lots">
-                        <i class="bi bi-boxes"></i>
-                        <span>Lotes</span>
-                    </NavLink>
-                </div>
-            </details>
-
-            <details class="nav-group" open>
-                <summary class="nav-group-title">
-                    <span>Operaciones</span>
-                    <i class="bi bi-chevron-down nav-group-chevron"></i>
-                </summary>
-
-                <div class="nav-submenu">
-                    <NavLink class="nav-item nav-subitem" href="movements">
-                        <i class="bi bi-arrow-left-right"></i>
-                        <span>Movimientos</span>
-                    </NavLink>
-
-                    <NavLink class="nav-item nav-subitem" href="analytics">
-                        <i class="bi bi-stars"></i>
-                        <span>Análisis IA</span>
-                    </NavLink>
-                </div>
-            </details>
-
-            <details class="nav-group" open>
-                <summary class="nav-group-title">
-                    <span>Reportes</span>
-                    <i class="bi bi-chevron-down nav-group-chevron"></i>
-                </summary>
                     <div class="nav-submenu">
-                    <NavLink class="nav-item nav-subitem" href="stockreport">
-                        <i class="bi bi-clipboard-data"></i>
-                        <span>Reporte de stock</span>
-                    </NavLink>
+                        <NavLink class="nav-item nav-subitem" href="movements">
+                            <i class="bi bi-arrow-left-right"></i>
+                            <span>Movimientos</span>
+                        </NavLink>
+                        @if (CurrentUserService.IsAdmin)
+                        {
+                            <NavLink class="nav-item nav-subitem" href="analytics">
+                                <i class="bi bi-stars"></i>
+                                <span>Análisis IA</span>
+                            </NavLink>
+                        }
+                    </div>
+                </details>
 
-                    <NavLink class="nav-item nav-subitem" href="kardex">
-                        <i class="bi bi-journal-text"></i>
-                        <span>Kardex</span>
-                    </NavLink>
-                  </div>
-            </details>
+                <details class="nav-group" open>
+                    <summary class="nav-group-title">
+                        <span>Reportes</span>
+                        <i class="bi bi-chevron-down nav-group-chevron"></i>
+                    </summary>
+                    <div class="nav-submenu">
+                        <NavLink class="nav-item nav-subitem" href="stockreport">
+                            <i class="bi bi-clipboard-data"></i>
+                            <span>Reporte de stock</span>
+                        </NavLink>
+                        <NavLink class="nav-item nav-subitem" href="kardex">
+                            <i class="bi bi-journal-text"></i>
+                            <span>Kardex</span>
+                        </NavLink>
+                    </div>
+                </details>
+            }
 
             <NavLink class="nav-item mt-2" href="profile">
                 <i class="bi bi-person-circle"></i>
@@ -169,18 +205,51 @@
 
 @code {
     private bool isDropdownOpen;
+    private List<MenuDto> userMenus = new();
 
     private void ToggleDropdown() => isDropdownOpen = !isDropdownOpen;
     private void CloseDropdown() => isDropdownOpen = false;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        CurrentUserService.OnChange += StateHasChanged;
+        CurrentUserService.OnChange += HandleUserChanged;
 
         // Redirigir al login si el usuario no está autenticado
         if (!CurrentUserService.IsAuthenticated)
         {
             NavigationManager.NavigateTo("/login", replace: true);
+            return;
+        }
+
+        await LoadMenusAsync();
+    }
+
+    private void HandleUserChanged()
+    {
+        InvokeAsync(async () =>
+        {
+            await LoadMenusAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadMenusAsync()
+    {
+        if (CurrentUserService.IsAuthenticated && !string.IsNullOrWhiteSpace(CurrentUserService.Role))
+        {
+            try
+            {
+                var menus = await MenuRepo.GetMenusByRoleName(CurrentUserService.Role);
+                userMenus = menus.ToList();
+            }
+            catch
+            {
+                userMenus = new();
+            }
+        }
+        else
+        {
+            userMenus = new();
         }
     }
 
@@ -188,6 +257,7 @@
     {
         isDropdownOpen = false;
         CurrentUserService.Clear();
+        userMenus.Clear();
         NavigationManager.NavigateTo("/login");
     }
 
@@ -202,15 +272,10 @@
         return name.Substring(0, Math.Min(2, name.Length)).ToUpper();
     }
 
-    private string GetRoleLabel(string role) => role switch
-    {
-        "Admin"    => "Administrador",
-        "AppUser"  => "Usuario",
-        _          => string.IsNullOrWhiteSpace(role) ? "Sin rol" : role
-    };
+    private string GetRoleLabel(string role) => string.IsNullOrWhiteSpace(role) ? "Sin rol" : role;
 
     public void Dispose()
     {
-        CurrentUserService.OnChange -= StateHasChanged;
+        CurrentUserService.OnChange -= HandleUserChanged;
     }
 }

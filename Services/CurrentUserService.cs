@@ -10,26 +10,31 @@ public class CurrentUserService
     public string? Email { get; private set; }
     public string? Phone { get; private set; }
     public string Role { get; private set; } = string.Empty;
+    public bool IsAdmin { get; private set; } = false;
     public int? WarehouseId { get; private set; }
     public string? WarehouseName { get; private set; }
     public bool IsAuthenticated { get; private set; } = false;
 
-    public bool IsAdmin => string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase);
-
     public event Action? OnChange;
 
-    public void SetUser(int userId, string name, string username, string role, int? warehouseId = null, string? warehouseName = null, string? email = null, string? phone = null)
+    public void SetUser(int userId, string name, string username, string role, bool isAdmin, int? warehouseId = null, string? warehouseName = null, string? email = null, string? phone = null)
     {
         UserId = userId;
         Name = string.IsNullOrWhiteSpace(name) ? username : name;
         Username = username;
         Role = string.IsNullOrWhiteSpace(role) ? string.Empty : role;
+        IsAdmin = isAdmin;
         WarehouseId = warehouseId;
         WarehouseName = warehouseName;
         Email = email;
         Phone = phone;
         IsAuthenticated = true;
         NotifyStateChanged();
+    }
+
+    public void SetUser(int userId, string name, string username, string role, int? warehouseId = null, string? warehouseName = null, string? email = null, string? phone = null)
+    {
+        SetUser(userId, name, username, role, false, warehouseId, warehouseName, email, phone);
     }
 
     public void UpdateProfileData(string? name, string? email, string? phone)
@@ -40,11 +45,6 @@ public class CurrentUserService
         NotifyStateChanged();
     }
 
-    public void SetUser(string name, string username, string role)
-    {
-        SetUser(0, name, username, role, null, null, null, null);
-    }
-
     public void Clear()
     {
         UserId = 0;
@@ -53,6 +53,7 @@ public class CurrentUserService
         Email = null;
         Phone = null;
         Role = string.Empty;
+        IsAdmin = false;
         WarehouseId = null;
         WarehouseName = null;
         IsAuthenticated = false;
@@ -61,4 +62,3 @@ public class CurrentUserService
 
     private void NotifyStateChanged() => OnChange?.Invoke();
 }
-

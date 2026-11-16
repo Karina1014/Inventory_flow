@@ -76,13 +76,16 @@ public class UserRepository : IUserRepository
         }
         var key = Encoding.UTF8.GetBytes(secretKey);
 
+        var isAdmin = user.Role?.IsAdmin ?? false;
+
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.IdUser.ToString()),
             new Claim("idUser", user.IdUser.ToString()),
             new Claim(ClaimTypes.Name, user.Username),
             new Claim("username", user.Username),
-            new Claim(ClaimTypes.Role, user.Role?.Name ?? string.Empty)
+            new Claim(ClaimTypes.Role, user.Role?.Name ?? string.Empty),
+            new Claim("is_admin", isAdmin.ToString())
         };
 
         if (user.IdWarehouse.HasValue)
@@ -109,6 +112,7 @@ public class UserRepository : IUserRepository
                 Email = user.Email,
                 Phone = user.Phone,
                 Role = user.Role?.Name,
+                IsAdmin = isAdmin,
                 IdWarehouse = user.IdWarehouse,
                 WarehouseName = user.Warehouse?.Name,
                 Password = ""
@@ -126,6 +130,7 @@ public class UserRepository : IUserRepository
             Username = createUserDto.UserName ?? "No Username",
             Name = createUserDto.Name,
             IdRole = createUserDto.IdRole,
+            IdWarehouse = createUserDto.IdWarehouse > 0 ? createUserDto.IdWarehouse : null,
             Password = encriptedPassword,
             IsActive = true,
             CreatedAt = DateTime.Now,
@@ -147,6 +152,7 @@ public class UserRepository : IUserRepository
             ? user.Username
             : updateUserDto.UserName.Trim();
         user.IdRole = updateUserDto.IdRole;
+        user.IdWarehouse = updateUserDto.IdWarehouse > 0 ? updateUserDto.IdWarehouse : null;
         user.IsActive = updateUserDto.IsActive;
 
         // La contraseña solo se re-encripta si llegó una nueva
@@ -173,7 +179,7 @@ public class UserRepository : IUserRepository
 
         if (user == null) return null;
 
-        var isAdmin = string.Equals(user.Role?.Name, "Admin", StringComparison.OrdinalIgnoreCase);
+        var isAdmin = user.Role?.IsAdmin ?? false;
 
         return new UserProfileDto
         {

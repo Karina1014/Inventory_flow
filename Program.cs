@@ -31,6 +31,7 @@ builder.Services.AddScoped<IMovementTypeRepository, MovementTypeRepository>();
 builder.Services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<IThresholdInvetoryRepository, ThresholdInvetoryRepository>();
+builder.Services.AddScoped<IMenuRepository, MenuRepository>();
 
 // 3. AutoMapper
 builder.Services.AddAutoMapper(cfg => {
@@ -114,5 +115,19 @@ app.UseAntiforgery();
 app.MapControllers();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// 7. Semilla de datos (Roles y Menús)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AplicationDbContext>();
+    try
+    {
+        await DbSeeder.SeedAsync(db);
+    }
+    catch
+    {
+        // Si la migración aún no ha sido aplicada, continúa sin bloquear el inicio
+    }
+}
 
 app.Run();

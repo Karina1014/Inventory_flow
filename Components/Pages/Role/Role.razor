@@ -40,6 +40,7 @@
                             <th>#</th>
                             <th>Nombre</th>
                             <th>Descripción</th>
+                            <th>Tipo de Acceso</th>
                             <th>Creado</th>
                             <th>Acciones</th>
                         </tr>
@@ -51,6 +52,16 @@
                                 <td class="col-id">@r.IdRole</td>
                                 <td class="col-name">@r.Name</td>
                                 <td class="col-address">@r.Description</td>
+                                <td>
+                                    @if (r.IsAdmin)
+                                    {
+                                        <span class="badge-active"><i class="bi bi-shield-check me-1"></i>Acceso Total</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-inactive">Estándar</span>
+                                    }
+                                </td>
                                 <td class="col-date">@r.CreateDate.ToLocalTime().ToString("dd/MM/yyyy")</td>
                                 <td class="col-actions">
                                     <button class="action-btn btn-edit" @onclick="() => OpenEdit(r)" title="Editar">
@@ -98,6 +109,14 @@
                     <input class="form-input" type="text" placeholder="Descripción de permisos"
                            @bind="formDescription" @bind:event="oninput" />
                 </div>
+            </div>
+
+            <div class="form-group toggle-group">
+                <label class="form-label">Privilegios</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" @bind="formIsAdmin" />
+                    <span class="toggle-label">@(formIsAdmin ? "Administrador (Acceso Global)" : "Operativo / Estándar")</span>
+                </label>
             </div>
 
             @if (!string.IsNullOrEmpty(errorMessage))
@@ -152,6 +171,7 @@
 
     private string formName = string.Empty;
     private string formDescription = string.Empty;
+    private bool formIsAdmin;
     private string errorMessage = string.Empty;
 
     private RoleModel? selectedRole;
@@ -177,6 +197,7 @@
     {
         formName = string.Empty;
         formDescription = string.Empty;
+        formIsAdmin = false;
         errorMessage = string.Empty;
         showValidation = false;
         isEditing = false;
@@ -189,6 +210,7 @@
         selectedRole = r;
         formName = r.Name ?? string.Empty;
         formDescription = r.Description ?? string.Empty;
+        formIsAdmin = r.IsAdmin;
         errorMessage = string.Empty;
         showValidation = false;
         isEditing = true;
@@ -224,7 +246,8 @@
             var dto = new CreateRoleDto
             {
                 Name = formName.Trim(),
-                Description = string.IsNullOrWhiteSpace(formDescription) ? null : formDescription.Trim()
+                Description = string.IsNullOrWhiteSpace(formDescription) ? null : formDescription.Trim(),
+                IsAdmin = formIsAdmin
             };
 
             if (isEditing && selectedRole != null)

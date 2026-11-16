@@ -7,6 +7,7 @@
 @using RoleModel = Inventory_Flow.Models.Role
 @inject IUserRepository UserRepo
 @inject IRoleRepository RoleRepo
+@inject IWarehouseRepository WarehouseRepo
 
 <div class="page-container">
     <div class="page-header">
@@ -43,6 +44,7 @@
                             <th>Nombre</th>
                             <th>Usuario</th>
                             <th>Rol</th>
+                            <th>Sucursal</th>
                             <th>Estado</th>
                             <th>Creado</th>
                             <th>Actualizado</th>
@@ -58,6 +60,9 @@
                                 <td>@user.Username</td>
                                 <td>
                                     <span class="badge-role">@(user.Role?.Name ?? "Sin rol")</span>
+                                </td>
+                                <td>
+                                    <span class="badge-branch">@(user.Warehouse?.Name ?? (user.Role?.IsAdmin == true ? "Acceso Global" : "Sin asignar"))</span>
                                 </td>
                                 <td>
                                     @if (user.IsActive)
@@ -166,6 +171,20 @@
                 }
             </div>
 
+            <div class="form-group">
+                <label class="form-label">Sucursal</label>
+                <div class="input-box">
+                    <i class="bi bi-building input-icon"></i>
+                    <select class="form-input" @bind="formIdWarehouse">
+                        <option value="0">Sin sucursal asignada (o Acceso Global)</option>
+                        @foreach (var warehouse in warehouses)
+                        {
+                            <option value="@warehouse.IdWarehouse">@warehouse.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
             <div class="form-group toggle-group">
                 <label class="form-label">Estado</label>
                 <label class="toggle-switch">
@@ -199,6 +218,7 @@
 @code {
     private List<User> users = new();
     private List<RoleModel> roles = new();
+    private List<Warehouse> warehouses = new();
 
     private bool showModal;
     private bool isSaving;
@@ -210,6 +230,7 @@
     private string formUserName = string.Empty;
     private string formPassword = string.Empty;
     private int formIdRole;
+    private int formIdWarehouse;
     private bool formIsActive = true;
 
     private User? selectedUser;
@@ -226,6 +247,7 @@
         {
             users = UserRepo.GetUsers().ToList();
             roles = RoleRepo.GetRoles().OrderBy(r => r.Name).ToList();
+            warehouses = WarehouseRepo.GetWarehouses().OrderBy(w => w.Name).ToList();
         }
         catch
         {
@@ -241,6 +263,7 @@
         formUserName = string.Empty;
         formPassword = string.Empty;
         formIdRole = 0;
+        formIdWarehouse = 0;
         formIsActive = true;
         errorMessage = string.Empty;
         showValidation = false;
@@ -256,6 +279,7 @@
         formUserName = user.Username ?? string.Empty;
         formPassword = string.Empty;
         formIdRole = user.IdRole ?? 0;
+        formIdWarehouse = user.IdWarehouse ?? 0;
         formIsActive = user.IsActive;
         errorMessage = string.Empty;
         showValidation = false;
@@ -318,6 +342,7 @@
                     Name = formName.Trim(),
                     Password = string.IsNullOrWhiteSpace(password) ? null : password,
                     IdRole = formIdRole,
+                    IdWarehouse = formIdWarehouse,
                     IsActive = formIsActive
                 });
             }
@@ -328,7 +353,8 @@
                     UserName = userName,
                     Name = formName.Trim(),
                     Password = password,
-                    IdRole = formIdRole
+                    IdRole = formIdRole,
+                    IdWarehouse = formIdWarehouse
                 });
             }
 

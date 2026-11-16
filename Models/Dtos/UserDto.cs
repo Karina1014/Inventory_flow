@@ -15,5 +15,5 @@ public class UserDto
     public string? Phone { get; set; }
     public int? IdWarehouse { get; set; }
     public string? WarehouseName { get; set; }
-
+    public bool IsAdmin { get; set; }
 }

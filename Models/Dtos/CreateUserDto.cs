@@ -17,4 +17,6 @@ public class CreateUserDto
     public int IdRole {get; set;}
     [Required(ErrorMessage = "El Campo Activo es requerido")]
     public bool IsActive{get;set;}
+
+    public int IdWarehouse { get; set; }
 }
