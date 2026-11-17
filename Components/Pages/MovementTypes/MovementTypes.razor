@@ -4,30 +4,168 @@
 @using Inventory_Flow.Models.Dtos
 @using Inventory_Flow.Repository.IRepository
 @inject IMovementTypeRepository MovementRepo
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
 
 <div class="page-container">
-    <div class="page-header">
-        <div>
-            <h1 class="title">Movimientos de inventario</h1>
-            <p class="subtitle">Registro de movimientos de inventario con su tipo</p>
+    <!-- ENCABEZADO CON ÍCONO EN CAJA REDONDEADA -->
+    <div class="page-header-block">
+        <div class="header-icon-box">
+            <i class="bi bi-arrow-left-right"></i>
         </div>
-        <button class="btn-primary" @onclick="OpenCreate">
-            <i class="bi bi-plus-lg"></i>
-            Nuevo movimiento
-        </button>
+        <div>
+            <h1 class="title">Tipos de movimientos</h1>
+            <p class="subtitle">Configuración y clasificación de los movimientos de inventario.</p>
+        </div>
     </div>
 
-    <div class="panel">
-        <div class="panel-header">
-            <span class="panel-title">Listado de movimientos</span>
-            <span class="record-count">@totalMovementTypesCount registros</span>
+    <!-- BARRA DE HERRAMIENTAS: BÚSQUEDA Y FILTROS A LA IZQUIERDA + BOTÓN NUEVO A LA DERECHA -->
+    <div class="table-toolbar">
+        <div class="toolbar-left">
+            <!-- BUSCADOR -->
+            <div class="filter-search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" placeholder="Buscar código, modo o descripción..."
+                       @bind="searchTerm" @bind:event="oninput" @bind:after="OnFilterChangedAsync" />
+            </div>
+
+            <!-- SELECTOR DESPLEGABLE DE MODO -->
+            <div class="custom-select-container filter-mode-width">
+                <button type="button"
+                        class="custom-select-trigger @(isModeFilterOpen ? "open" : "")"
+                        @onclick="ToggleModeFilterDropdown">
+                    <div class="trigger-content">
+                        <i class="bi bi-shuffle trigger-icon"></i>
+                        <span class="trigger-text">@GetModeFilterName()</span>
+                    </div>
+                    <i class="bi bi-chevron-down trigger-chevron"></i>
+                </button>
+
+                @if (isModeFilterOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="custom-select-menu">
+                        <button type="button"
+                                class="custom-select-option @(selectedModeFilter == "all" ? "active" : "")"
+                                @onclick='() => SelectModeFilterAsync("all")'>
+                            <span>Todos los modos</span>
+                            @if (selectedModeFilter == "all")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        @foreach (var mode in availableModes)
+                        {
+                            <button type="button"
+                                    class="custom-select-option @(selectedModeFilter == mode ? "active" : "")"
+                                    @onclick="() => SelectModeFilterAsync(mode)">
+                                <span>@mode</span>
+                                @if (selectedModeFilter == mode)
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- SELECTOR DESPLEGABLE DE FECHAS TIPO CALENDARIO -->
+            <div class="custom-select-container filter-date-width">
+                <button type="button"
+                        class="custom-select-trigger @(isDateMenuOpen ? "open" : "")"
+                        @onclick="ToggleDateMenu">
+                    <div class="trigger-content">
+                        <i class="bi bi-calendar3 trigger-icon"></i>
+                        <span class="trigger-text">@GetDateFilterLabel()</span>
+                    </div>
+                    @if (selectedDatePreset != "all" || startDate.HasValue || endDate.HasValue)
+                    {
+                        <span class="clear-icon-wrapper" @onclick="ClearDateFilterAsync" @onclick:stopPropagation="true" title="Restablecer fechas">
+                            <i class="bi bi-x-circle-fill clear-filter-icon"></i>
+                        </span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-chevron-down trigger-chevron"></i>
+                    }
+                </button>
+
+                @if (isDateMenuOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="date-menu-popover">
+                        <div class="date-presets-list">
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "all" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("all")'>
+                                <i class="bi bi-infinity"></i>
+                                <span>Todas las fechas</span>
+                                @if (selectedDatePreset == "all") { <i class="bi bi-check2 option-check"></i> }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "today" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("today")'>
+                                <i class="bi bi-calendar-day"></i>
+                                <span>Hoy</span>
+                                @if (selectedDatePreset == "today") { <i class="bi bi-check2 option-check"></i> }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "week" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("week")'>
+                                <i class="bi bi-calendar-week"></i>
+                                <span>Últimos 7 días</span>
+                                @if (selectedDatePreset == "week") { <i class="bi bi-check2 option-check"></i> }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "month" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("month")'>
+                                <i class="bi bi-calendar-month"></i>
+                                <span>Este mes</span>
+                                @if (selectedDatePreset == "month") { <i class="bi bi-check2 option-check"></i> }
+                            </button>
+                        </div>
+
+                        <div class="date-menu-divider"></div>
+
+                        <!-- RANGO PERSONALIZADO -->
+                        <div class="custom-range-section">
+                            <span class="custom-range-title">Rango de fechas específico</span>
+                            <div class="custom-range-fields">
+                                <div class="date-range-field">
+                                    <label>Desde:</label>
+                                    <input type="date" @bind="customStartDate" />
+                                </div>
+                                <div class="date-range-field">
+                                    <label>Hasta:</label>
+                                    <input type="date" @bind="customEndDate" />
+                                </div>
+                            </div>
+                            <div class="custom-range-actions">
+                                <button type="button" class="btn-apply-range" @onclick="ApplyCustomDateRangeAsync">
+                                    Aplicar filtro
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
         </div>
 
+        <div class="toolbar-right">
+            <button type="button" class="btn-primary" @onclick="OpenCreate">
+                <i class="bi bi-plus-lg"></i>
+                <span>Nuevo tipo</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- TABLA PRINCIPAL ESTILO CUADRÍCULA LIMPIA (SIN COLUMNA ID) -->
+    <div class="panel">
         @if (movementTypes.Count == 0)
         {
             <div class="empty-state">
                 <i class="bi bi-arrow-left-right"></i>
-                <span>No hay movimientos registrados</span>
+                <span>No se encontraron tipos de movimientos registrados</span>
             </div>
         }
         else
@@ -36,32 +174,44 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            @* <th>#</th> *@
                             <th>Código</th>
                             <th>Modo</th>
                             <th>Descripción</th>
-                            @* <th>Creado</th> *@
-                            <th>Acciones</th>
+                            <th>Creado</th>
+                            <th class="col-actions-header">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var m in movementTypes)
                         {
                             <tr>
-                                @* <td class="col-id">@m.IdMovementType</td> *@
-                                <td class="col-code">@m.Code</td>
-                                <td>
-                                    <span class="badge">@m.Mode</span>
+                                <td class="col-code">
+                                    <span class="code-pill">@m.Code</span>
                                 </td>
-                                <td class="col-address">@m.Description</td>
-                                @* <td class="col-date">@m.CreationDate.ToString("dd/MM/yyyy HH:mm")</td> *@
+                                <td>
+                                    <span class="mode-badge @GetModeBadgeClass(m.Mode)">
+                                        <i class="@GetModeIconClass(m.Mode)"></i>
+                                        <span>@m.Mode</span>
+                                    </span>
+                                </td>
+                                <td class="col-description" title="@m.Description">@m.Description</td>
+                                <td class="col-date">@m.CreationDate.ToString("dd/MM/yyyy HH:mm")</td>
                                 <td class="col-actions">
-                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(m)" title="Editar">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </button>
-                                    <button class="action-btn btn-delete" @onclick="() => OpenDelete(m)" title="Eliminar">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </button>
+                                    <!-- BOTONES DE ACCIÓN DIRECTOS, CLAROS Y ATRACTIVOS (PILLS) -->
+                                    <div class="actions-pill-group">
+                                        <button type="button"
+                                                class="btn-action-pill btn-pill-edit"
+                                                @onclick="() => OpenEdit(m)"
+                                                title="Editar @m.Code">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="btn-action-pill btn-pill-delete"
+                                                @onclick="() => OpenDelete(m)"
+                                                title="Eliminar @m.Code">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -82,15 +232,15 @@
     <div class="modal-backdrop" @onclick="CloseModal"></div>
     <div class="modal-box">
         <div class="modal-header">
-            <span class="modal-title">@(isEditing ? "Editar movimiento" : "Nuevo movimiento")</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <span class="modal-title">@(isEditing ? "Editar tipo de movimiento" : "Nuevo tipo de movimiento")</span>
+            <button type="button" class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body">
             <div class="form-group">
                 <label class="form-label">Código <span class="required">*</span></label>
                 <div class="input-box">
                     <i class="bi bi-upc-scan input-icon"></i>
-                    <input class="form-input" type="text" placeholder="Código del movimiento"
+                    <input class="form-input" type="text" placeholder="Ej: ENT-01"
                            @bind="formCode" @bind:event="oninput" />
                 </div>
                 @if (showValidation && string.IsNullOrWhiteSpace(formCode))
@@ -100,24 +250,24 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label">Modo<span class="required">*</span></label>
+                <label class="form-label">Modo <span class="required">*</span></label>
                 <div class="input-box">
                     <i class="bi bi-arrow-left-right input-icon"></i>
-                    <input class="form-input" type="text" placeholder="Tipo de movimiento"
+                    <input class="form-input" type="text" placeholder="Ej: Entrada, Salida, Ajuste"
                            @bind="formMode" @bind:event="oninput" />
                 </div>
                 @if (showValidation && string.IsNullOrWhiteSpace(formMode))
                 {
-                    <span class="field-error">El Modo de movimiento es requerido.</span>
+                    <span class="field-error">El modo de movimiento es requerido.</span>
                 }
             </div>
 
             <div class="form-group">
                 <label class="form-label">Descripción</label>
-                <div class="input-box">
+                <div class="input-box textarea-box">
                     <i class="bi bi-card-text input-icon"></i>
-                    <input class="form-input" type="text" placeholder="Detalle del movimiento"
-                           @bind="formDescription" @bind:event="oninput" />
+                    <textarea class="form-input form-textarea" rows="2" placeholder="Detalles del tipo de movimiento..."
+                              @bind="formDescription" @bind:event="oninput"></textarea>
                 </div>
             </div>
 
@@ -127,8 +277,8 @@
             }
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-save" @onclick="Save" disabled="@isSaving">
                 @if (isSaving)
                 {
                     <span>Guardando...</span>
@@ -148,14 +298,14 @@
     <div class="modal-box modal-sm">
         <div class="modal-header">
             <span class="modal-title">Confirmar eliminación</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body">
-            <p class="delete-msg">¿Deseas eliminar el movimiento <strong>@selectedMovementType?.Code</strong>? Esta acción no se puede deshacer.</p>
+            <p class="delete-msg">¿Deseas eliminar el tipo de movimiento <strong>@selectedMovementType?.Code</strong>? Esta acción no se puede deshacer.</p>
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
                 @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
             </button>
         </div>
@@ -164,9 +314,21 @@
 
 @code {
     private List<MovementType> movementTypes = new();
+    private List<string> availableModes = new();
     private int currentPage = 1;
     private int pageSize = 10;
     private int totalMovementTypesCount;
+
+    private string searchTerm = string.Empty;
+    private string selectedModeFilter = "all";
+    private bool isModeFilterOpen;
+
+    private string selectedDatePreset = "all";
+    private DateTime? startDate;
+    private DateTime? endDate;
+    private DateTime? customStartDate;
+    private DateTime? customEndDate;
+    private bool isDateMenuOpen;
 
     private bool showModal;
     private bool showDeleteModal;
@@ -183,6 +345,26 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadInitialDataAsync();
+    }
+
+    private async Task LoadInitialDataAsync()
+    {
+        try
+        {
+            var all = MovementRepo.GetMovementTypes();
+            availableModes = all
+                .Select(m => m.Mode?.Trim())
+                .Where(m => !string.IsNullOrWhiteSpace(m))
+                .Distinct()
+                .OrderBy(m => m)
+                .ToList()!;
+        }
+        catch
+        {
+            availableModes = new List<string> { "Entrada", "Salida", "Ajuste" };
+        }
+
         await LoadMovementTypesAsync();
     }
 
@@ -190,7 +372,14 @@
     {
         try
         {
-            var paged = await MovementRepo.GetMovementTypesPagedAsync(currentPage, pageSize);
+            var paged = await MovementRepo.GetMovementTypesPagedAsync(
+                currentPage,
+                pageSize,
+                searchTerm,
+                selectedModeFilter,
+                startDate,
+                endDate);
+
             movementTypes = paged.Items.ToList();
             totalMovementTypesCount = paged.TotalCount;
             currentPage = paged.PageNumber;
@@ -199,6 +388,140 @@
         {
             errorMessage = "No se pudieron cargar los movimientos.";
         }
+    }
+
+    private async Task OnFilterChangedAsync()
+    {
+        currentPage = 1;
+        await LoadMovementTypesAsync();
+    }
+
+    private void CloseAllDropdowns()
+    {
+        isModeFilterOpen = false;
+        isDateMenuOpen = false;
+    }
+
+    private void ToggleModeFilterDropdown()
+    {
+        var current = isModeFilterOpen;
+        CloseAllDropdowns();
+        isModeFilterOpen = !current;
+    }
+
+    private async Task SelectModeFilterAsync(string mode)
+    {
+        selectedModeFilter = mode;
+        isModeFilterOpen = false;
+        currentPage = 1;
+        await LoadMovementTypesAsync();
+    }
+
+    private string GetModeFilterName()
+    {
+        if (selectedModeFilter == "all") return "Todos los modos";
+        return selectedModeFilter;
+    }
+
+    private void ToggleDateMenu()
+    {
+        var current = isDateMenuOpen;
+        CloseAllDropdowns();
+        isDateMenuOpen = !current;
+    }
+
+    private async Task SelectDatePresetAsync(string preset)
+    {
+        selectedDatePreset = preset;
+        var now = DateTime.Today;
+
+        switch (preset)
+        {
+            case "today":
+                startDate = now;
+                endDate = now;
+                break;
+            case "week":
+                startDate = now.AddDays(-6);
+                endDate = now;
+                break;
+            case "month":
+                startDate = new DateTime(now.Year, now.Month, 1);
+                endDate = now;
+                break;
+            case "all":
+            default:
+                selectedDatePreset = "all";
+                startDate = null;
+                endDate = null;
+                break;
+        }
+
+        customStartDate = startDate;
+        customEndDate = endDate;
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadMovementTypesAsync();
+    }
+
+    private async Task ApplyCustomDateRangeAsync()
+    {
+        if (!customStartDate.HasValue && !customEndDate.HasValue)
+        {
+            await SelectDatePresetAsync("all");
+            return;
+        }
+
+        startDate = customStartDate;
+        endDate = customEndDate;
+        selectedDatePreset = "custom";
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadMovementTypesAsync();
+    }
+
+    private async Task ClearDateFilterAsync()
+    {
+        selectedDatePreset = "all";
+        startDate = null;
+        endDate = null;
+        customStartDate = null;
+        customEndDate = null;
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadMovementTypesAsync();
+    }
+
+    private string GetDateFilterLabel()
+    {
+        return selectedDatePreset switch
+        {
+            "today" => "Hoy",
+            "week" => "Últimos 7 días",
+            "month" => "Este mes",
+            "custom" when startDate.HasValue && endDate.HasValue => $"{startDate.Value:dd/MM} - {endDate.Value:dd/MM}",
+            "custom" when startDate.HasValue => $"Desde {startDate.Value:dd/MM}",
+            "custom" when endDate.HasValue => $"Hasta {endDate.Value:dd/MM}",
+            _ => "Todas las fechas"
+        };
+    }
+
+    private string GetModeBadgeClass(string? mode)
+    {
+        var m = mode?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (m.Contains("entrada") || m.Contains("ingreso")) return "badge-entrada";
+        if (m.Contains("salida") || m.Contains("egreso")) return "badge-salida";
+        if (m.Contains("ajuste")) return "badge-ajuste";
+        return "badge-default";
+    }
+
+    private string GetModeIconClass(string? mode)
+    {
+        var m = mode?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (m.Contains("entrada") || m.Contains("ingreso")) return "bi bi-arrow-down-left";
+        if (m.Contains("salida") || m.Contains("egreso")) return "bi bi-arrow-up-right";
+        if (m.Contains("ajuste")) return "bi bi-arrow-repeat";
+        return "bi bi-arrow-left-right";
     }
 
     private void OpenCreate()
@@ -260,6 +583,7 @@
                     Description = formDescription?.Trim() ?? string.Empty
                 };
                 await MovementRepo.UpdateMovementType(selectedMovementType.IdMovementType, dto);
+                ToastService.ShowSuccess("Tipo de movimiento actualizado correctamente.");
             }
             else
             {
@@ -278,9 +602,10 @@
                 }
 
                 await MovementRepo.CreateMovementType(dto);
+                ToastService.ShowSuccess("Tipo de movimiento creado correctamente.");
             }
 
-            await LoadMovementTypesAsync();
+            await LoadInitialDataAsync();
             CloseModal();
         }
         catch
@@ -298,7 +623,8 @@
         try
         {
             MovementRepo.DeleteMovementType(selectedMovementType.IdMovementType);
-            await LoadMovementTypesAsync();
+            ToastService.ShowSuccess("Tipo de movimiento eliminado correctamente.");
+            await LoadInitialDataAsync();
             CloseModal();
         }
         catch

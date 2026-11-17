@@ -38,37 +38,43 @@
     margin: 0.15rem 0 0 0;
 }
 
-/* BARRA DE HERRAMIENTAS SOBRE LA TABLA */
+/* BARRA DE HERRAMIENTAS: DISTRIBUCIÓN EN LÍNEA ÚNICA */
 .table-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.75rem;
+    flex-wrap: nowrap;
+    gap: 0.65rem;
 }
 
 .toolbar-left {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 0.6rem;
+    gap: 0.45rem;
+    flex: 1;
+    min-width: 0;
+    flex-wrap: nowrap;
 }
 
 .toolbar-right {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    flex-shrink: 0;
+    margin-left: auto;
 }
 
 .filter-search-box {
     display: flex;
     align-items: center;
-    gap: 0.45rem;
+    gap: 0.4rem;
     background: #ffffff;
     border: 1px solid #cbd5e1;
     border-radius: 8px;
-    padding: 0.38rem 0.75rem;
+    padding: 0.35rem 0.65rem;
     transition: border-color 0.15s, box-shadow 0.15s;
+    min-width: 140px;
+    max-width: 260px;
+    flex: 1;
 }
 
 .filter-search-box:focus-within {
@@ -84,9 +90,10 @@
 .filter-search-box input {
     border: none;
     outline: none;
-    font-size: 0.8rem;
+    font-size: 0.79rem;
     color: #0f172a;
-    width: 220px;
+    width: 100%;
+    min-width: 90px;
     background: transparent;
 }
 
@@ -435,11 +442,12 @@
     font-weight: 600;
     color: #0f172a;
     white-space: nowrap;
+    width: 240px;
 }
 
 .col-description {
     color: #475569;
-    max-width: 320px;
+    max-width: 500px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -448,42 +456,47 @@
 .col-date {
     color: #64748b;
     white-space: nowrap;
+    width: 130px;
     font-size: 0.8rem;
 }
 
 .col-actions-header {
     text-align: right !important;
-    width: 170px;
+    width: 95px;
     padding-right: 1.25rem !important;
 }
 
 .col-actions {
-    width: 170px;
+    width: 95px;
     text-align: right;
     padding-right: 1.25rem !important;
 }
 
 /* ========================================================
-   DISEÑO MODERNO, ATRACTIVO Y ENTENDIBLE DE ACCIONES (PILLS)
+   DISEÑO MODERNO DE ACCIONES: BOTONES DE ÍCONO COMPACTOS
    ======================================================== */
 .actions-pill-group {
     display: inline-flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.45rem;
+    gap: 0.4rem;
 }
 
 .btn-action-pill {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.32rem 0.65rem;
-    border-radius: 7px;
-    font-size: 0.77rem;
-    font-weight: 600;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 8px;
     cursor: pointer;
     transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-    white-space: nowrap;
+}
+
+.btn-action-pill i {
+    font-size: 0.88rem;
+    line-height: 1;
 }
 
 .btn-pill-edit {
