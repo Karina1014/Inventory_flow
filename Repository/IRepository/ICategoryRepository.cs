@@ -6,7 +6,7 @@ namespace Inventory_Flow.Repository.IRepository;
 public interface ICategoryRepository
 {
     ICollection<Category> GetCategories();
-    Task<PagedResultDto<Category>> GetCategoriesPagedAsync(int pageNumber, int pageSize);
+    Task<PagedResultDto<Category>> GetCategoriesPagedAsync(int pageNumber, int pageSize, string? search = null, DateTime? startDate = null, DateTime? endDate = null);
     Category? GetCategory(int IdCategory);
     bool IsUniqueName(string name);
     Task<Category> CreateCategory(CreateCategoryDto createCategoryDto);

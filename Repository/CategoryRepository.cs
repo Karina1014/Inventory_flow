@@ -20,9 +20,31 @@ public class CategoryRepository : ICategoryRepository
         return _db.Categories.OrderBy(c => c.Name).ToList();
     }
 
-    public async Task<PagedResultDto<Category>> GetCategoriesPagedAsync(int pageNumber, int pageSize)
+    public async Task<PagedResultDto<Category>> GetCategoriesPagedAsync(int pageNumber, int pageSize, string? search = null, DateTime? startDate = null, DateTime? endDate = null)
     {
-        return await _db.Categories
+        var query = _db.Categories.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(c =>
+                (c.Name != null && c.Name.Contains(term)) ||
+                (c.Description != null && c.Description.Contains(term)));
+        }
+
+        if (startDate.HasValue)
+        {
+            var start = startDate.Value.Date;
+            query = query.Where(c => c.CreationDate >= start);
+        }
+
+        if (endDate.HasValue)
+        {
+            var end = endDate.Value.Date.AddDays(1);
+            query = query.Where(c => c.CreationDate < end);
+        }
+
+        return await query
             .OrderBy(c => c.Name)
             .ToPagedResultAsync(pageNumber, pageSize);
     }
