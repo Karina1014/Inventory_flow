@@ -46,6 +46,106 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("Categories");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.InternalRequisition", b =>
+                {
+                    b.Property<int>("IdInternalRequisition")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdInternalRequisition"));
+
+                    b.Property<int>("IdFulfillingWarehouse")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdRequestingWarehouse")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdRequisitionStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdRequisitionType")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IdReviewedByUser")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdUser")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Observation")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("RequisitionCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("RequisitionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReviewNote")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTime?>("ReviewedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("IdInternalRequisition");
+
+                    b.HasIndex("IdFulfillingWarehouse");
+
+                    b.HasIndex("IdRequestingWarehouse");
+
+                    b.HasIndex("IdRequisitionStatus");
+
+                    b.HasIndex("IdRequisitionType");
+
+                    b.HasIndex("IdReviewedByUser");
+
+                    b.HasIndex("IdUser");
+
+                    b.HasIndex("RequisitionCode")
+                        .IsUnique();
+
+                    b.ToTable("InternalRequisitions");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.InternalRequisitionDetail", b =>
+                {
+                    b.Property<int>("IdInternalRequisitionDetail")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdInternalRequisitionDetail"));
+
+                    b.Property<int>("DispatchedQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdInternalRequisition")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdProduct")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("RequestedQuantity")
+                        .HasColumnType("int");
+
+                    b.HasKey("IdInternalRequisitionDetail");
+
+                    b.HasIndex("IdInternalRequisition");
+
+                    b.HasIndex("IdProduct");
+
+                    b.ToTable("InternalRequisitionDetails");
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.InventoryMovement", b =>
                 {
                     b.Property<int>("IdInventoryMovement")
@@ -280,6 +380,199 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("Products");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.RequisitionStatus", b =>
+                {
+                    b.Property<int>("IdRequisitionStatus")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdRequisitionStatus"));
+
+                    b.Property<string>("BadgeColor")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsFinal")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("IdRequisitionStatus");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("RequisitionStatuses");
+
+                    b.HasData(
+                        new
+                        {
+                            IdRequisitionStatus = 1,
+                            BadgeColor = "warning",
+                            Code = "SOLICITADO",
+                            Description = "Enviada por la sucursal, pendiente de revisión en Carapungo.",
+                            IsFinal = false,
+                            Name = "Solicitado",
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            IdRequisitionStatus = 2,
+                            BadgeColor = "info",
+                            Code = "EN_REVISION",
+                            Description = "Carapungo está verificando disponibilidad de stock.",
+                            IsFinal = false,
+                            Name = "En revisión",
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            IdRequisitionStatus = 3,
+                            BadgeColor = "primary",
+                            Code = "APROBADO_PARCIAL",
+                            Description = "Se atiende solo una parte; el faltante pasa a compras.",
+                            IsFinal = false,
+                            Name = "Aprobado parcial",
+                            SortOrder = 3
+                        },
+                        new
+                        {
+                            IdRequisitionStatus = 4,
+                            BadgeColor = "primary",
+                            Code = "DESPACHADO",
+                            Description = "La mercadería salió de Carapungo hacia la sucursal.",
+                            IsFinal = false,
+                            Name = "Despachado",
+                            SortOrder = 4
+                        },
+                        new
+                        {
+                            IdRequisitionStatus = 5,
+                            BadgeColor = "success",
+                            Code = "COMPLETADO",
+                            Description = "La sucursal confirmó la recepción.",
+                            IsFinal = true,
+                            Name = "Completado",
+                            SortOrder = 5
+                        },
+                        new
+                        {
+                            IdRequisitionStatus = 6,
+                            BadgeColor = "danger",
+                            Code = "RECHAZADO",
+                            Description = "Carapungo rechazó la solicitud.",
+                            IsFinal = true,
+                            Name = "Rechazado",
+                            SortOrder = 6
+                        },
+                        new
+                        {
+                            IdRequisitionStatus = 7,
+                            BadgeColor = "secondary",
+                            Code = "CANCELADO",
+                            Description = "La solicitud fue anulada.",
+                            IsFinal = true,
+                            Name = "Cancelado",
+                            SortOrder = 7
+                        });
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.RequisitionType", b =>
+                {
+                    b.Property<int>("IdRequisitionType")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdRequisitionType"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MaxResponseHours")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int>("PriorityLevel")
+                        .HasColumnType("int");
+
+                    b.HasKey("IdRequisitionType");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("RequisitionTypes");
+
+                    b.HasData(
+                        new
+                        {
+                            IdRequisitionType = 1,
+                            Code = "URGENCIA_QUIRURGICA",
+                            Description = "Insumos críticos para cirugías o emergencias médicas.",
+                            IsActive = true,
+                            MaxResponseHours = 4,
+                            Name = "Urgencia quirúrgica / emergencia",
+                            PriorityLevel = 1
+                        },
+                        new
+                        {
+                            IdRequisitionType = 2,
+                            Code = "PACIENTE_ESPECIFICO",
+                            Description = "Medicamento bajo pedido para un tratamiento puntual.",
+                            IsActive = true,
+                            MaxResponseHours = 24,
+                            Name = "Paciente específico",
+                            PriorityLevel = 2
+                        },
+                        new
+                        {
+                            IdRequisitionType = 3,
+                            Code = "CAMPANIA_SANITARIA",
+                            Description = "Stock adicional para jornadas planificadas.",
+                            IsActive = true,
+                            MaxResponseHours = 48,
+                            Name = "Campaña sanitaria / vacunación",
+                            PriorityLevel = 3
+                        },
+                        new
+                        {
+                            IdRequisitionType = 4,
+                            Code = "REPOSICION_ORDINARIA",
+                            Description = "Reabastecimiento rutinario semanal de la sucursal.",
+                            IsActive = true,
+                            MaxResponseHours = 72,
+                            Name = "Reposición ordinaria",
+                            PriorityLevel = 4
+                        });
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.Role", b =>
                 {
                     b.Property<int>("IdRole")
@@ -451,6 +744,75 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("Warehouses");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.InternalRequisition", b =>
+                {
+                    b.HasOne("Inventory_Flow.Models.Warehouse", "FulfillingWarehouse")
+                        .WithMany()
+                        .HasForeignKey("IdFulfillingWarehouse")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.Warehouse", "RequestingWarehouse")
+                        .WithMany()
+                        .HasForeignKey("IdRequestingWarehouse")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.RequisitionStatus", "RequisitionStatus")
+                        .WithMany()
+                        .HasForeignKey("IdRequisitionStatus")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.RequisitionType", "RequisitionType")
+                        .WithMany()
+                        .HasForeignKey("IdRequisitionType")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.User", "ReviewedByUser")
+                        .WithMany()
+                        .HasForeignKey("IdReviewedByUser")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Inventory_Flow.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("IdUser")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FulfillingWarehouse");
+
+                    b.Navigation("RequestingWarehouse");
+
+                    b.Navigation("RequisitionStatus");
+
+                    b.Navigation("RequisitionType");
+
+                    b.Navigation("ReviewedByUser");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.InternalRequisitionDetail", b =>
+                {
+                    b.HasOne("Inventory_Flow.Models.InternalRequisition", "InternalRequisition")
+                        .WithMany("Details")
+                        .HasForeignKey("IdInternalRequisition")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("IdProduct")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("InternalRequisition");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.InventoryMovement", b =>
                 {
                     b.HasOne("Inventory_Flow.Models.Warehouse", "DestinationWarehouse")
@@ -560,6 +922,11 @@ namespace Inventory_Flow.Migrations
                     b.Navigation("Role");
 
                     b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.InternalRequisition", b =>
+                {
+                    b.Navigation("Details");
                 });
 
             modelBuilder.Entity("Inventory_Flow.Models.InventoryMovement", b =>
