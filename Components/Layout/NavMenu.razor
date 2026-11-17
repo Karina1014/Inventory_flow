@@ -1,0 +1,245 @@
+@inject NavigationManager NavigationManager
+@inject Inventory_Flow.Services.CurrentUserService CurrentUserService
+@inject Inventory_Flow.Repository.IRepository.IMenuRepository MenuRepo
+@using Inventory_Flow.Models.Dtos
+@implements IDisposable
+
+<nav class="sidebar-nav">
+    <!-- 1. DASHBOARD (Enlace directo principal) -->
+    <NavLink class="nav-item-link" href="dashboard" Match="NavLinkMatch.All">
+        <i class="bi bi-grid-1x2"></i>
+        <span>Dashboard</span>
+    </NavLink>
+
+    <!-- 2. INVENTARIO (Sección desplegable controlada por estado booleano en C#) -->
+    @if (HasCategoryAccess("/inventario", "/lots", "/movements"))
+    {
+        <div class="nav-group">
+            <button type="button" class="nav-item-link nav-group-toggle" @onclick="ToggleInventory">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-boxes"></i>
+                    <span>Inventario</span>
+                </div>
+                <i class="bi @(isInventoryOpen ? "bi-chevron-up" : "bi-chevron-down") chevron-indicator"></i>
+            </button>
+
+            @if (isInventoryOpen)
+            {
+                <div class="submenu">
+                    @if (HasAccess("/inventario"))
+                    {
+                        <NavLink class="submenu-link" href="inventario" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-box-seam"></i>
+                            <span>Control de Inventario</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/lots"))
+                    {
+                        <NavLink class="submenu-link" href="lots" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-upc-scan"></i>
+                            <span>Lotes</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/movements"))
+                    {
+                        <NavLink class="submenu-link" href="movements" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-arrow-left-right"></i>
+                            <span>Movimientos</span>
+                        </NavLink>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    <!-- 3. ADMINISTRACIÓN (Sección desplegable para catálogos y configuración maestra) -->
+    @if (HasCategoryAccess("/products", "/categories", "/thresholds", "/movementtypes", "/warehouses", "/users", "/roles"))
+    {
+        <div class="nav-group">
+            <button type="button" class="nav-item-link nav-group-toggle" @onclick="ToggleAdmin">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-sliders"></i>
+                    <span>Administración</span>
+                </div>
+                <i class="bi @(isAdminOpen ? "bi-chevron-up" : "bi-chevron-down") chevron-indicator"></i>
+            </button>
+
+            @if (isAdminOpen)
+            {
+                <div class="submenu">
+                    @if (HasAccess("/products"))
+                    {
+                        <NavLink class="submenu-link" href="products" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-capsule"></i>
+                            <span>Productos</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/categories"))
+                    {
+                        <NavLink class="submenu-link" href="categories" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-tags"></i>
+                            <span>Categorías</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/thresholds"))
+                    {
+                        <NavLink class="submenu-link" href="thresholds" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-speedometer2"></i>
+                            <span>Umbral de Stock</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/movementtypes"))
+                    {
+                        <NavLink class="submenu-link" href="movementtypes" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-diagram-3"></i>
+                            <span>Tipos de movimientos</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/warehouses"))
+                    {
+                        <NavLink class="submenu-link" href="warehouses" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-building"></i>
+                            <span>Sucursales</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/users"))
+                    {
+                        <NavLink class="submenu-link" href="users" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-people"></i>
+                            <span>Usuarios</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/roles"))
+                    {
+                        <NavLink class="submenu-link" href="roles" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-person-badge"></i>
+                            <span>Roles</span>
+                        </NavLink>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    <!-- 4. INTELIGENCIA Y REPORTES (Sección desplegable) -->
+    @if (HasCategoryAccess("/analytics", "/stockreport", "/kardex"))
+    {
+        <div class="nav-group">
+            <button type="button" class="nav-item-link nav-group-toggle" @onclick="ToggleReports">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-graph-up"></i>
+                    <span>Inteligencia y Reportes</span>
+                </div>
+                <i class="bi @(isReportsOpen ? "bi-chevron-up" : "bi-chevron-down") chevron-indicator"></i>
+            </button>
+
+            @if (isReportsOpen)
+            {
+                <div class="submenu">
+                    @if (HasAccess("/analytics"))
+                    {
+                        <NavLink class="submenu-link" href="analytics" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-cpu"></i>
+                            <span>Análisis IA</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/stockreport"))
+                    {
+                        <NavLink class="submenu-link" href="stockreport" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-file-earmark-bar-graph"></i>
+                            <span>Reporte de stock</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/kardex"))
+                    {
+                        <NavLink class="submenu-link" href="kardex" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-journal-text"></i>
+                            <span>Kardex</span>
+                        </NavLink>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    <!-- MI PERFIL -->
+    <NavLink class="nav-item-link mt-2" href="profile" Match="NavLinkMatch.Prefix">
+        <i class="bi bi-person-circle"></i>
+        <span>Mi Perfil</span>
+    </NavLink>
+</nav>
+
+@code {
+    // Control de estado booleano en C# para submenús desplegables (contraídos por defecto)
+    private bool isInventoryOpen = false;
+    private bool isAdminOpen = false;
+    private bool isReportsOpen = false;
+
+    private List<MenuDto> userMenus = new();
+
+    private void ToggleInventory() => isInventoryOpen = !isInventoryOpen;
+    private void ToggleAdmin() => isAdminOpen = !isAdminOpen;
+    private void ToggleReports() => isReportsOpen = !isReportsOpen;
+
+    protected override async Task OnInitializedAsync()
+    {
+        CurrentUserService.OnChange += HandleUserChanged;
+        await LoadMenusAsync();
+    }
+
+    private void HandleUserChanged()
+    {
+        InvokeAsync(async () =>
+        {
+            await LoadMenusAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadMenusAsync()
+    {
+        if (CurrentUserService.IsAuthenticated)
+        {
+            try
+            {
+                var menus = await MenuRepo.GetMenusByUserId(CurrentUserService.UserId);
+                userMenus = menus?.ToList() ?? new();
+            }
+            catch
+            {
+                userMenus = new();
+            }
+        }
+        else
+        {
+            userMenus = new();
+        }
+    }
+
+    private bool HasAccess(string url)
+    {
+        // Si no hay restricciones específicas en DB, se permite el acceso
+        if (userMenus == null || userMenus.Count == 0)
+        {
+            return true;
+        }
+
+        var cleanTarget = url.TrimStart('/');
+        return userMenus.Any(m => string.Equals(m.Url.TrimStart('/'), cleanTarget, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool HasCategoryAccess(params string[] urls)
+    {
+        if (userMenus == null || userMenus.Count == 0)
+        {
+            return true;
+        }
+
+        return urls.Any(HasAccess);
+    }
+
+    public void Dispose()
+    {
+        CurrentUserService.OnChange -= HandleUserChanged;
+    }
+}

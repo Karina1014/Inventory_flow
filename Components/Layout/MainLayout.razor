@@ -9,190 +9,25 @@
 <ToastContainer />
 
 <div class="layout-container">
-    <!-- Sidebar Izquierdo Fijo (260px) con fondo gris claro #F8FAFC y borde fino #E2E8F0 -->
+    <!-- Sidebar Izquierdo Fijo (260px) con fondo gris claro #F8FAFC y borde #E2E8F0 -->
     <aside class="sidebar">
-        <!-- Logotipo Arriba -->
+        <!-- Encabezado superior con Logotipo y Título -->
         <div class="sidebar-brand">
             <div class="brand-icon">
                 <i class="bi bi-box-seam-fill"></i>
             </div>
             <div class="brand-text">
                 <span class="brand-title">Inventory Flow</span>
-                <span class="brand-subtitle">MedVet Enterprise</span>
+                <span class="brand-subtitle">MEDVET ENTERPRISE</span>
             </div>
         </div>
 
-        <!-- Enlaces de Navegación -->
-        <nav class="sidebar-nav">
-            <!-- 1. Enlace Raíz Principal: Dashboard -->
-            <NavLink class="nav-item-link" href="dashboard" Match="NavLinkMatch.All">
-                <i class="bi bi-grid-1x2"></i>
-                <span>Dashboard</span>
-            </NavLink>
-
-            <!-- 2. Enlace a Nuevo Módulo: Control de Inventario -->
-            <NavLink class="nav-item-link" href="inventario">
-                <i class="bi bi-boxes"></i>
-                <span>Control de Inventario</span>
-            </NavLink>
-
-            @if (userMenus != null && userMenus.Any())
-            {
-                @* Menús dinámicos cargados según el rol del usuario *@
-
-                @* Enlaces raíz adicionales sin categoría *@
-                @foreach (var item in userMenus.Where(m => string.IsNullOrWhiteSpace(m.Category) && !IsDefaultRoot(m.Url)))
-                {
-                    <NavLink class="nav-item-link" href="@item.Url.TrimStart('/')">
-                        <i class="@item.Icon"></i>
-                        <span>@item.Name</span>
-                    </NavLink>
-                }
-
-                @* Grupos por categoría (Operaciones, Administración, Reportes, etc.) *@
-                @foreach (var group in userMenus.Where(m => !string.IsNullOrWhiteSpace(m.Category)).GroupBy(m => m.Category))
-                {
-                    var catKey = group.Key!;
-                    var isOpen = IsCategoryOpen(catKey);
-
-                    <div class="nav-group">
-                        <button type="button" class="nav-item-link nav-group-toggle" @onclick="() => ToggleCategory(catKey)">
-                            <div class="d-flex align-items-center gap-2">
-                                <i class="@GetCategoryIcon(catKey)"></i>
-                                <span>@FormatCategoryTitle(catKey)</span>
-                            </div>
-                            <i class="bi @(isOpen ? "bi-chevron-up" : "bi-chevron-down") chevron-indicator"></i>
-                        </button>
-
-                        @if (isOpen)
-                        {
-                            <div class="submenu">
-                                @foreach (var sub in group)
-                                {
-                                    <NavLink class="submenu-link" href="@sub.Url.TrimStart('/')">
-                                        <i class="@sub.Icon"></i>
-                                        <span>@sub.Name</span>
-                                    </NavLink>
-                                }
-                            </div>
-                        }
-                    </div>
-                }
-            }
-            else
-            {
-                @* Estructura completa predeterminada con todas las categorías *@
-
-                <!-- GRUPO: OPERACIONES -->
-                <div class="nav-group">
-                    <button type="button" class="nav-item-link nav-group-toggle" @onclick='() => ToggleCategory("Operaciones")'>
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-arrow-left-right"></i>
-                            <span>Operaciones</span>
-                        </div>
-                        <i class="bi @(IsCategoryOpen("Operaciones") ? "bi-chevron-up" : "bi-chevron-down") chevron-indicator"></i>
-                    </button>
-
-                    @if (IsCategoryOpen("Operaciones"))
-                    {
-                        <div class="submenu">
-                            <NavLink class="submenu-link" href="movements">
-                                <i class="bi bi-arrow-left-right"></i>
-                                <span>Movimientos</span>
-                            </NavLink>
-                            <NavLink class="submenu-link" href="analytics">
-                                <i class="bi bi-graph-up"></i>
-                                <span>Análisis IA</span>
-                            </NavLink>
-                        </div>
-                    }
-                </div>
-
-                <!-- GRUPO: ADMINISTRACIÓN -->
-                <div class="nav-group">
-                    <button type="button" class="nav-item-link nav-group-toggle" @onclick='() => ToggleCategory("Administración")'>
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-sliders"></i>
-                            <span>Administración</span>
-                        </div>
-                        <i class="bi @(IsCategoryOpen("Administración") ? "bi-chevron-up" : "bi-chevron-down") chevron-indicator"></i>
-                    </button>
-
-                    @if (IsCategoryOpen("Administración"))
-                    {
-                        <div class="submenu">
-                            <NavLink class="submenu-link" href="products">
-                                <i class="bi bi-box-seam"></i>
-                                <span>Productos</span>
-                            </NavLink>
-                            <NavLink class="submenu-link" href="lots">
-                                <i class="bi bi-upc-scan"></i>
-                                <span>Control de Lotes</span>
-                            </NavLink>
-                            <NavLink class="submenu-link" href="categories">
-                                <i class="bi bi-tags"></i>
-                                <span>Categorías</span>
-                            </NavLink>
-                            <NavLink class="submenu-link" href="warehouses">
-                                <i class="bi bi-building"></i>
-                                <span>Sucursales</span>
-                            </NavLink>
-                            <NavLink class="submenu-link" href="movementtypes">
-                                <i class="bi bi-diagram-3"></i>
-                                <span>Tipos de Movimientos</span>
-                            </NavLink>
-                            <NavLink class="submenu-link" href="thresholds">
-                                <i class="bi bi-speedometer2"></i>
-                                <span>Umbral de Stock</span>
-                            </NavLink>
-                            <NavLink class="submenu-link" href="users">
-                                <i class="bi bi-people"></i>
-                                <span>Usuarios</span>
-                            </NavLink>
-                            <NavLink class="submenu-link" href="roles">
-                                <i class="bi bi-person-badge"></i>
-                                <span>Roles</span>
-                            </NavLink>
-                        </div>
-                    }
-                </div>
-
-                <!-- GRUPO: REPORTES -->
-                <div class="nav-group">
-                    <button type="button" class="nav-item-link nav-group-toggle" @onclick='() => ToggleCategory("Reportes")'>
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-file-earmark-bar-graph"></i>
-                            <span>Reportes</span>
-                        </div>
-                        <i class="bi @(IsCategoryOpen("Reportes") ? "bi-chevron-up" : "bi-chevron-down") chevron-indicator"></i>
-                    </button>
-
-                    @if (IsCategoryOpen("Reportes"))
-                    {
-                        <div class="submenu">
-                            <NavLink class="submenu-link" href="stockreport">
-                                <i class="bi bi-bar-chart"></i>
-                                <span>Reporte de Stock</span>
-                            </NavLink>
-                            <NavLink class="submenu-link" href="kardex">
-                                <i class="bi bi-journal-text"></i>
-                                <span>Kardex</span>
-                            </NavLink>
-                        </div>
-                    }
-                </div>
-            }
-
-            <!-- Módulo Mi Perfil -->
-            <NavLink class="nav-item-link mt-2" href="profile">
-                <i class="bi bi-person-circle"></i>
-                <span>Mi Perfil</span>
-            </NavLink>
-        </nav>
+        <!-- Menú de Navegación Lateral Reorganizado -->
+        <NavMenu />
 
         <!-- Pie del Menú Lateral -->
         <div class="sidebar-footer">
-            <span class="text-muted small">&copy; @DateTime.Now.Year Universidad Central del Ecuador</span>
+            <span class="text-muted small">&copy; 2026 Universidad Central del Ecuador</span>
         </div>
     </aside>
 
@@ -258,38 +93,8 @@
     private bool isDropdownOpen;
     private List<MenuDto> userMenus = new();
 
-    // Gestión de estados de categorías abiertas en C#
-    private HashSet<string> openCategories = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "Operaciones",
-        "Administración",
-        "Reportes"
-    };
-
-    private bool IsCategoryOpen(string category) => openCategories.Contains(category);
-
-    private void ToggleCategory(string category)
-    {
-        if (openCategories.Contains(category))
-        {
-            openCategories.Remove(category);
-        }
-        else
-        {
-            openCategories.Add(category);
-        }
-    }
-
     private void ToggleDropdown() => isDropdownOpen = !isDropdownOpen;
     private void CloseDropdown() => isDropdownOpen = false;
-
-    private bool IsDefaultRoot(string url)
-    {
-        var clean = "/" + url.Trim('/');
-        return clean.Equals("/dashboard", StringComparison.OrdinalIgnoreCase) 
-            || clean.Equals("/inventario", StringComparison.OrdinalIgnoreCase)
-            || clean.Equals("/profile", StringComparison.OrdinalIgnoreCase);
-    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -388,25 +193,6 @@
     }
 
     private string GetRoleLabel(string role) => string.IsNullOrWhiteSpace(role) ? "Administrador" : role;
-
-    private string FormatCategoryTitle(string? cat)
-    {
-        if (string.IsNullOrWhiteSpace(cat)) return string.Empty;
-        var lower = cat.Trim().ToLowerInvariant();
-        if (lower == "administracion" || lower == "administración") return "Administración";
-        if (lower == "operaciones") return "Operaciones";
-        if (lower == "reportes") return "Reportes";
-        return char.ToUpper(lower[0]) + lower.Substring(1);
-    }
-
-    private string GetCategoryIcon(string? cat)
-    {
-        var lower = cat?.Trim().ToLowerInvariant() ?? "";
-        if (lower.Contains("admin")) return "bi bi-sliders";
-        if (lower.Contains("operac") || lower.Contains("movim")) return "bi bi-arrow-left-right";
-        if (lower.Contains("report") || lower.Contains("analis")) return "bi bi-file-earmark-bar-graph";
-        return "bi bi-folder2";
-    }
 
     public void Dispose()
     {
