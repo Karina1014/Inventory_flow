@@ -1,0 +1,1205 @@
+@page "/purchase-orders"
+@layout MainLayout
+@using Inventory_Flow.Models
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository.IRepository
+@inject IPurchaseOrderRepository OrderRepo
+@inject IPurchaseOrderCatalogRepository CatalogRepo
+@inject ISupplierRepository SupplierRepo
+@inject IWarehouseRepository WarehouseRepo
+@inject IProductRepository ProductRepo
+@inject Inventory_Flow.Services.CurrentUserService CurrentUserService
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
+
+<div class="page-container">
+    <!-- Migas de Pan (Breadcrumb) -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="dashboard" class="text-decoration-none text-muted">
+                    <i class="bi bi-house-door me-1"></i>Inicio
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <span class="text-muted">Inventario</span>
+            </li>
+            <li class="breadcrumb-item active fw-semibold text-dark" aria-current="page">
+                Órdenes de Compra
+            </li>
+        </ol>
+    </nav>
+
+    <!-- Encabezado -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <div class="header-icon-box">
+                <i class="bi bi-cart-check"></i>
+            </div>
+            <div>
+                <h1 class="h4 mb-0 fw-bold text-dark">Órdenes de Compra y Aprobación Financiera</h1>
+                <p class="text-muted small mb-0">Adquisiciones centralizadas desde matriz Carapungo a proveedores externos con control presupuestario.</p>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-brand-primary" @onclick="OpenCreateModal">
+                <i class="bi bi-plus-lg me-1"></i>
+                <span>Nueva Orden de Compra</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Pestañas de Navegación -->
+    <div class="modern-tabs">
+        <button type="button"
+                class="modern-tab-btn @(activeTab == TabOrders ? "active" : "")"
+                @onclick="() => SwitchTab(TabOrders)">
+            <i class="bi bi-list-check"></i>
+            <span>Bandeja de Compras</span>
+        </button>
+        <button type="button"
+                class="modern-tab-btn @(activeTab == TabFinancial ? "active" : "")"
+                @onclick="() => SwitchTab(TabFinancial)">
+            <i class="bi bi-cash-coin"></i>
+            <span>Aprobación Financiera</span>
+            @if (pendingFinancialCount > 0)
+            {
+                <span class="badge-tab">@pendingFinancialCount</span>
+            }
+        </button>
+    </div>
+
+    <!-- ==================== PESTAÑA 1: BANDEJA DE COMPRAS ==================== -->
+    @if (activeTab == TabOrders)
+    {
+        <!-- Filtros y Búsqueda -->
+        <div class="flat-card p-3 mb-3">
+            <div class="row g-2 align-items-center">
+                <!-- Buscador -->
+                <div class="col-12 col-md-4">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white border-end-0 text-muted">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text"
+                               class="form-control form-control-flat border-start-0"
+                               placeholder="Buscar por N° Orden o Proveedor..."
+                               @bind="searchTerm"
+                               @bind:event="oninput"
+                               @onkeyup="HandleSearchKeyUp" />
+                    </div>
+                </div>
+
+                <!-- Filtro Proveedor -->
+                <div class="col-12 col-sm-6 col-md-3">
+                    <select class="form-select form-select-sm form-select-flat" @bind="filterSupplierId" @bind:after="LoadOrdersAsync">
+                        <option value="0">Todos los Proveedores</option>
+                        @foreach (var s in suppliers)
+                        {
+                            <option value="@s.IdSupplier">@s.CompanyName</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Filtro Estado -->
+                <div class="col-12 col-sm-6 col-md-2">
+                    <select class="form-select form-select-sm form-select-flat" @bind="filterStatusId" @bind:after="LoadOrdersAsync">
+                        <option value="0">Todos los Estados</option>
+                        @foreach (var st in statuses)
+                        {
+                            <option value="@st.IdPurchaseOrderStatus">@st.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Filtro Tipo de Orden -->
+                <div class="col-12 col-sm-6 col-md-2">
+                    <select class="form-select form-select-sm form-select-flat" @bind="filterTypeId" @bind:after="LoadOrdersAsync">
+                        <option value="0">Todos los Tipos</option>
+                        @foreach (var t in types)
+                        {
+                            <option value="@t.IdPurchaseOrderType">@t.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Botón Limpiar -->
+                <div class="col-12 col-sm-6 col-md-1 text-end">
+                    <button type="button" class="btn btn-flat-secondary btn-sm w-100" @onclick="ResetFilters" title="Limpiar filtros">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla de Órdenes de Compra -->
+        <div class="flat-card overflow-hidden mb-3">
+            <div class="table-responsive">
+                <table class="table flat-table align-middle">
+                    <thead>
+                        <tr>
+                            <th class="ps-3">N° Orden</th>
+                            <th>Proveedor</th>
+                            <th>Tipo de Compra</th>
+                            <th>Fecha Emisión</th>
+                            <th>Fecha Entrega</th>
+                            <th class="text-end">Total</th>
+                            <th class="text-center">Estado</th>
+                            <th class="text-end pe-3">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (isLoading)
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <div class="spinner-border text-primary spinner-border-sm me-2" role="status"></div>
+                                    <span>Cargando órdenes de compra...</span>
+                                </td>
+                            </tr>
+                        }
+                        else if (pagedOrders.Items == null || !pagedOrders.Items.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <i class="bi bi-inbox fs-3 d-block mb-2 text-secondary"></i>
+                                    <span>No se encontraron órdenes de compra registradas.</span>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var order in pagedOrders.Items)
+                            {
+                                <tr>
+                                    <td class="ps-3 fw-bold text-dark font-monospace">@order.OrderNumber</td>
+                                    <td>
+                                        <div class="fw-semibold text-dark">@(order.Supplier?.CompanyName ?? "N/D")</div>
+                                        <span class="text-muted small">RUC: @(order.Supplier?.Ruc ?? "-")</span>
+                                    </td>
+                                    <td>
+                                        <span class="small text-secondary">
+                                            @(order.PurchaseOrderType?.Name ?? "-")
+                                        </span>
+                                    </td>
+                                    <td class="small text-muted">@order.OrderDate.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td class="small text-muted">
+                                        @(order.ExpectedDeliveryDate?.ToString("dd/MM/yyyy") ?? "-")
+                                    </td>
+                                    <td class="text-end fw-bold text-dark font-monospace">
+                                        $@order.TotalAmount.ToString("N2")
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="flat-badge flat-badge-@(order.PurchaseOrderStatus?.BadgeColor ?? "secondary")">
+                                            @(order.PurchaseOrderStatus?.Name ?? "Desconocido")
+                                        </span>
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <div class="d-inline-flex gap-1">
+                                            <button type="button"
+                                                    class="btn-action-icon"
+                                                    title="Ver Detalle"
+                                                    @onclick="() => OpenDetailModal(order)">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                            @if (order.PurchaseOrderStatus != null && !order.PurchaseOrderStatus.IsFinal)
+                                            {
+                                                <button type="button"
+                                                        class="btn-action-icon text-danger"
+                                                        title="Anular Orden"
+                                                        @onclick="() => OpenCancelModal(order)">
+                                                    <i class="bi bi-x-circle"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginación Flat -->
+            @if (pagedOrders.TotalPages > 1)
+            {
+                <div class="d-flex align-items-center justify-content-between p-3 border-top">
+                    <span class="small text-muted">
+                        Mostrando @(((pagedOrders.PageNumber - 1) * pagedOrders.PageSize) + 1)
+                        a @(Math.Min(pagedOrders.PageNumber * pagedOrders.PageSize, pagedOrders.TotalCount))
+                        de @pagedOrders.TotalCount órdenes
+                    </span>
+                    <div class="d-flex gap-1">
+                        <button type="button"
+                                class="btn btn-flat-secondary btn-sm"
+                                disabled="@(pagedOrders.PageNumber <= 1)"
+                                @onclick="() => GoToPage(pagedOrders.PageNumber - 1)">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <span class="btn btn-flat-secondary btn-sm disabled text-dark fw-bold">
+                            @pagedOrders.PageNumber / @pagedOrders.TotalPages
+                        </span>
+                        <button type="button"
+                                class="btn btn-flat-secondary btn-sm"
+                                disabled="@(pagedOrders.PageNumber >= pagedOrders.TotalPages)"
+                                @onclick="() => GoToPage(pagedOrders.PageNumber + 1)">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- ==================== PESTAÑA 2: APROBACIÓN FINANCIERA ==================== -->
+    @if (activeTab == TabFinancial)
+    {
+        <div class="mb-3 d-flex align-items-center justify-content-between">
+            <div>
+                <h5 class="fw-bold mb-1 text-dark">Bandeja de Aprobación Presupuestaria</h5>
+                <p class="text-muted small mb-0">Órdenes de compra remitidas por bodega matriz a la espera de resolución financiera.</p>
+            </div>
+            <button type="button" class="btn btn-flat-secondary btn-sm" @onclick="LoadFinancialPendingOrdersAsync">
+                <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+            </button>
+        </div>
+
+        @if (isLoadingFinancial)
+        {
+            <div class="flat-card p-5 text-center text-muted">
+                <div class="spinner-border text-primary spinner-border-sm me-2" role="status"></div>
+                <span>Consultando órdenes pendientes de aprobación financiera...</span>
+            </div>
+        }
+        else if (financialPendingOrders == null || !financialPendingOrders.Any())
+        {
+            <div class="flat-card p-5 text-center text-muted">
+                <i class="bi bi-check2-circle fs-1 text-success d-block mb-2"></i>
+                <h6 class="fw-bold text-dark">Todo al día</h6>
+                <p class="small text-muted mb-0">No hay órdenes de compra pendientes de resolución presupuestaria en este momento.</p>
+            </div>
+        }
+        else
+        {
+            <div class="row g-3">
+                @foreach (var fo in financialPendingOrders)
+                {
+                    <div class="col-12">
+                        <div class="financial-review-card">
+                            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+                                <div>
+                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle me-2 fw-bold">
+                                        PENDIENTE DE APROBACIÓN
+                                    </span>
+                                    <span class="fw-bold text-dark font-monospace fs-6">@fo.OrderNumber</span>
+                                    <span class="text-muted small ms-2">
+                                        <i class="bi bi-calendar3 me-1"></i>@fo.OrderDate.ToString("dd/MM/yyyy HH:mm")
+                                    </span>
+                                </div>
+                                <div class="text-end">
+                                    <span class="small text-muted d-block">Monto Compra:</span>
+                                    <span class="fs-5 fw-bold text-dark font-monospace">$@fo.TotalAmount.ToString("N2")</span>
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-3 text-secondary small">
+                                <div class="col-12 col-md-4">
+                                    <strong>Proveedor:</strong> @(fo.Supplier?.CompanyName ?? "N/D") (RUC: @(fo.Supplier?.Ruc ?? "-"))
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <strong>Tipo de Gasto:</strong> @(fo.PurchaseOrderType?.Name ?? "-")
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <strong>Destino:</strong> @(fo.DestinationWarehouse?.Name ?? "Carapungo")
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(fo.Observation))
+                                {
+                                    <div class="col-12">
+                                        <strong>Justificación / Nota:</strong> <span class="fst-italic text-dark">@fo.Observation</span>
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Botones de Acción Financiera -->
+                            <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+                                <button type="button" class="btn btn-flat-secondary btn-sm" @onclick="() => OpenDetailModal(fo)">
+                                    <i class="bi bi-card-checklist me-1"></i>Ver Ítems
+                                </button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => OpenApprovalModal(fo, false)">
+                                    <i class="bi bi-x-circle me-1"></i>Rechazar Gasto
+                                </button>
+                                <button type="button" class="btn btn-success btn-sm fw-semibold" @onclick="() => OpenApprovalModal(fo, true)">
+                                    <i class="bi bi-check2-circle me-1"></i>Aprobar Presupuesto
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+<!-- ==================== MODAL: NUEVA ORDEN DE COMPRA ==================== -->
+@if (showCreateModal)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-dialog-custom">
+            <div class="modal-header-custom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="header-icon-box" style="width:36px; height:36px; font-size:1.1rem;">
+                        <i class="bi bi-cart-plus"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark">Nueva Orden de Compra</h5>
+                        <span class="text-muted small">Adquisición a proveedor externo con destino Matriz Carapungo.</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" @onclick="CloseModals"></button>
+            </div>
+
+            <div class="modal-body-custom">
+                @if (!string.IsNullOrWhiteSpace(createErrorMessage))
+                {
+                    <div class="alert alert-danger py-2 px-3 small mb-3">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>@createErrorMessage
+                    </div>
+                }
+
+                <div class="row g-3 mb-3">
+                    <!-- Proveedor -->
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-semibold text-muted mb-1">
+                            Proveedor <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select form-select-flat" @bind="newSupplierId" @bind:after="OnSupplierSelected">
+                            <option value="0">Seleccionar proveedor...</option>
+                            @foreach (var s in suppliers)
+                            {
+                                <option value="@s.IdSupplier">@s.CompanyName (Entrega: @s.DeliveryLeadTimeDays d)</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Tipo de Orden -->
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-semibold text-muted mb-1">
+                            Tipo de Orden de Compra <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select form-select-flat" @bind="newTypeId">
+                            @foreach (var t in types)
+                            {
+                                <option value="@t.IdPurchaseOrderType">@t.Name (Prioridad @t.PriorityLevel)</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Bodega Destino -->
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-semibold text-muted mb-1">
+                            Bodega de Recepción <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select form-select-flat" @bind="newWarehouseId">
+                            @foreach (var w in warehouses)
+                            {
+                                <option value="@w.IdWarehouse">@w.Name</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Fecha Estimada Entrega -->
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-semibold text-muted mb-1">Fecha Estimada de Entrega</label>
+                        <input type="date" class="form-control form-control-flat" @bind="newExpectedDate" />
+                    </div>
+
+                    <!-- Observaciones -->
+                    <div class="col-12">
+                        <label class="form-label small fw-semibold text-muted mb-1">Observaciones / Justificación</label>
+                        <textarea class="form-control form-control-flat" rows="2"
+                                  placeholder="Detalle el motivo de la adquisición o necesidad de reposición..."
+                                  @bind="newObservation"></textarea>
+                    </div>
+                </div>
+
+                <!-- Selector de Productos -->
+                <div class="card p-3 bg-light border mb-3">
+                    <span class="fw-semibold text-dark small mb-2 d-block">
+                        <i class="bi bi-box-seam me-1 text-primary"></i>Agregar Ítems a la Orden
+                    </span>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-5">
+                            <label class="form-label small text-muted mb-1">Producto</label>
+                            <select class="form-select form-select-sm form-select-flat" @bind="selectedProductId">
+                                <option value="0">Seleccionar producto...</option>
+                                @foreach (var p in availableProducts)
+                                {
+                                    <option value="@p.IdProduct">@p.Code - @p.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small text-muted mb-1">Cantidad</label>
+                            <input type="number" class="form-control form-control-sm form-control-flat" min="1" @bind="inputQuantity" />
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small text-muted mb-1">P. Unitario ($)</label>
+                            <input type="number" step="0.01" min="0" class="form-control form-control-sm form-control-flat" @bind="inputUnitPrice" />
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small text-muted mb-1">% IVA</label>
+                            <select class="form-select form-select-sm form-select-flat" @bind="inputTaxPct">
+                                <option value="15">15%</option>
+                                <option value="0">0% (Exento)</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-1">
+                            <button type="button" class="btn btn-brand-primary btn-sm w-100" @onclick="AddProductToDraft" title="Agregar ítem">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de Ítems en Borrador -->
+                <div class="table-responsive border rounded mb-3">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr class="small text-muted">
+                                <th class="ps-3">Producto</th>
+                                <th class="text-center" style="width: 90px;">Cant.</th>
+                                <th class="text-end" style="width: 100px;">P. Unit.</th>
+                                <th class="text-end" style="width: 80px;">IVA</th>
+                                <th class="text-end" style="width: 110px;">Subtotal</th>
+                                <th class="text-end pe-3" style="width: 50px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!draftDetails.Any())
+                            {
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted small">
+                                        No has agregado productos a esta orden de compra aún.
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var item in draftDetails)
+                                {
+                                    var prod = availableProducts.FirstOrDefault(p => p.IdProduct == item.IdProduct);
+                                    var lineSub = Math.Round(item.Quantity * item.UnitPrice, 2);
+                                    var lineTax = Math.Round(lineSub * (item.TaxPercentage / 100m), 2);
+                                    var lineTot = lineSub + lineTax;
+
+                                    <tr>
+                                        <td class="ps-3">
+                                            <div class="fw-semibold text-dark">@(prod?.Name ?? $"ID {item.IdProduct}")</div>
+                                            <span class="text-muted small">Cod: @(prod?.Code ?? "-")</span>
+                                        </td>
+                                        <td class="text-center font-monospace">@item.Quantity</td>
+                                        <td class="text-end font-monospace">$@item.UnitPrice.ToString("N2")</td>
+                                        <td class="text-end font-monospace text-muted small">@item.TaxPercentage%</td>
+                                        <td class="text-end font-monospace fw-bold">$@lineTot.ToString("N2")</td>
+                                        <td class="text-end pe-3">
+                                            <button type="button" class="btn btn-sm btn-link text-danger p-0" @onclick="() => RemoveDraftDetail(item)">
+                                                <i class="bi bi-trash3"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Resumen Financiero en Tiempo Real -->
+                <div class="summary-box">
+                    <div class="summary-row">
+                        <span>Subtotal Neto:</span>
+                        <span class="font-monospace fw-semibold">$@DraftSubtotal.ToString("N2")</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Impuesto (IVA):</span>
+                        <span class="font-monospace fw-semibold">$@DraftTaxAmount.ToString("N2")</span>
+                    </div>
+                    <div class="summary-row total-row">
+                        <span>Total de la Orden:</span>
+                        <span class="font-monospace">$@DraftTotalAmount.ToString("N2")</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-flat-secondary" @onclick="CloseModals">Cancelar</button>
+                <button type="button" class="btn btn-brand-primary" disabled="@(!draftDetails.Any() || isSubmitting)" @onclick="SubmitCreateOrderAsync">
+                    @if (isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        <span>Guardando...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-send-check me-1"></i>
+                        <span>Generar y Enviar a Finanzas</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ==================== MODAL: DETALLE DE ORDEN ==================== -->
+@if (showDetailModal && selectedOrder != null)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-dialog-custom">
+            <div class="modal-header-custom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="header-icon-box" style="width:36px; height:36px; font-size:1.1rem;">
+                        <i class="bi bi-receipt"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark font-monospace">@selectedOrder.OrderNumber</h5>
+                        <span class="text-muted small">Detalle completo de la orden de compra</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" @onclick="CloseModals"></button>
+            </div>
+
+            <div class="modal-body-custom">
+                <!-- Información General -->
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-4">
+                        <label class="small text-muted d-block">Proveedor</label>
+                        <span class="fw-bold text-dark">@(selectedOrder.Supplier?.CompanyName ?? "N/D")</span>
+                        <span class="small text-muted d-block">RUC: @(selectedOrder.Supplier?.Ruc ?? "-")</span>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="small text-muted d-block">Estado Actual</label>
+                        <span class="flat-badge flat-badge-@(selectedOrder.PurchaseOrderStatus?.BadgeColor ?? "secondary")">
+                            @(selectedOrder.PurchaseOrderStatus?.Name ?? "-")
+                        </span>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="small text-muted d-block">Tipo de Adquisición</label>
+                        <span class="fw-semibold text-dark">@(selectedOrder.PurchaseOrderType?.Name ?? "-")</span>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="small text-muted d-block">Fecha de Emisión</label>
+                        <span class="text-dark">@selectedOrder.OrderDate.ToString("dd/MM/yyyy HH:mm")</span>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="small text-muted d-block">Entrega Estimada</label>
+                        <span class="text-dark">@(selectedOrder.ExpectedDeliveryDate?.ToString("dd/MM/yyyy") ?? "-")</span>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="small text-muted d-block">Bodega Destino</label>
+                        <span class="text-dark">@(selectedOrder.DestinationWarehouse?.Name ?? "Carapungo")</span>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(selectedOrder.Observation))
+                {
+                    <div class="alert alert-light border small text-secondary mb-3">
+                        <strong>Observaciones:</strong> @selectedOrder.Observation
+                    </div>
+                }
+
+                @if (selectedOrder.FinancialApprovalDate.HasValue)
+                {
+                    <div class="card p-2 bg-light border mb-3 small">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-bold text-dark">Resolución Financiera:</span>
+                                <span class="ms-1 text-muted">@selectedOrder.FinancialApprovalDate.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                            </div>
+                            <span class="fw-bold text-primary">Por: @(selectedOrder.FinancialApprovalUser?.Username ?? "Finanzas")</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(selectedOrder.FinancialApprovalNote))
+                        {
+                            <div class="text-muted mt-1 fst-italic">"@selectedOrder.FinancialApprovalNote"</div>
+                        }
+                    </div>
+                }
+
+                <!-- Tabla de Productos de la Orden -->
+                <span class="fw-semibold text-dark small mb-2 d-block">Ítems Requeridos:</span>
+                <div class="table-responsive border rounded mb-3">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr class="small text-muted">
+                                <th class="ps-3">Producto</th>
+                                <th class="text-center">Cant. Pedida</th>
+                                <th class="text-center">Cant. Recibida</th>
+                                <th class="text-end">P. Unitario</th>
+                                <th class="text-end">IVA</th>
+                                <th class="text-end pe-3">Total Línea</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in selectedOrder.Details)
+                            {
+                                <tr>
+                                    <td class="ps-3">
+                                        <div class="fw-semibold text-dark">@(d.Product?.Name ?? $"Producto {d.IdProduct}")</div>
+                                        <span class="text-muted small">Cód: @(d.Product?.Code ?? "-")</span>
+                                    </td>
+                                    <td class="text-center font-monospace">@d.Quantity</td>
+                                    <td class="text-center font-monospace">
+                                        <span class="@(d.ReceivedQuantity >= d.Quantity ? "text-success fw-bold" : "text-muted")">
+                                            @d.ReceivedQuantity
+                                        </span>
+                                    </td>
+                                    <td class="text-end font-monospace">$@d.UnitPrice.ToString("N2")</td>
+                                    <td class="text-end font-monospace text-muted small">@d.TaxPercentage%</td>
+                                    <td class="text-end pe-3 font-monospace fw-bold">$@d.Total.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Cuadro de Totales -->
+                <div class="summary-box">
+                    <div class="summary-row">
+                        <span>Subtotal:</span>
+                        <span class="font-monospace">$@selectedOrder.Subtotal.ToString("N2")</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>IVA:</span>
+                        <span class="font-monospace">$@selectedOrder.TaxAmount.ToString("N2")</span>
+                    </div>
+                    <div class="summary-row total-row">
+                        <span>Total de Compra:</span>
+                        <span class="font-monospace">$@selectedOrder.TotalAmount.ToString("N2")</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-flat-secondary" @onclick="CloseModals">Cerrar</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ==================== MODAL: RESOLUCIÓN FINANCIERA ==================== -->
+@if (showApprovalModal && selectedOrder != null)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-dialog-custom modal-dialog-sm">
+            <div class="modal-header-custom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="header-icon-box @(isApprovingAction ? "text-success" : "text-danger")"
+                         style="width:36px; height:36px; font-size:1.1rem; background-color:@(isApprovingAction ? "#DCFCE7" : "#FEE2E2");">
+                        <i class="bi @(isApprovingAction ? "bi-check2-circle" : "bi-x-circle")"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark">
+                            @(isApprovingAction ? "Aprobar Presupuesto" : "Rechazar Gasto de Compra")
+                        </h5>
+                        <span class="text-muted small">Orden: @selectedOrder.OrderNumber</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" @onclick="CloseModals"></button>
+            </div>
+
+            <div class="modal-body-custom">
+                <p class="small text-muted mb-3">
+                    @(isApprovingAction
+                        ? "Al aprobar el presupuesto, la orden pasará a estado 'Aprobado por Finanzas' y quedará lista para ser emitida al proveedor externo."
+                        : "Al rechazar el gasto, la orden será devuelta con observaciones a compras / bodega matriz.")
+                </p>
+
+                <div class="summary-box mb-3">
+                    <div class="summary-row">
+                        <span>Proveedor:</span>
+                        <span class="fw-semibold text-dark">@(selectedOrder.Supplier?.CompanyName ?? "N/D")</span>
+                    </div>
+                    <div class="summary-row total-row">
+                        <span>Monto Comprometido:</span>
+                        <span class="font-monospace text-primary">$@selectedOrder.TotalAmount.ToString("N2")</span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-muted">
+                        Nota u Observación Financiera @(isApprovingAction ? "(Opcional)" : "(Obligatoria)")
+                    </label>
+                    <textarea class="form-control form-control-flat" rows="3"
+                              placeholder="@(isApprovingAction ? "Ej. Presupuesto validado contra partida CEDI..." : "Indique la causa del rechazo presupuestario...")"
+                              @bind="approvalNote"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-flat-secondary" @onclick="CloseModals">Cancelar</button>
+                <button type="button"
+                        class="btn @(isApprovingAction ? "btn-success" : "btn-danger")"
+                        disabled="@(isSubmittingApproval || (!isApprovingAction && string.IsNullOrWhiteSpace(approvalNote)))"
+                        @onclick="SubmitFinancialApprovalAsync">
+                    @if (isSubmittingApproval)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        <span>Procesando...</span>
+                    }
+                    else
+                    {
+                        <i class="bi @(isApprovingAction ? "bi-check2-circle" : "bi-x-circle") me-1"></i>
+                        <span>@(isApprovingAction ? "Confirmar Aprobación" : "Confirmar Rechazo")</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ==================== MODAL: ANULAR ORDEN ==================== -->
+@if (showCancelModal && selectedOrder != null)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-dialog-custom modal-dialog-sm">
+            <div class="modal-header-custom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="header-icon-box text-danger" style="width:36px; height:36px; font-size:1.1rem; background-color:#FEE2E2;">
+                        <i class="bi bi-x-circle"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark">Anular Orden de Compra</h5>
+                        <span class="text-muted small">N° @selectedOrder.OrderNumber</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" @onclick="CloseModals"></button>
+            </div>
+
+            <div class="modal-body-custom">
+                <p class="small text-muted mb-3">
+                    ¿Está seguro de que desea anular esta orden de compra? Esta acción es irreversible y finalizará el flujo de la orden.
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-muted">Motivo de Anulación <span class="text-danger">*</span></label>
+                    <textarea class="form-control form-control-flat" rows="2"
+                              placeholder="Ej. Solicitud cancelada por cambio de requerimiento..."
+                              @bind="cancelReason"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-flat-secondary" @onclick="CloseModals">Volver</button>
+                <button type="button"
+                        class="btn btn-danger"
+                        disabled="@(string.IsNullOrWhiteSpace(cancelReason) || isSubmitting)"
+                        @onclick="SubmitCancelOrderAsync">
+                    <i class="bi bi-trash3 me-1"></i>Anular Orden
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private const string TabOrders = "orders";
+    private const string TabFinancial = "financial";
+
+    private string activeTab = TabOrders;
+
+    // Catálogos
+    private ICollection<PurchaseOrderStatus> statuses = new List<PurchaseOrderStatus>();
+    private ICollection<PurchaseOrderType> types = new List<PurchaseOrderType>();
+    private ICollection<Supplier> suppliers = new List<Supplier>();
+    private ICollection<Warehouse> warehouses = new List<Warehouse>();
+    private ICollection<Product> availableProducts = new List<Product>();
+
+    // Paginación y Listado Tab 1
+    private PagedResultDto<PurchaseOrder> pagedOrders = new();
+    private int currentPage = 1;
+    private const int PageSize = 10;
+    private bool isLoading = true;
+
+    // Filtros
+    private string searchTerm = string.Empty;
+    private int filterSupplierId = 0;
+    private int filterStatusId = 0;
+    private int filterTypeId = 0;
+
+    // Tab 2: Aprobación Financiera
+    private List<PurchaseOrder> financialPendingOrders = new();
+    private int pendingFinancialCount = 0;
+    private bool isLoadingFinancial = false;
+
+    // Modales
+    private bool showCreateModal = false;
+    private bool showDetailModal = false;
+    private bool showApprovalModal = false;
+    private bool showCancelModal = false;
+
+    private PurchaseOrder? selectedOrder;
+
+    // Formulario Crear
+    private int newSupplierId = 0;
+    private int newTypeId = 1;
+    private int newWarehouseId = 0;
+    private DateTime? newExpectedDate;
+    private string newObservation = string.Empty;
+    private string createErrorMessage = string.Empty;
+    private bool isSubmitting = false;
+
+    // Ítems de la orden en borrador
+    private int selectedProductId = 0;
+    private int inputQuantity = 1;
+    private decimal inputUnitPrice = 0;
+    private decimal inputTaxPct = 15;
+    private List<CreatePurchaseOrderDetailDto> draftDetails = new();
+
+    // Acciones de Aprobación
+    private bool isApprovingAction = true;
+    private string approvalNote = string.Empty;
+    private bool isSubmittingApproval = false;
+
+    // Cancelar
+    private string cancelReason = string.Empty;
+
+    // Totales calculados en borrador
+    private decimal DraftSubtotal => draftDetails.Sum(d => Math.Round(d.Quantity * d.UnitPrice, 2));
+    private decimal DraftTaxAmount => draftDetails.Sum(d => Math.Round(Math.Round(d.Quantity * d.UnitPrice, 2) * (d.TaxPercentage / 100m), 2));
+    private decimal DraftTotalAmount => DraftSubtotal + DraftTaxAmount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadCatalogsAsync();
+            await LoadOrdersAsync();
+            await LoadFinancialPendingOrdersAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error inicializando módulo: {ex.Message}", "Error");
+            isLoading = false;
+            isLoadingFinancial = false;
+        }
+    }
+
+    private async Task LoadCatalogsAsync()
+    {
+        try
+        {
+            statuses = await CatalogRepo.GetStatusesAsync();
+            types = await CatalogRepo.GetTypesAsync(activeOnly: true);
+            suppliers = SupplierRepo.GetSuppliers().Where(s => s.IsActive).OrderBy(s => s.CompanyName).ToList();
+            warehouses = WarehouseRepo.GetWarehouses().Where(w => w.IsActive).OrderBy(w => w.Name).ToList();
+            availableProducts = ProductRepo.GetProducts().Where(p => p.IsActive).OrderBy(p => p.Name).ToList();
+
+            // Bodega matriz por defecto
+            var matriz = warehouses.FirstOrDefault(w => w.Name.Contains("Carapungo") || w.Name.Contains("Matriz"));
+            newWarehouseId = matriz?.IdWarehouse ?? (warehouses.FirstOrDefault()?.IdWarehouse ?? 0);
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error al cargar catálogos de compra: {ex.Message}", "Catálogos");
+        }
+    }
+
+    private async Task LoadOrdersAsync()
+    {
+        isLoading = true;
+        try
+        {
+            pagedOrders = await OrderRepo.GetOrdersPagedAsync(
+                pageNumber: currentPage,
+                pageSize: PageSize,
+                supplierId: filterSupplierId > 0 ? filterSupplierId : null,
+                statusId: filterStatusId > 0 ? filterStatusId : null,
+                orderTypeId: filterTypeId > 0 ? filterTypeId : null,
+                search: string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm.Trim());
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error al consultar órdenes: {ex.Message}", "Base de Datos");
+            pagedOrders = new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadFinancialPendingOrdersAsync()
+    {
+        isLoadingFinancial = true;
+        try
+        {
+            // Id 2 = Pendiente Aprobación Financiera
+            var result = await OrderRepo.GetOrdersPagedAsync(
+                pageNumber: 1,
+                pageSize: 100,
+                pendingFinancialOnly: true);
+
+            financialPendingOrders = result.Items.ToList();
+            pendingFinancialCount = result.TotalCount;
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error al consultar órdenes financieras: {ex.Message}", "Finanzas");
+            financialPendingOrders = new();
+            pendingFinancialCount = 0;
+        }
+        finally
+        {
+            isLoadingFinancial = false;
+        }
+    }
+
+    private async Task SwitchTab(string tab)
+    {
+        activeTab = tab;
+        if (tab == TabOrders)
+        {
+            await LoadOrdersAsync();
+        }
+        else
+        {
+            await LoadFinancialPendingOrdersAsync();
+        }
+    }
+
+    private async Task HandleSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            currentPage = 1;
+            await LoadOrdersAsync();
+        }
+    }
+
+    private async Task ResetFilters()
+    {
+        searchTerm = string.Empty;
+        filterSupplierId = 0;
+        filterStatusId = 0;
+        filterTypeId = 0;
+        currentPage = 1;
+        await LoadOrdersAsync();
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1 || page > pagedOrders.TotalPages) return;
+        currentPage = page;
+        await LoadOrdersAsync();
+    }
+
+    private void OpenCreateModal()
+    {
+        newSupplierId = 0;
+        newTypeId = types.FirstOrDefault()?.IdPurchaseOrderType ?? 1;
+        newExpectedDate = DateTime.Now.AddDays(3);
+        newObservation = string.Empty;
+        createErrorMessage = string.Empty;
+        selectedProductId = 0;
+        inputQuantity = 1;
+        inputUnitPrice = 0;
+        inputTaxPct = 15;
+        draftDetails.Clear();
+        showCreateModal = true;
+    }
+
+    private void OnSupplierSelected()
+    {
+        var sup = suppliers.FirstOrDefault(s => s.IdSupplier == newSupplierId);
+        if (sup != null)
+        {
+            newExpectedDate = DateTime.Now.AddDays(Math.Max(1, sup.DeliveryLeadTimeDays));
+        }
+    }
+
+    private void AddProductToDraft()
+    {
+        createErrorMessage = string.Empty;
+        if (selectedProductId <= 0)
+        {
+            createErrorMessage = "Seleccione un producto para agregar.";
+            return;
+        }
+        if (inputQuantity <= 0)
+        {
+            createErrorMessage = "La cantidad debe ser mayor a 0.";
+            return;
+        }
+        if (inputUnitPrice < 0)
+        {
+            createErrorMessage = "El precio unitario no puede ser negativo.";
+            return;
+        }
+
+        var existing = draftDetails.FirstOrDefault(d => d.IdProduct == selectedProductId);
+        if (existing != null)
+        {
+            existing.Quantity += inputQuantity;
+            existing.UnitPrice = inputUnitPrice > 0 ? inputUnitPrice : existing.UnitPrice;
+            existing.TaxPercentage = inputTaxPct;
+        }
+        else
+        {
+            draftDetails.Add(new CreatePurchaseOrderDetailDto
+            {
+                IdProduct = selectedProductId,
+                Quantity = inputQuantity,
+                UnitPrice = inputUnitPrice,
+                TaxPercentage = inputTaxPct
+            });
+        }
+
+        selectedProductId = 0;
+        inputQuantity = 1;
+        inputUnitPrice = 0;
+    }
+
+    private void RemoveDraftDetail(CreatePurchaseOrderDetailDto item)
+    {
+        draftDetails.Remove(item);
+    }
+
+    private async Task SubmitCreateOrderAsync()
+    {
+        createErrorMessage = string.Empty;
+        if (newSupplierId <= 0)
+        {
+            createErrorMessage = "Debe seleccionar un proveedor para la orden de compra.";
+            return;
+        }
+        if (!draftDetails.Any())
+        {
+            createErrorMessage = "Debe agregar al menos un producto a la orden.";
+            return;
+        }
+
+        isSubmitting = true;
+        try
+        {
+            var dto = new CreatePurchaseOrderDto
+            {
+                IdSupplier = newSupplierId,
+                IdPurchaseOrderType = newTypeId,
+                IdDestinationWarehouse = newWarehouseId,
+                ExpectedDeliveryDate = newExpectedDate,
+                Observation = newObservation,
+                Details = draftDetails
+            };
+
+            var userId = CurrentUserService.UserId > 0 ? CurrentUserService.UserId : 1;
+            var created = await OrderRepo.CreateOrderAsync(dto, userId);
+
+            ToastService.Success($"Orden de compra {created.OrderNumber} enviada a Finanzas correctamente.");
+            CloseModals();
+            await LoadOrdersAsync();
+            await LoadFinancialPendingOrdersAsync();
+        }
+        catch (Exception ex)
+        {
+            createErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task OpenDetailModal(PurchaseOrder order)
+    {
+        selectedOrder = await OrderRepo.GetOrderByIdAsync(order.IdPurchaseOrder) ?? order;
+        showDetailModal = true;
+    }
+
+    private void OpenApprovalModal(PurchaseOrder order, bool approved)
+    {
+        selectedOrder = order;
+        isApprovingAction = approved;
+        approvalNote = string.Empty;
+        showApprovalModal = true;
+    }
+
+    private async Task SubmitFinancialApprovalAsync()
+    {
+        if (selectedOrder == null) return;
+
+        if (!isApprovingAction && string.IsNullOrWhiteSpace(approvalNote))
+        {
+            ToastService.Warning("Debe ingresar una observación explicando el motivo del rechazo.");
+            return;
+        }
+
+        isSubmittingApproval = true;
+        try
+        {
+            var userId = CurrentUserService.UserId > 0 ? CurrentUserService.UserId : 1;
+            var success = await OrderRepo.ProcessFinancialApprovalAsync(
+                selectedOrder.IdPurchaseOrder, isApprovingAction, userId, approvalNote);
+
+            if (success)
+            {
+                var msg = isApprovingAction
+                    ? $"Presupuesto de la orden {selectedOrder.OrderNumber} APROBADO."
+                    : $"Orden {selectedOrder.OrderNumber} RECHAZADA por Finanzas.";
+                ToastService.Success(msg);
+                CloseModals();
+                await LoadOrdersAsync();
+                await LoadFinancialPendingOrdersAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(ex.Message, "Error en Resolución Financiera");
+        }
+        finally
+        {
+            isSubmittingApproval = false;
+        }
+    }
+
+    private void OpenCancelModal(PurchaseOrder order)
+    {
+        selectedOrder = order;
+        cancelReason = string.Empty;
+        showCancelModal = true;
+    }
+
+    private async Task SubmitCancelOrderAsync()
+    {
+        if (selectedOrder == null || string.IsNullOrWhiteSpace(cancelReason)) return;
+
+        isSubmitting = true;
+        try
+        {
+            var userId = CurrentUserService.UserId > 0 ? CurrentUserService.UserId : 1;
+            var success = await OrderRepo.CancelOrderAsync(selectedOrder.IdPurchaseOrder, userId, cancelReason);
+            if (success)
+            {
+                ToastService.Success($"Orden {selectedOrder.OrderNumber} anulada correctamente.");
+                CloseModals();
+                await LoadOrdersAsync();
+                await LoadFinancialPendingOrdersAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(ex.Message, "Error al anular orden");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void CloseModals()
+    {
+        showCreateModal = false;
+        showDetailModal = false;
+        showApprovalModal = false;
+        showCancelModal = false;
+        selectedOrder = null;
+        createErrorMessage = string.Empty;
+    }
+}

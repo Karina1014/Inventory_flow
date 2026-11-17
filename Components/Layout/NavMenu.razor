@@ -12,7 +12,7 @@
     </NavLink>
 
     <!-- 2. INVENTARIO (Sección desplegable controlada por estado booleano en C#) -->
-    @if (HasCategoryAccess("/inventario", "/requisitions", "/lots", "/movements"))
+    @if (HasCategoryAccess("/inventario", "/requisitions", "/purchase-orders", "/lots", "/movements"))
     {
         <div class="nav-group">
             <button type="button" class="nav-item-link nav-group-toggle" @onclick="ToggleInventory">
@@ -38,6 +38,13 @@
                         <NavLink class="submenu-link" href="requisitions" Match="NavLinkMatch.Prefix">
                             <i class="bi bi-send-check"></i>
                             <span>Requisiciones</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/purchase-orders"))
+                    {
+                        <NavLink class="submenu-link" href="purchase-orders" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-cart-check"></i>
+                            <span>Órdenes de Compra</span>
                         </NavLink>
                     }
                     @if (HasAccess("/lots"))
@@ -245,6 +252,7 @@
         // 2. Módulos recién integrados visibles por defecto
         if (string.Equals(cleanTarget, "suppliers", StringComparison.OrdinalIgnoreCase)
             || string.Equals(cleanTarget, "requisitions", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(cleanTarget, "purchase-orders", StringComparison.OrdinalIgnoreCase)
             || string.Equals(cleanTarget, "inventario", StringComparison.OrdinalIgnoreCase)
             || string.Equals(cleanTarget, "dashboard", StringComparison.OrdinalIgnoreCase)
             || string.Equals(cleanTarget, "profile", StringComparison.OrdinalIgnoreCase))

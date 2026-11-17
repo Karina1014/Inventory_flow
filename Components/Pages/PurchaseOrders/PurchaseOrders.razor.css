@@ -1,0 +1,334 @@
+/* Contenedor principal */
+.page-container {
+    padding: 1.5rem;
+    background-color: #F8FAFC;
+    min-height: calc(100vh - 70px);
+}
+
+/* Icono enmarcado del encabezado */
+.header-icon-box {
+    width: 44px;
+    height: 44px;
+    background-color: #E6F0F6;
+    color: #0066A1;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    border: 1px solid #D0E2ED;
+    flex-shrink: 0;
+}
+
+/* Tarjetas Flat */
+.flat-card {
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    box-shadow: none !important;
+}
+
+/* Pestañas de navegación Modern Flat */
+.modern-tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid #E2E8F0;
+    padding-bottom: 0;
+    margin-bottom: 1.25rem;
+}
+
+.modern-tab-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 0.75rem 1.25rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #64748B;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: -2px;
+}
+
+.modern-tab-btn:hover {
+    color: #0066A1;
+    background-color: #F1F5F9;
+    border-radius: 8px 8px 0 0;
+}
+
+.modern-tab-btn.active {
+    color: #0066A1;
+    border-bottom-color: #0066A1;
+    background-color: transparent;
+}
+
+.badge-tab {
+    background-color: #EF4444;
+    color: #FFFFFF;
+    font-size: 0.72rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 10px;
+    font-weight: 700;
+}
+
+/* Botones principales de marca */
+.btn-brand-primary {
+    background-color: #0066A1;
+    color: #FFFFFF;
+    border: 1px solid #005587;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.15s ease-in-out;
+    box-shadow: none !important;
+}
+
+.btn-brand-primary:hover {
+    background-color: #005587;
+    color: #FFFFFF;
+    border-color: #00456E;
+}
+
+/* Botones outline */
+.btn-flat-secondary {
+    background-color: #FFFFFF;
+    color: #475569;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 0.5rem 0.9rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    box-shadow: none !important;
+}
+
+.btn-flat-secondary:hover {
+    background-color: #F8FAFC;
+    color: #1E293B;
+    border-color: #94A3B8;
+}
+
+/* Badges con estilo Flat */
+.flat-badge {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    letter-spacing: 0.01em;
+}
+
+.flat-badge-secondary {
+    background-color: #F1F5F9;
+    color: #475569;
+    border: 1px solid #CBD5E1;
+}
+
+.flat-badge-warning {
+    background-color: #FEF3C7;
+    color: #92400E;
+    border: 1px solid #FCD34D;
+}
+
+.flat-badge-info {
+    background-color: #E0F2FE;
+    color: #0369A1;
+    border: 1px solid #BAE6FD;
+}
+
+.flat-badge-primary {
+    background-color: #DBEAFE;
+    color: #1E40AF;
+    border: 1px solid #BFDBFE;
+}
+
+.flat-badge-success {
+    background-color: #DCFCE7;
+    color: #166534;
+    border: 1px solid #BBF7D0;
+}
+
+.flat-badge-danger {
+    background-color: #FEE2E2;
+    color: #991B1B;
+    border: 1px solid #FECACA;
+}
+
+/* Tablas con diseño Flat */
+.flat-table {
+    margin-bottom: 0;
+}
+
+.flat-table thead th {
+    background-color: #F8FAFC;
+    color: #475569;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #E2E8F0;
+    border-top: none;
+}
+
+.flat-table tbody td {
+    padding: 0.85rem 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #F1F5F9;
+    color: #334155;
+    font-size: 0.88rem;
+}
+
+.flat-table tbody tr:hover {
+    background-color: #F8FAFC;
+}
+
+/* Botones de acción dentro de filas */
+.btn-action-icon {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
+    background-color: #FFFFFF;
+    color: #475569;
+    transition: all 0.15s ease;
+}
+
+.btn-action-icon:hover {
+    background-color: #F1F5F9;
+    color: #0066A1;
+    border-color: #CBD5E1;
+}
+
+/* Tarjetas de Aprobación Financiera */
+.financial-review-card {
+    border: 1px solid #E2E8F0;
+    border-left: 4px solid #F59E0B;
+    border-radius: 10px;
+    background-color: #FFFFFF;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    transition: all 0.15s ease;
+}
+
+.financial-review-card:hover {
+    border-color: #CBD5E1;
+    border-left-color: #D97706;
+}
+
+/* Resumen financiero en modal */
+.summary-box {
+    background-color: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.35rem 0;
+    font-size: 0.9rem;
+    color: #475569;
+}
+
+.summary-row.total-row {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0F172A;
+    border-top: 1px dashed #CBD5E1;
+    padding-top: 0.6rem;
+    margin-top: 0.4rem;
+}
+
+/* Controles de formulario Modern Flat */
+.form-control-flat,
+.form-select-flat {
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    padding: 0.5rem 0.75rem;
+    box-shadow: none !important;
+}
+
+.form-control-flat:focus,
+.form-select-flat:focus {
+    border-color: #0066A1;
+    outline: none;
+}
+
+/* Backdrop y modal */
+.modal-backdrop-custom {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(15, 23, 42, 0.45);
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.modal-dialog-custom {
+    background: #FFFFFF;
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    width: 100%;
+    max-width: 900px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: fadeInModal 0.2s ease-out;
+}
+
+.modal-dialog-sm {
+    max-width: 520px;
+}
+
+@keyframes fadeInModal {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header-custom {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #E2E8F0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #FFFFFF;
+}
+
+.modal-body-custom {
+    padding: 1.25rem;
+    overflow-y: auto;
+}
+
+.modal-footer-custom {
+    padding: 0.85rem 1.25rem;
+    border-top: 1px solid #E2E8F0;
+    background-color: #F8FAFC;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
