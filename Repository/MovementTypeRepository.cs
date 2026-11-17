@@ -20,10 +20,45 @@ public class MovementTypeRepository : IMovementTypeRepository
         return _db.MovementTypes.OrderByDescending(m => m.CreationDate).ToList();
     }
 
-    public async Task<PagedResultDto<MovementType>> GetMovementTypesPagedAsync(int pageNumber, int pageSize)
+    public async Task<PagedResultDto<MovementType>> GetMovementTypesPagedAsync(
+        int pageNumber,
+        int pageSize,
+        string? search = null,
+        string? modeFilter = null,
+        DateTime? startDate = null,
+        DateTime? endDate = null)
     {
-        return await _db.MovementTypes
+        var query = _db.MovementTypes.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(m =>
+                (m.Code != null && m.Code.Contains(term)) ||
+                (m.Mode != null && m.Mode.Contains(term)) ||
+                (m.Description != null && m.Description.Contains(term)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(modeFilter) && modeFilter != "all")
+        {
+            query = query.Where(m => m.Mode == modeFilter);
+        }
+
+        if (startDate.HasValue)
+        {
+            var start = startDate.Value.Date;
+            query = query.Where(m => m.CreationDate >= start);
+        }
+
+        if (endDate.HasValue)
+        {
+            var end = endDate.Value.Date.AddDays(1);
+            query = query.Where(m => m.CreationDate < end);
+        }
+
+        return await query
             .OrderByDescending(m => m.CreationDate)
+            .ThenByDescending(m => m.IdMovementType)
             .ToPagedResultAsync(pageNumber, pageSize);
     }
 

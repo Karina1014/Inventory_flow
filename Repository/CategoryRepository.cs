@@ -45,7 +45,8 @@ public class CategoryRepository : ICategoryRepository
         }
 
         return await query
-            .OrderBy(c => c.Name)
+            .OrderByDescending(c => c.CreationDate)
+            .ThenByDescending(c => c.IdCategory)
             .ToPagedResultAsync(pageNumber, pageSize);
     }
 
