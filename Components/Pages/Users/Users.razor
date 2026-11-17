@@ -11,7 +11,7 @@
 @inject IMenuRepository MenuRepo
 @inject Inventory_Flow.Services.IToastNotificationService ToastService
 
-<div class="page-container" @onclick="CloseAllDropdowns">
+<div class="page-container">
     <!-- ENCABEZADO CON ÍCONO EN CAJA REDONDEADA (ESTILO REFERENCIA) -->
     <div class="page-header-block">
         <div class="header-icon-box">
@@ -23,64 +23,57 @@
         </div>
     </div>
 
-    <!-- BARRA DE HERRAMIENTAS SOBRE LA TABLA: FILTROS A LA IZQUIERDA + AÑADIR A LA DERECHA -->
-    <div class="table-toolbar" @onclick:stopPropagation="true">
+    <!-- BARRA DE HERRAMIENTAS SOBRE LA TABLA: BÚSQUEDA Y ROL A LA IZQUIERDA + AÑADIR A LA DERECHA -->
+    <div class="table-toolbar">
         <div class="toolbar-left">
-            <button type="button" class="btn-filter-toggle @(showFilters ? "active" : "")" @onclick="() => showFilters = !showFilters">
-                <i class="bi bi-funnel"></i>
-                <span>Filtros</span>
-            </button>
+            <div class="filter-search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" placeholder="Buscar nombre o usuario..." @bind="searchTerm" @bind:event="oninput" @bind:after="OnFilterChangedAsync" />
+            </div>
 
-            @if (showFilters)
-            {
-                <div class="filter-search-box">
-                    <i class="bi bi-search"></i>
-                    <input type="text" placeholder="Buscar nombre o usuario..." @bind="searchTerm" @bind:event="oninput" @bind:after="OnFilterChangedAsync" />
-                </div>
+            <div class="custom-select-container filter-select-width">
+                <button type="button"
+                        class="custom-select-trigger @(isFilterRoleOpen ? "open" : "")"
+                        @onclick="ToggleFilterRoleDropdown">
+                    <div class="trigger-content">
+                        <i class="bi bi-shield-check trigger-icon"></i>
+                        <span class="trigger-text">@GetFilterRoleName()</span>
+                    </div>
+                    <i class="bi bi-chevron-down trigger-chevron"></i>
+                </button>
 
-                <div class="custom-select-container filter-select-width">
-                    <button type="button"
-                            class="custom-select-trigger @(isFilterRoleOpen ? "open" : "")"
-                            @onclick="ToggleFilterRoleDropdown">
-                        <div class="trigger-content">
-                            <i class="bi bi-shield-check trigger-icon"></i>
-                            <span class="trigger-text">@GetFilterRoleName()</span>
-                        </div>
-                        <i class="bi bi-chevron-down trigger-chevron"></i>
-                    </button>
-
-                    @if (isFilterRoleOpen)
-                    {
-                        <div class="custom-select-menu">
+                @if (isFilterRoleOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="custom-select-menu">
+                        <button type="button"
+                                class="custom-select-option @(filterRoleId == 0 ? "active" : "")"
+                                @onclick="() => SelectFilterRoleAsync(0)">
+                            <span>Todos los roles</span>
+                            @if (filterRoleId == 0)
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        @foreach (var role in roles)
+                        {
                             <button type="button"
-                                    class="custom-select-option @(filterRoleId == 0 ? "active" : "")"
-                                    @onclick="() => SelectFilterRoleAsync(0)">
-                                <span>Todos los roles</span>
-                                @if (filterRoleId == 0)
+                                    class="custom-select-option @(filterRoleId == role.IdRole ? "active" : "")"
+                                    @onclick="() => SelectFilterRoleAsync(role.IdRole)">
+                                <span>@role.Name</span>
+                                @if (filterRoleId == role.IdRole)
                                 {
                                     <i class="bi bi-check2 option-check"></i>
                                 }
                             </button>
-                            @foreach (var role in roles)
-                            {
-                                <button type="button"
-                                        class="custom-select-option @(filterRoleId == role.IdRole ? "active" : "")"
-                                        @onclick="() => SelectFilterRoleAsync(role.IdRole)">
-                                    <span>@role.Name</span>
-                                    @if (filterRoleId == role.IdRole)
-                                    {
-                                        <i class="bi bi-check2 option-check"></i>
-                                    }
-                                </button>
-                            }
-                        </div>
-                    }
-                </div>
-            }
+                        }
+                    </div>
+                }
+            </div>
         </div>
 
         <div class="toolbar-right">
-            <button class="btn-primary" @onclick="OpenCreate">
+            <button type="button" class="btn-primary" @onclick="OpenCreate">
                 <i class="bi bi-plus-lg"></i>
                 <span>Usuario</span>
             </button>
@@ -256,7 +249,7 @@
 
             <div class="form-row-2">
                 <!-- SELECTOR DE ROL PERSONALIZADO CON PUNTAS REDONDAS -->
-                <div class="form-group" @onclick:stopPropagation="true">
+                <div class="form-group">
                     <label class="form-label">Rol <span class="required">*</span></label>
                     <div class="custom-select-container">
                         <button type="button"
@@ -271,6 +264,7 @@
 
                         @if (isModalRoleOpen)
                         {
+                            <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
                             <div class="custom-select-menu">
                                 @foreach (var role in roles)
                                 {
@@ -294,7 +288,7 @@
                 </div>
 
                 <!-- SELECTOR DE SUCURSAL PERSONALIZADO CON PUNTAS REDONDAS -->
-                <div class="form-group" @onclick:stopPropagation="true">
+                <div class="form-group">
                     <label class="form-label">Sucursal</label>
                     @if (selectedRoleIsAdmin)
                     {
@@ -318,6 +312,7 @@
 
                             @if (isModalWarehouseOpen)
                             {
+                                <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
                                 <div class="custom-select-menu">
                                     <button type="button"
                                             class="custom-select-option @(formIdWarehouse == 0 ? "active" : "")"
@@ -447,7 +442,6 @@
     private bool isFilterRoleOpen;
     private bool isModalRoleOpen;
     private bool isModalWarehouseOpen;
-    private bool showFilters = true;
 
     private string searchTerm = string.Empty;
     private int filterRoleId;

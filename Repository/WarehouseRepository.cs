@@ -21,9 +21,28 @@ public class WarehouseRepository : IWarehouseRepository
         return _db.Warehouses.OrderBy(w => w.Name).ToList();
     }
 
-    public async Task<PagedResultDto<Warehouse>> GetWarehousesPagedAsync(int pageNumber, int pageSize)
+    public async Task<PagedResultDto<Warehouse>> GetWarehousesPagedAsync(int pageNumber, int pageSize, string? search = null, string statusFilter = "all")
     {
-        return await _db.Warehouses
+        var query = _db.Warehouses.AsQueryable();
+
+        if (statusFilter == "active")
+        {
+            query = query.Where(w => w.IsActive);
+        }
+        else if (statusFilter == "inactive")
+        {
+            query = query.Where(w => !w.IsActive);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(w =>
+                (w.Name != null && w.Name.ToLower().Contains(term)) ||
+                (w.Address != null && w.Address.ToLower().Contains(term)));
+        }
+
+        return await query
             .OrderBy(w => w.Name)
             .ToPagedResultAsync(pageNumber, pageSize);
     }

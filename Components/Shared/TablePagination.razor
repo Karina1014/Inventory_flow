@@ -1,7 +1,7 @@
 @using Inventory_Flow.Models.Dtos
 
-<div class="pagination-bar" @onclick="CloseSizeDropdown">
-    <div class="pagination-left" @onclick:stopPropagation="true">
+<div class="pagination-bar">
+    <div class="pagination-left">
         <span class="pagination-label">Filas por página</span>
 
         <div class="page-size-select-wrapper">
@@ -14,6 +14,7 @@
 
             @if (isSizeMenuOpen)
             {
+                <div class="dropdown-backdrop" @onclick="CloseSizeDropdown"></div>
                 <div class="page-size-menu">
                     @foreach (var size in PaginationParamsDto.AllowedPageSizes)
                     {

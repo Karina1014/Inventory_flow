@@ -73,6 +73,16 @@
     color: #0077b6;
 }
 
+.dropdown-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1240;
+    background: transparent;
+}
+
 .page-size-menu {
     position: absolute;
     bottom: calc(100% + 6px);

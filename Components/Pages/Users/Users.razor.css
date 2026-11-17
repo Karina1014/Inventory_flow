@@ -256,6 +256,16 @@
     color: #0077b6;
 }
 
+.dropdown-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1100;
+    background: transparent;
+}
+
 .custom-select-menu {
     position: absolute;
     top: calc(100% + 5px);

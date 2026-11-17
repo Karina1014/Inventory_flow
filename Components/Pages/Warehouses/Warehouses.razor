@@ -4,30 +4,90 @@
 @using Inventory_Flow.Models.Dtos
 @using Inventory_Flow.Repository.IRepository
 @inject IWarehouseRepository WarehouseRepo
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
 
 <div class="page-container">
-    <div class="page-header">
+    <!-- ENCABEZADO CON ÍCONO EN CAJA REDONDEADA -->
+    <div class="page-header-block">
+        <div class="header-icon-box">
+            <i class="bi bi-building"></i>
+        </div>
         <div>
             <h1 class="title">Sucursales</h1>
-            <p class="subtitle">Gestión de sucursales y puntos de almacenamiento</p>
+            <p class="subtitle">Gestión de sucursales y puntos de almacenamiento de inventario.</p>
         </div>
-        <button class="btn-primary" @onclick="OpenCreate">
-            <i class="bi bi-plus-lg"></i>
-            Nueva sucursal
-        </button>
     </div>
 
-    <div class="panel">
-        <div class="panel-header">
-            <span class="panel-title">Listado de sucursales</span>
-            <span class="record-count">@totalWarehousesCount registros</span>
+    <!-- BARRA DE BÚSQUEDA Y SELECTOR DE ESTADO A LA IZQUIERDA + BOTÓN AÑADIR A LA DERECHA -->
+    <div class="table-toolbar">
+        <div class="toolbar-left">
+            <div class="filter-search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" placeholder="Buscar nombre o dirección..." @bind="searchTerm" @bind:event="oninput" @bind:after="OnFilterChangedAsync" />
+            </div>
+
+            <div class="custom-select-container filter-select-width">
+                <button type="button"
+                        class="custom-select-trigger @(isStatusFilterOpen ? "open" : "")"
+                        @onclick="ToggleStatusFilterDropdown">
+                    <div class="trigger-content">
+                        <i class="bi bi-sliders trigger-icon"></i>
+                        <span class="trigger-text">@GetStatusFilterName()</span>
+                    </div>
+                    <i class="bi bi-chevron-down trigger-chevron"></i>
+                </button>
+
+                @if (isStatusFilterOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="custom-select-menu">
+                        <button type="button"
+                                class="custom-select-option @(statusFilter == "all" ? "active" : "")"
+                                @onclick='() => SelectStatusFilterAsync("all")'>
+                            <span>Todos los estados</span>
+                            @if (statusFilter == "all")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        <button type="button"
+                                class="custom-select-option @(statusFilter == "active" ? "active" : "")"
+                                @onclick='() => SelectStatusFilterAsync("active")'>
+                            <span>Activos</span>
+                            @if (statusFilter == "active")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        <button type="button"
+                                class="custom-select-option @(statusFilter == "inactive" ? "active" : "")"
+                                @onclick='() => SelectStatusFilterAsync("inactive")'>
+                            <span>Inactivos</span>
+                            @if (statusFilter == "inactive")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                    </div>
+                }
+            </div>
         </div>
 
+        <div class="toolbar-right">
+            <button type="button" class="btn-primary" @onclick="OpenCreate">
+                <i class="bi bi-plus-lg"></i>
+                <span>Nueva sucursal</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- TABLA PRINCIPAL ESTILO CUADRÍCULA LIMPIA (SIN COLUMNA ID) -->
+    <div class="panel">
         @if (warehouses.Count == 0)
         {
             <div class="empty-state">
                 <i class="bi bi-building"></i>
-                <span>No hay sucursales registradas</span>
+                <span>No se encontraron sucursales registradas</span>
             </div>
         }
         else
@@ -36,7 +96,6 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>#</th>
                             <th>Nombre</th>
                             <th>Dirección</th>
                             <th>Estado</th>
@@ -48,7 +107,6 @@
                         @foreach (var w in warehouses)
                         {
                             <tr>
-                                <td class="col-id">@w.IdWarehouse</td>
                                 <td class="col-name">@w.Name</td>
                                 <td class="col-address">@w.Address</td>
                                 <td>
@@ -63,10 +121,10 @@
                                 </td>
                                 <td class="col-date">@w.CreationDate.ToString("dd/MM/yyyy")</td>
                                 <td class="col-actions">
-                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(w)" title="Editar">
+                                    <button type="button" class="action-btn btn-edit" @onclick="() => OpenEdit(w)" title="Editar">
                                         <i class="bi bi-pencil-fill"></i>
                                     </button>
-                                    <button class="action-btn btn-delete" @onclick="() => OpenDelete(w)" title="Eliminar">
+                                    <button type="button" class="action-btn btn-delete" @onclick="() => OpenDelete(w)" title="Eliminar">
                                         <i class="bi bi-trash-fill"></i>
                                     </button>
                                 </td>
@@ -90,14 +148,14 @@
     <div class="modal-box">
         <div class="modal-header">
             <span class="modal-title">@(isEditing ? "Editar sucursal" : "Nueva sucursal")</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body">
             <div class="form-group">
                 <label class="form-label">Nombre <span class="required">*</span></label>
                 <div class="input-box">
                     <i class="bi bi-building input-icon"></i>
-                    <input class="form-input" type="text"                           placeholder="Nombre de la sucursal"
+                    <input class="form-input" type="text" placeholder="Nombre de la sucursal"
                            @bind="formName" @bind:event="oninput" />
                 </div>
                 @if (showValidation && string.IsNullOrWhiteSpace(formName))
@@ -110,7 +168,7 @@
                 <label class="form-label">Dirección <span class="required">*</span></label>
                 <div class="input-box">
                     <i class="bi bi-geo-alt input-icon"></i>
-                    <input class="form-input" type="text"                           placeholder="Dirección de la sucursal"
+                    <input class="form-input" type="text" placeholder="Dirección de la sucursal"
                            @bind="formAddress" @bind:event="oninput" />
                 </div>
                 @if (showValidation && string.IsNullOrWhiteSpace(formAddress))
@@ -134,8 +192,8 @@
             }
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-save" @onclick="Save" disabled="@isSaving">
                 @if (isSaving)
                 {
                     <span>Guardando...</span>
@@ -155,14 +213,14 @@
     <div class="modal-box modal-sm">
         <div class="modal-header">
             <span class="modal-title">Confirmar eliminación</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body">
             <p class="delete-msg">¿Deseas eliminar la sucursal <strong>@selectedWarehouse?.Name</strong>? Esta acción no se puede deshacer.</p>
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
                 @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
             </button>
         </div>
@@ -174,6 +232,10 @@
     private int currentPage = 1;
     private int pageSize = 10;
     private int totalWarehousesCount;
+
+    private string searchTerm = string.Empty;
+    private string statusFilter = "all";
+    private bool isStatusFilterOpen;
 
     private bool showModal;
     private bool showDeleteModal;
@@ -195,11 +257,42 @@
 
     private async Task LoadWarehousesAsync()
     {
-        var paged = await WarehouseRepo.GetWarehousesPagedAsync(currentPage, pageSize);
+        var paged = await WarehouseRepo.GetWarehousesPagedAsync(currentPage, pageSize, searchTerm, statusFilter);
         warehouses = paged.Items.ToList();
         totalWarehousesCount = paged.TotalCount;
         currentPage = paged.PageNumber;
     }
+
+    private async Task OnFilterChangedAsync()
+    {
+        currentPage = 1;
+        await LoadWarehousesAsync();
+    }
+
+    private void CloseAllDropdowns()
+    {
+        isStatusFilterOpen = false;
+    }
+
+    private void ToggleStatusFilterDropdown()
+    {
+        isStatusFilterOpen = !isStatusFilterOpen;
+    }
+
+    private async Task SelectStatusFilterAsync(string status)
+    {
+        statusFilter = status;
+        isStatusFilterOpen = false;
+        currentPage = 1;
+        await LoadWarehousesAsync();
+    }
+
+    private string GetStatusFilterName() => statusFilter switch
+    {
+        "active"   => "Activos",
+        "inactive" => "Inactivos",
+        _          => "Todos los estados"
+    };
 
     private void OpenCreate()
     {
@@ -260,6 +353,7 @@
                     IsActive = formIsActive
                 };
                 await WarehouseRepo.UpdateWarehouse(selectedWarehouse.IdWarehouse, dto);
+                ToastService.ShowSuccess("Sucursal actualizada correctamente.");
             }
             else
             {
@@ -270,6 +364,7 @@
                     IsActive = formIsActive
                 };
                 await WarehouseRepo.CreateWarehouse(dto);
+                ToastService.ShowSuccess("Sucursal creada correctamente.");
             }
 
             await LoadWarehousesAsync();
@@ -290,6 +385,7 @@
         try
         {
             WarehouseRepo.DeleteWarehouse(selectedWarehouse.IdWarehouse);
+            ToastService.ShowSuccess("Sucursal eliminada correctamente.");
             await LoadWarehousesAsync();
             CloseModal();
         }
