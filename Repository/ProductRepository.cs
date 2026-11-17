@@ -3,6 +3,7 @@ using Inventory_Flow.Extensions;
 using Inventory_Flow.Models;
 using Inventory_Flow.Models.Dtos;
 using Inventory_Flow.Repository.IRepository;
+using Microsoft.EntityFrameworkCore;
 
 namespace Inventory_Flow.Repository;
 
@@ -17,13 +18,61 @@ public class ProductRepository : IProductRepository
 
     public ICollection<Product> GetProducts()
     {
-        return _db.Products.OrderBy(p => p.Name).ToList();
+        return _db.Products
+            .OrderByDescending(p => p.CreationDate)
+            .ThenByDescending(p => p.IdProduct)
+            .ToList();
     }
 
-    public async Task<PagedResultDto<Product>> GetProductsPagedAsync(int pageNumber, int pageSize)
+    public async Task<PagedResultDto<Product>> GetProductsPagedAsync(
+        int pageNumber,
+        int pageSize,
+        string? search = null,
+        int? categoryId = null,
+        string statusFilter = "all",
+        DateTime? startDate = null,
+        DateTime? endDate = null)
     {
-        return await _db.Products
-            .OrderBy(p => p.Name)
+        var query = _db.Products.Include(p => p.Category).AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(p =>
+                (p.Name != null && p.Name.Contains(term)) ||
+                (p.Code != null && p.Code.Contains(term)) ||
+                (p.Description != null && p.Description.Contains(term)));
+        }
+
+        if (categoryId.HasValue && categoryId.Value > 0)
+        {
+            query = query.Where(p => p.IdCategory == categoryId.Value);
+        }
+
+        if (statusFilter == "active")
+        {
+            query = query.Where(p => p.IsActive);
+        }
+        else if (statusFilter == "inactive")
+        {
+            query = query.Where(p => !p.IsActive);
+        }
+
+        if (startDate.HasValue)
+        {
+            var start = startDate.Value.Date;
+            query = query.Where(p => p.CreationDate >= start);
+        }
+
+        if (endDate.HasValue)
+        {
+            var end = endDate.Value.Date.AddDays(1);
+            query = query.Where(p => p.CreationDate < end);
+        }
+
+        return await query
+            .OrderByDescending(p => p.CreationDate)
+            .ThenByDescending(p => p.IdProduct)
             .ToPagedResultAsync(pageNumber, pageSize);
     }
 

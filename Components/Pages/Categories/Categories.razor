@@ -4,30 +4,137 @@
 @using Inventory_Flow.Models.Dtos
 @using Inventory_Flow.Repository.IRepository
 @inject ICategoryRepository CategoryRepo
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
 
 <div class="page-container">
-    <div class="page-header">
+    <!-- ENCABEZADO CON ÍCONO EN CAJA REDONDEADA -->
+    <div class="page-header-block">
+        <div class="header-icon-box">
+            <i class="bi bi-tags"></i>
+        </div>
         <div>
             <h1 class="title">Categorías</h1>
-            <p class="subtitle">Clasificación de los productos del inventario</p>
+            <p class="subtitle">Clasificación y organización de los productos del inventario.</p>
         </div>
-        <button class="btn-primary" @onclick="OpenCreate">
-            <i class="bi bi-plus-lg"></i>
-            Nueva categoría
-        </button>
     </div>
 
-    <div class="panel">
-        <div class="panel-header">
-            <span class="panel-title">Listado de categorías</span>
-            <span class="record-count">@totalCategoriesCount registros</span>
+    <!-- BARRA DE HERRAMIENTAS: BÚSQUEDA A LA IZQUIERDA + BOTÓN NUEVA CATEGORÍA A LA DERECHA -->
+    <div class="table-toolbar">
+        <div class="toolbar-left">
+            <div class="filter-search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" placeholder="Buscar categoría o descripción..." @bind="searchTerm" @bind:event="oninput" @bind:after="OnSearchChangedAsync" />
+            </div>
+
+            <!-- SELECTOR DESPLEGABLE DE FECHAS MODERNO Y FÁCIL DE USAR -->
+            <div class="custom-select-container filter-date-width">
+                <button type="button"
+                        class="custom-select-trigger @(isDateMenuOpen ? "open" : "")"
+                        @onclick="ToggleDateMenu">
+                    <div class="trigger-content">
+                        <i class="bi bi-calendar3 trigger-icon"></i>
+                        <span class="trigger-text">@GetDateFilterLabel()</span>
+                    </div>
+                    @if (selectedDatePreset != "all" || startDate.HasValue || endDate.HasValue)
+                    {
+                        <span class="clear-icon-wrapper" @onclick="ClearDateFilterAsync" @onclick:stopPropagation="true" title="Restablecer fechas">
+                            <i class="bi bi-x-circle-fill clear-filter-icon"></i>
+                        </span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-chevron-down trigger-chevron"></i>
+                    }
+                </button>
+
+                @if (isDateMenuOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseDateMenu"></div>
+                    <div class="date-menu-popover">
+                        <div class="date-presets-list">
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "all" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("all")'>
+                                <i class="bi bi-infinity"></i>
+                                <span>Todas las fechas</span>
+                                @if (selectedDatePreset == "all")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "today" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("today")'>
+                                <i class="bi bi-calendar-day"></i>
+                                <span>Hoy</span>
+                                @if (selectedDatePreset == "today")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "week" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("week")'>
+                                <i class="bi bi-calendar-week"></i>
+                                <span>Últimos 7 días</span>
+                                @if (selectedDatePreset == "week")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "month" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("month")'>
+                                <i class="bi bi-calendar-month"></i>
+                                <span>Este mes</span>
+                                @if (selectedDatePreset == "month")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                        </div>
+
+                        <div class="date-menu-divider"></div>
+
+                        <!-- RANGO PERSONALIZADO -->
+                        <div class="custom-range-section">
+                            <span class="custom-range-title">Rango de fechas específico</span>
+                            <div class="custom-range-fields">
+                                <div class="date-range-field">
+                                    <label>Desde:</label>
+                                    <input type="date" @bind="customStartDate" />
+                                </div>
+                                <div class="date-range-field">
+                                    <label>Hasta:</label>
+                                    <input type="date" @bind="customEndDate" />
+                                </div>
+                            </div>
+                            <div class="custom-range-actions">
+                                <button type="button" class="btn-apply-range" @onclick="ApplyCustomDateRangeAsync">
+                                    Aplicar filtro
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
         </div>
 
+        <div class="toolbar-right">
+            <button type="button" class="btn-primary" @onclick="OpenCreate">
+                <i class="bi bi-plus-lg"></i>
+                <span>Nueva categoría</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- TABLA PRINCIPAL ESTILO CUADRÍCULA LIMPIA (SIN COLUMNA ID) -->
+    <div class="panel">
         @if (categories.Count == 0)
         {
             <div class="empty-state">
                 <i class="bi bi-tags"></i>
-                <span>No hay categorías registradas</span>
+                <span>No se encontraron categorías registradas</span>
             </div>
         }
         else
@@ -36,28 +143,36 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>#</th>
                             <th>Nombre</th>
                             <th>Descripción</th>
                             <th>Creado</th>
-                            <th>Acciones</th>
+                            <th class="col-actions-header">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var c in categories)
                         {
                             <tr>
-                                <td class="col-id">@c.IdCategory</td>
                                 <td class="col-name">@c.Name</td>
-                                <td class="col-address">@c.Description</td>
+                                <td class="col-description" title="@c.Description">@c.Description</td>
                                 <td class="col-date">@c.CreationDate.ToString("dd/MM/yyyy")</td>
                                 <td class="col-actions">
-                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(c)" title="Editar">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </button>
-                                    <button class="action-btn btn-delete" @onclick="() => OpenDelete(c)" title="Eliminar">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </button>
+                                    <!-- BOTONES DE ACCIÓN DIRECTOS, CLAROS Y ATRACTIVOS (PILLS) -->
+                                    <div class="actions-pill-group">
+                                        <button type="button"
+                                                class="btn-action-pill btn-pill-edit"
+                                                @onclick="() => OpenEdit(c)"
+                                                title="Editar @c.Name">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="btn-action-pill btn-pill-delete"
+                                                @onclick="() => OpenDelete(c)"
+                                                title="Eliminar @c.Name">
+                                            <i class="bi bi-trash3"></i>
+                                         
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -79,7 +194,7 @@
     <div class="modal-box">
         <div class="modal-header">
             <span class="modal-title">@(isEditing ? "Editar categoría" : "Nueva categoría")</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body">
             <div class="form-group">
@@ -97,10 +212,10 @@
 
             <div class="form-group">
                 <label class="form-label">Descripción <span class="required">*</span></label>
-                <div class="input-box">
+                <div class="input-box textarea-box">
                     <i class="bi bi-card-text input-icon"></i>
-                    <input class="form-input" type="text" placeholder="Descripción de la categoría"
-                           @bind="formDescription" @bind:event="oninput" />
+                    <textarea class="form-input form-textarea" rows="3" placeholder="Descripción de la categoría"
+                              @bind="formDescription" @bind:event="oninput"></textarea>
                 </div>
                 @if (showValidation && string.IsNullOrWhiteSpace(formDescription))
                 {
@@ -114,8 +229,8 @@
             }
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-save" @onclick="Save" disabled="@isSaving">
                 @if (isSaving)
                 {
                     <span>Guardando...</span>
@@ -135,14 +250,14 @@
     <div class="modal-box modal-sm">
         <div class="modal-header">
             <span class="modal-title">Confirmar eliminación</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body">
             <p class="delete-msg">¿Deseas eliminar la categoría <strong>@selectedCategory?.Name</strong>? Esta acción no se puede deshacer.</p>
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
                 @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
             </button>
         </div>
@@ -155,6 +270,13 @@
     private int pageSize = 10;
     private int totalCategoriesCount;
 
+    private string searchTerm = string.Empty;
+    private string selectedDatePreset = "all";
+    private DateTime? startDate;
+    private DateTime? endDate;
+    private DateTime? customStartDate;
+    private DateTime? customEndDate;
+    private bool isDateMenuOpen;
     private bool showModal;
     private bool showDeleteModal;
     private bool isEditing;
@@ -174,10 +296,102 @@
 
     private async Task LoadCategoriesAsync()
     {
-        var paged = await CategoryRepo.GetCategoriesPagedAsync(currentPage, pageSize);
+        var paged = await CategoryRepo.GetCategoriesPagedAsync(currentPage, pageSize, searchTerm, startDate, endDate);
         categories = paged.Items.ToList();
         totalCategoriesCount = paged.TotalCount;
         currentPage = paged.PageNumber;
+    }
+
+    private async Task OnSearchChangedAsync()
+    {
+        currentPage = 1;
+        await LoadCategoriesAsync();
+    }
+
+    private void ToggleDateMenu()
+    {
+        isDateMenuOpen = !isDateMenuOpen;
+    }
+
+    private void CloseDateMenu()
+    {
+        isDateMenuOpen = false;
+    }
+
+    private async Task SelectDatePresetAsync(string preset)
+    {
+        selectedDatePreset = preset;
+        var now = DateTime.Today;
+
+        switch (preset)
+        {
+            case "today":
+                startDate = now;
+                endDate = now;
+                break;
+            case "week":
+                startDate = now.AddDays(-6);
+                endDate = now;
+                break;
+            case "month":
+                startDate = new DateTime(now.Year, now.Month, 1);
+                endDate = now;
+                break;
+            case "all":
+            default:
+                selectedDatePreset = "all";
+                startDate = null;
+                endDate = null;
+                break;
+        }
+
+        customStartDate = startDate;
+        customEndDate = endDate;
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadCategoriesAsync();
+    }
+
+    private async Task ApplyCustomDateRangeAsync()
+    {
+        if (!customStartDate.HasValue && !customEndDate.HasValue)
+        {
+            await SelectDatePresetAsync("all");
+            return;
+        }
+
+        startDate = customStartDate;
+        endDate = customEndDate;
+        selectedDatePreset = "custom";
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadCategoriesAsync();
+    }
+
+    private async Task ClearDateFilterAsync()
+    {
+        selectedDatePreset = "all";
+        startDate = null;
+        endDate = null;
+        customStartDate = null;
+        customEndDate = null;
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadCategoriesAsync();
+    }
+
+    private string GetDateFilterLabel()
+    {
+        return selectedDatePreset switch
+        {
+            "today" => "Hoy",
+            "week" => "Últimos 7 días",
+            "month" => "Este mes",
+            "custom" when startDate.HasValue && endDate.HasValue => $"{startDate.Value:dd/MM} - {endDate.Value:dd/MM}",
+            "custom" when startDate.HasValue => $"Desde {startDate.Value:dd/MM}",
+            "custom" when endDate.HasValue => $"Hasta {endDate.Value:dd/MM}",
+            _ => "Todas las fechas"
+        };
     }
 
     private void OpenCreate()
@@ -236,6 +450,7 @@
                     Description = formDescription.Trim()
                 };
                 await CategoryRepo.UpdateCategory(selectedCategory.IdCategory, dto);
+                ToastService.ShowSuccess("Categoría actualizada correctamente.");
             }
             else
             {
@@ -245,6 +460,7 @@
                     Description = formDescription.Trim()
                 };
                 await CategoryRepo.CreateCategory(dto);
+                ToastService.ShowSuccess("Categoría creada correctamente.");
             }
 
             await LoadCategoriesAsync();
@@ -265,6 +481,7 @@
         try
         {
             CategoryRepo.DeleteCategory(selectedCategory.IdCategory);
+            ToastService.ShowSuccess("Categoría eliminada correctamente.");
             await LoadCategoriesAsync();
             CloseModal();
         }
