@@ -18,13 +18,44 @@ public class RoleRepository : IRoleRepository
 
     public ICollection<Role> GetRoles()
     {
-        return _db.Roles.OrderBy(r => r.Name).ToList();
+        return _db.Roles
+            .OrderByDescending(r => r.CreateDate)
+            .ThenByDescending(r => r.IdRole)
+            .ToList();
     }
 
-    public async Task<PagedResultDto<Role>> GetRolesPagedAsync(int pageNumber, int pageSize)
+    public async Task<PagedResultDto<Role>> GetRolesPagedAsync(int pageNumber, int pageSize, string? search = null, bool? isAdmin = null, DateTime? startDate = null, DateTime? endDate = null)
     {
-        return await _db.Roles
-            .OrderBy(r => r.Name)
+        var query = _db.Roles.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(r =>
+                (r.Name != null && r.Name.Contains(term)) ||
+                (r.Description != null && r.Description.Contains(term)));
+        }
+
+        if (isAdmin.HasValue)
+        {
+            query = query.Where(r => r.IsAdmin == isAdmin.Value);
+        }
+
+        if (startDate.HasValue)
+        {
+            var start = startDate.Value.Date;
+            query = query.Where(r => r.CreateDate >= start);
+        }
+
+        if (endDate.HasValue)
+        {
+            var end = endDate.Value.Date.AddDays(1);
+            query = query.Where(r => r.CreateDate < end);
+        }
+
+        return await query
+            .OrderByDescending(r => r.CreateDate)
+            .ThenByDescending(r => r.IdRole)
             .ToPagedResultAsync(pageNumber, pageSize);
     }
 
