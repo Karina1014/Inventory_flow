@@ -380,6 +380,330 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("Products");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.PurchaseOrder", b =>
+                {
+                    b.Property<int>("IdPurchaseOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdPurchaseOrder"));
+
+                    b.Property<DateTime?>("ExpectedDeliveryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FinancialApprovalDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FinancialApprovalNote")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("IdDestinationWarehouse")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IdFinancialApprovalUser")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdPurchaseOrderStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdPurchaseOrderType")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdSupplier")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdUser")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Observation")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("OrderDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("IdPurchaseOrder");
+
+                    b.HasIndex("IdDestinationWarehouse");
+
+                    b.HasIndex("IdFinancialApprovalUser");
+
+                    b.HasIndex("IdPurchaseOrderStatus");
+
+                    b.HasIndex("IdPurchaseOrderType");
+
+                    b.HasIndex("IdSupplier");
+
+                    b.HasIndex("IdUser");
+
+                    b.HasIndex("OrderNumber")
+                        .IsUnique();
+
+                    b.ToTable("PurchaseOrders");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.PurchaseOrderDetail", b =>
+                {
+                    b.Property<int>("IdPurchaseOrderDetail")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdPurchaseOrderDetail"));
+
+                    b.Property<int?>("IdInternalRequisition")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdProduct")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdPurchaseOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReceivedQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TaxPercentage")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("IdPurchaseOrderDetail");
+
+                    b.HasIndex("IdInternalRequisition");
+
+                    b.HasIndex("IdProduct");
+
+                    b.HasIndex("IdPurchaseOrder");
+
+                    b.ToTable("PurchaseOrderDetails");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.PurchaseOrderStatus", b =>
+                {
+                    b.Property<int>("IdPurchaseOrderStatus")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdPurchaseOrderStatus"));
+
+                    b.Property<string>("BadgeColor")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsFinal")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("IdPurchaseOrderStatus");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("PurchaseOrderStatuses");
+
+                    b.HasData(
+                        new
+                        {
+                            IdPurchaseOrderStatus = 1,
+                            BadgeColor = "secondary",
+                            Code = "BORRADOR",
+                            Description = "En preparación por compras / bodega central.",
+                            IsFinal = false,
+                            Name = "Borrador",
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            IdPurchaseOrderStatus = 2,
+                            BadgeColor = "warning",
+                            Code = "PENDIENTE_FINANCIERO",
+                            Description = "Enviada a dirección financiera para validación de gasto.",
+                            IsFinal = false,
+                            Name = "Pendiente Aprobación Financiera",
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            IdPurchaseOrderStatus = 3,
+                            BadgeColor = "info",
+                            Code = "APROBADO_FINANCIERO",
+                            Description = "Presupuesto aprobado y lista para emitir a proveedor.",
+                            IsFinal = false,
+                            Name = "Aprobado por Finanzas",
+                            SortOrder = 3
+                        },
+                        new
+                        {
+                            IdPurchaseOrderStatus = 4,
+                            BadgeColor = "danger",
+                            Code = "RECHAZADO_FINANCIERO",
+                            Description = "Rechazado o devuelto con observaciones financieras.",
+                            IsFinal = false,
+                            Name = "Rechazado por Finanzas",
+                            SortOrder = 4
+                        },
+                        new
+                        {
+                            IdPurchaseOrderStatus = 5,
+                            BadgeColor = "primary",
+                            Code = "EMITIDO_PROVEEDOR",
+                            Description = "Orden enviada formalmente al proveedor para despacho.",
+                            IsFinal = false,
+                            Name = "Emitido al Proveedor",
+                            SortOrder = 5
+                        },
+                        new
+                        {
+                            IdPurchaseOrderStatus = 6,
+                            BadgeColor = "primary",
+                            Code = "RECIBIDO_PARCIAL",
+                            Description = "Mercadería ingresada parcialmente en Carapungo.",
+                            IsFinal = false,
+                            Name = "Recibido Parcial",
+                            SortOrder = 6
+                        },
+                        new
+                        {
+                            IdPurchaseOrderStatus = 7,
+                            BadgeColor = "success",
+                            Code = "RECIBIDO_TOTAL",
+                            Description = "Total de ítems recibidos e ingresados al inventario.",
+                            IsFinal = true,
+                            Name = "Recibido Completo",
+                            SortOrder = 7
+                        },
+                        new
+                        {
+                            IdPurchaseOrderStatus = 8,
+                            BadgeColor = "secondary",
+                            Code = "CANCELADO",
+                            Description = "Orden de compra anulada formalmente.",
+                            IsFinal = true,
+                            Name = "Cancelado",
+                            SortOrder = 8
+                        });
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.PurchaseOrderType", b =>
+                {
+                    b.Property<int>("IdPurchaseOrderType")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdPurchaseOrderType"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("PriorityLevel")
+                        .HasColumnType("int");
+
+                    b.HasKey("IdPurchaseOrderType");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("PurchaseOrderTypes");
+
+                    b.HasData(
+                        new
+                        {
+                            IdPurchaseOrderType = 1,
+                            Code = "DESABASTECIMIENTO_CRITICO",
+                            Description = "Compra urgente de fármacos o insumos esenciales agotados.",
+                            IsActive = true,
+                            Name = "Desabastecimiento Crítico",
+                            PriorityLevel = 1
+                        },
+                        new
+                        {
+                            IdPurchaseOrderType = 2,
+                            Code = "REPOSICION_CENTRAL",
+                            Description = "Reabastecimiento regular de stock de seguridad para Carapungo.",
+                            IsActive = true,
+                            Name = "Reposición Periódica CEDI",
+                            PriorityLevel = 2
+                        },
+                        new
+                        {
+                            IdPurchaseOrderType = 3,
+                            Code = "CAMPANIA_ESTACIONAL",
+                            Description = "Volumen extraordinario para campañas masivas de vacunación.",
+                            IsActive = true,
+                            Name = "Campaña / Temporada",
+                            PriorityLevel = 3
+                        },
+                        new
+                        {
+                            IdPurchaseOrderType = 4,
+                            Code = "PEDIDO_ESPECIAL_IMPORTADO",
+                            Description = "Insumos o equipos específicos no habituales en inventario.",
+                            IsActive = true,
+                            Name = "Bajo Pedido Especial",
+                            PriorityLevel = 4
+                        });
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.RequisitionStatus", b =>
                 {
                     b.Property<int>("IdRequisitionStatus")
@@ -908,6 +1232,82 @@ namespace Inventory_Flow.Migrations
                     b.Navigation("Category");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.PurchaseOrder", b =>
+                {
+                    b.HasOne("Inventory_Flow.Models.Warehouse", "DestinationWarehouse")
+                        .WithMany()
+                        .HasForeignKey("IdDestinationWarehouse")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.User", "FinancialApprovalUser")
+                        .WithMany()
+                        .HasForeignKey("IdFinancialApprovalUser")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Inventory_Flow.Models.PurchaseOrderStatus", "PurchaseOrderStatus")
+                        .WithMany()
+                        .HasForeignKey("IdPurchaseOrderStatus")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.PurchaseOrderType", "PurchaseOrderType")
+                        .WithMany()
+                        .HasForeignKey("IdPurchaseOrderType")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.Supplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("IdSupplier")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("IdUser")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DestinationWarehouse");
+
+                    b.Navigation("FinancialApprovalUser");
+
+                    b.Navigation("PurchaseOrderStatus");
+
+                    b.Navigation("PurchaseOrderType");
+
+                    b.Navigation("Supplier");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.PurchaseOrderDetail", b =>
+                {
+                    b.HasOne("Inventory_Flow.Models.InternalRequisition", "InternalRequisition")
+                        .WithMany()
+                        .HasForeignKey("IdInternalRequisition")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Inventory_Flow.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("IdProduct")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.PurchaseOrder", "PurchaseOrder")
+                        .WithMany("Details")
+                        .HasForeignKey("IdPurchaseOrder")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("InternalRequisition");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("PurchaseOrder");
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.User", b =>
                 {
                     b.HasOne("Inventory_Flow.Models.Role", "Role")
@@ -930,6 +1330,11 @@ namespace Inventory_Flow.Migrations
                 });
 
             modelBuilder.Entity("Inventory_Flow.Models.InventoryMovement", b =>
+                {
+                    b.Navigation("Details");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.PurchaseOrder", b =>
                 {
                     b.Navigation("Details");
                 });
