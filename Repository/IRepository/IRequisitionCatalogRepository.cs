@@ -9,6 +9,7 @@ public interface IRequisitionCatalogRepository
 {
     Task<ICollection<RequisitionStatus>> GetStatusesAsync();
     Task<ICollection<RequisitionType>> GetTypesAsync(bool activeOnly = true);
+    Task<RequisitionStatus?> GetStatusByIdAsync(int idRequisitionStatus);
     Task<RequisitionStatus?> GetStatusByCodeAsync(string code);
     Task<RequisitionType?> GetTypeByIdAsync(int idRequisitionType);
 }

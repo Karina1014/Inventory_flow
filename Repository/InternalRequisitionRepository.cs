@@ -119,8 +119,9 @@ public class InternalRequisitionRepository : IInternalRequisitionRepository
             throw new InvalidOperationException("El tipo de requisición seleccionado no existe o está inactivo.");
         }
 
-        var initialStatus = await _catalog.GetStatusByCodeAsync(RequisitionStatusCodes.Solicitado)
-            ?? throw new InvalidOperationException("No está configurado el estado inicial SOLICITADO en el catálogo.");
+        var initialStatus = await _catalog.GetStatusByIdAsync(1)
+            ?? await _db.RequisitionStatuses.OrderBy(s => s.SortOrder).FirstOrDefaultAsync()
+            ?? throw new InvalidOperationException("No está configurado el estado inicial en el catálogo de requisiciones.");
 
         // Si no se especifica la bodega proveedora, se usa la matriz (Carapungo)
         var fulfillingWarehouseId = dto.IdFulfillingWarehouse;
@@ -182,15 +183,14 @@ public class InternalRequisitionRepository : IInternalRequisitionRepository
 
         if (requisition == null) return false;
 
-        var newStatus = await _catalog.GetStatusByCodeAsync(newStatusCode)
-            ?? throw new InvalidOperationException($"El estado '{newStatusCode}' no existe en el catálogo.");
-
-        var currentCode = requisition.RequisitionStatus?.Code ?? string.Empty;
-        if (!RequisitionStatusCodes.CanTransition(currentCode, newStatus.Code))
+        if (requisition.RequisitionStatus != null && requisition.RequisitionStatus.IsFinal)
         {
             throw new InvalidOperationException(
-                $"No se puede cambiar la requisición de '{requisition.RequisitionStatus?.Name}' a '{newStatus.Name}'.");
+                $"No se puede cambiar el estado porque la requisición ya está en estado final '{requisition.RequisitionStatus.Name}'.");
         }
+
+        var newStatus = await _catalog.GetStatusByCodeAsync(newStatusCode)
+            ?? throw new InvalidOperationException($"El estado '{newStatusCode}' no existe en el catálogo.");
 
         requisition.IdRequisitionStatus = newStatus.IdRequisitionStatus;
         requisition.ReviewedDate = DateTime.Now;
@@ -213,6 +213,12 @@ public class InternalRequisitionRepository : IInternalRequisitionRepository
 
         if (requisition == null) return false;
 
+        if (requisition.RequisitionStatus != null && requisition.RequisitionStatus.IsFinal)
+        {
+            throw new InvalidOperationException(
+                $"No se pueden actualizar despachos porque la requisición ya está en estado final '{requisition.RequisitionStatus.Name}'.");
+        }
+
         foreach (var detail in requisition.Details)
         {
             if (productDispatchedQuantities.TryGetValue(detail.IdProduct, out var qty))
@@ -225,25 +231,19 @@ public class InternalRequisitionRepository : IInternalRequisitionRepository
         var totalReq = requisition.Details.Sum(d => d.RequestedQuantity);
         var totalDisp = requisition.Details.Sum(d => d.DispatchedQuantity);
 
-        string? targetCode = totalDisp <= 0
-            ? null
-            : totalDisp >= totalReq ? RequisitionStatusCodes.Despachado : RequisitionStatusCodes.AprobadoParcial;
-
-        if (targetCode != null && !string.Equals(requisition.RequisitionStatus?.Code, targetCode, StringComparison.OrdinalIgnoreCase))
+        if (totalDisp > 0)
         {
-            var currentCode = requisition.RequisitionStatus?.Code ?? string.Empty;
-            if (!RequisitionStatusCodes.CanTransition(currentCode, targetCode))
+            // Id 4 = Despachado (total), Id 3 = Aprobado Parcial
+            var targetStatusId = totalDisp >= totalReq ? 4 : 3;
+            var targetStatus = await _catalog.GetStatusByIdAsync(targetStatusId)
+                ?? await _db.RequisitionStatuses.FirstOrDefaultAsync(s => s.IdRequisitionStatus == targetStatusId);
+
+            if (targetStatus != null)
             {
-                throw new InvalidOperationException(
-                    $"No se puede registrar el despacho cuando la requisición está en estado '{requisition.RequisitionStatus?.Name}'.");
+                requisition.IdRequisitionStatus = targetStatus.IdRequisitionStatus;
+                requisition.ReviewedDate = DateTime.Now;
+                requisition.IdReviewedByUser = reviewedByUserId;
             }
-
-            var targetStatus = await _catalog.GetStatusByCodeAsync(targetCode)
-                ?? throw new InvalidOperationException($"El estado '{targetCode}' no existe en el catálogo.");
-
-            requisition.IdRequisitionStatus = targetStatus.IdRequisitionStatus;
-            requisition.ReviewedDate = DateTime.Now;
-            requisition.IdReviewedByUser = reviewedByUserId;
         }
 
         await _db.SaveChangesAsync();
@@ -252,6 +252,29 @@ public class InternalRequisitionRepository : IInternalRequisitionRepository
 
     public async Task<bool> CancelRequisitionAsync(int id, int userId, string reason)
     {
-        return await UpdateStatusAsync(id, RequisitionStatusCodes.Cancelado, userId, reason);
+        var requisition = await _db.InternalRequisitions
+            .Include(r => r.RequisitionStatus)
+            .FirstOrDefaultAsync(r => r.IdInternalRequisition == id);
+
+        if (requisition == null) return false;
+
+        if (requisition.RequisitionStatus != null && requisition.RequisitionStatus.IsFinal)
+        {
+            throw new InvalidOperationException(
+                $"No se puede anular la requisición porque ya se encuentra en estado final '{requisition.RequisitionStatus.Name}'.");
+        }
+
+        // Id 7 = Cancelado
+        var cancelStatus = await _catalog.GetStatusByIdAsync(7)
+            ?? await _db.RequisitionStatuses.FirstOrDefaultAsync(s => s.Code == "CANCELADO")
+            ?? throw new InvalidOperationException("No se encontró el estado de cancelación en el catálogo.");
+
+        requisition.IdRequisitionStatus = cancelStatus.IdRequisitionStatus;
+        requisition.ReviewedDate = DateTime.Now;
+        requisition.IdReviewedByUser = userId;
+        requisition.ReviewNote = string.IsNullOrWhiteSpace(reason) ? "Requisición anulada" : reason.Trim();
+
+        await _db.SaveChangesAsync();
+        return true;
     }
 }

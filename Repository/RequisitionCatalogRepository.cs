@@ -39,6 +39,11 @@ public class RequisitionCatalogRepository : IRequisitionCatalogRepository
             .ToListAsync();
     }
 
+    public async Task<RequisitionStatus?> GetStatusByIdAsync(int idRequisitionStatus)
+    {
+        return await _db.RequisitionStatuses.FirstOrDefaultAsync(s => s.IdRequisitionStatus == idRequisitionStatus);
+    }
+
     public async Task<RequisitionStatus?> GetStatusByCodeAsync(string code)
     {
         if (string.IsNullOrWhiteSpace(code)) return null;

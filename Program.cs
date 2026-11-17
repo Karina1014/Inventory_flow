@@ -35,6 +35,8 @@ builder.Services.AddScoped<IMenuRepository, MenuRepository>();
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 builder.Services.AddScoped<IRequisitionCatalogRepository, RequisitionCatalogRepository>();
 builder.Services.AddScoped<IInternalRequisitionRepository, InternalRequisitionRepository>();
+builder.Services.AddScoped<IPurchaseOrderCatalogRepository, PurchaseOrderCatalogRepository>();
+builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
 
 // 3. AutoMapper
 builder.Services.AddAutoMapper(cfg => {
@@ -49,6 +51,7 @@ builder.Services.AddAutoMapper(cfg => {
     cfg.AddProfile<ThresholdInvetoryProfile>();
     cfg.AddProfile<SupplierProfile>();
     cfg.AddProfile<InternalRequisitionProfile>();
+    cfg.AddProfile<PurchaseOrderProfile>();
 });
 
 var secretKey = builder.Configuration.GetValue<string>("ApiSettings:SecretKey");
