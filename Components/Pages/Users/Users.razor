@@ -12,39 +12,38 @@
 @inject Inventory_Flow.Services.IToastNotificationService ToastService
 
 <div class="page-container" @onclick="CloseAllDropdowns">
-    <!-- ENCABEZADO PRINCIPAL CON BOTÓN + USUARIO A LA DERECHA -->
-    <div class="page-header">
+    <!-- ENCABEZADO CON ÍCONO EN CAJA REDONDEADA (ESTILO REFERENCIA) -->
+    <div class="page-header-block">
+        <div class="header-icon-box">
+            <i class="bi bi-people"></i>
+        </div>
         <div>
             <h1 class="title">Usuarios</h1>
-            <p class="subtitle">Gestión de las cuentas de acceso, roles y permisos de menú del sistema</p>
+            <p class="subtitle">Gestión de las cuentas de acceso, roles y permisos de menú del sistema.</p>
         </div>
-        <button class="btn-primary" @onclick="OpenCreate">
-            <i class="bi bi-plus-lg"></i>
-            <span>Usuario</span>
-        </button>
     </div>
 
-    <!-- TABLA PRINCIPAL A ANCHO COMPLETO -->
-    <div class="panel">
-        <div class="panel-header list-header-bar">
-            <div class="d-flex align-items-center gap-2">
-                <span class="panel-title">Listado de usuarios</span>
-                <span class="record-count">@totalUsersCount registros</span>
-            </div>
+    <!-- BARRA DE HERRAMIENTAS SOBRE LA TABLA: FILTROS A LA IZQUIERDA + AÑADIR A LA DERECHA -->
+    <div class="table-toolbar" @onclick:stopPropagation="true">
+        <div class="toolbar-left">
+            <button type="button" class="btn-filter-toggle @(showFilters ? "active" : "")" @onclick="() => showFilters = !showFilters">
+                <i class="bi bi-funnel"></i>
+                <span>Filtros</span>
+            </button>
 
-            <div class="list-filters" @onclick:stopPropagation="true">
+            @if (showFilters)
+            {
                 <div class="filter-search-box">
                     <i class="bi bi-search"></i>
                     <input type="text" placeholder="Buscar nombre o usuario..." @bind="searchTerm" @bind:event="oninput" @bind:after="OnFilterChangedAsync" />
                 </div>
 
-                <!-- FILTRO DE ROL ESTILIZADO CON PUNTAS REDONDAS -->
                 <div class="custom-select-container filter-select-width">
                     <button type="button"
                             class="custom-select-trigger @(isFilterRoleOpen ? "open" : "")"
                             @onclick="ToggleFilterRoleDropdown">
                         <div class="trigger-content">
-                            <i class="bi bi-funnel trigger-icon"></i>
+                            <i class="bi bi-shield-check trigger-icon"></i>
                             <span class="trigger-text">@GetFilterRoleName()</span>
                         </div>
                         <i class="bi bi-chevron-down trigger-chevron"></i>
@@ -77,8 +76,19 @@
                         </div>
                     }
                 </div>
-            </div>
+            }
         </div>
+
+        <div class="toolbar-right">
+            <button class="btn-primary" @onclick="OpenCreate">
+                <i class="bi bi-plus-lg"></i>
+                <span>Usuario</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- TABLA PRINCIPAL ESTILO CUADRÍCULA LIMPIA -->
+    <div class="panel">
 
         @if (users.Count == 0)
         {
@@ -437,6 +447,7 @@
     private bool isFilterRoleOpen;
     private bool isModalRoleOpen;
     private bool isModalWarehouseOpen;
+    private bool showFilters = true;
 
     private string searchTerm = string.Empty;
     private int filterRoleId;

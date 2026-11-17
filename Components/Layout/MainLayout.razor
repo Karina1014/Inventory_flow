@@ -105,6 +105,22 @@
         </header>
 
         <main class="content">
+            @{
+                var (category, pageName) = GetCurrentBreadcrumb();
+            }
+            @if (!string.IsNullOrWhiteSpace(pageName))
+            {
+                <nav class="app-breadcrumb" aria-label="Ruta de navegación">
+                    <a href="/dashboard" class="breadcrumb-link">Inicio</a>
+                    @if (!string.IsNullOrWhiteSpace(category))
+                    {
+                        <i class="bi bi-chevron-right breadcrumb-sep"></i>
+                        <span class="breadcrumb-category">@category</span>
+                    }
+                    <i class="bi bi-chevron-right breadcrumb-sep"></i>
+                    <span class="breadcrumb-current">@pageName</span>
+                </nav>
+            }
             @Body
         </main>
     </div>
@@ -211,6 +227,45 @@
     }
 
     private string GetRoleLabel(string role) => string.IsNullOrWhiteSpace(role) ? "Sin rol" : role;
+
+    private (string Category, string PageName) GetCurrentBreadcrumb()
+    {
+        var relativePath = "/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('?')[0].Trim('/');
+
+        if (string.Equals(relativePath, "/dashboard", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(relativePath, "/", StringComparison.OrdinalIgnoreCase))
+        {
+            return (string.Empty, "Dashboard");
+        }
+
+        if (string.Equals(relativePath, "/profile", StringComparison.OrdinalIgnoreCase))
+        {
+            return ("Cuenta", "Mi Perfil");
+        }
+
+        var match = userMenus.FirstOrDefault(m => string.Equals("/" + m.Url.Trim('/'), relativePath, StringComparison.OrdinalIgnoreCase));
+        if (match != null)
+        {
+            return (match.Category ?? string.Empty, match.Name);
+        }
+
+        return relativePath.ToLowerInvariant() switch
+        {
+            "/warehouses"    => ("Administración", "Sucursales"),
+            "/categories"    => ("Administración", "Categorías"),
+            "/products"      => ("Administración", "Productos"),
+            "/movementtypes" => ("Administración", "Tipos de movimientos"),
+            "/roles"         => ("Administración", "Roles"),
+            "/users"         => ("Administración", "Usuarios"),
+            "/thresholds"    => ("Administración", "Umbral de Stock"),
+            "/lots"          => ("Administración", "Lotes"),
+            "/movements"     => ("Operaciones", "Movimientos"),
+            "/analytics"     => ("Operaciones", "Análisis IA"),
+            "/stockreport"   => ("Reportes", "Reporte de stock"),
+            "/kardex"        => ("Reportes", "Kardex"),
+            _                => (string.Empty, string.Empty)
+        };
+    }
 
     public void Dispose()
     {

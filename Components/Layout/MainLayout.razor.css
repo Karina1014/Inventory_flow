@@ -375,6 +375,38 @@
     padding: 1.5rem;
 }
 
+.app-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-bottom: 0.9rem;
+    font-size: 0.78rem;
+}
+
+.breadcrumb-link {
+    color: #64748b;
+    text-decoration: none;
+    transition: color 0.15s;
+}
+
+.breadcrumb-link:hover {
+    color: #0077b6;
+}
+
+.breadcrumb-sep {
+    font-size: 0.65rem;
+    color: #94a3b8;
+}
+
+.breadcrumb-category {
+    color: #64748b;
+}
+
+.breadcrumb-current {
+    color: #0f172a;
+    font-weight: 600;
+}
+
 @media (max-width: 768px) {
     .app-layout {
         flex-direction: column;
