@@ -1,0 +1,873 @@
+@page "/requisitions"
+@layout MainLayout
+@using Inventory_Flow.Models
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository.IRepository
+@inject IInternalRequisitionRepository RequisitionRepo
+@inject IRequisitionCatalogRepository CatalogRepo
+@inject IWarehouseRepository WarehouseRepo
+@inject IProductRepository ProductRepo
+@inject Inventory_Flow.Services.CurrentUserService CurrentUserService
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
+
+<div class="page-container">
+    <!-- Migas de Pan (Breadcrumb) -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="dashboard" class="text-decoration-none text-muted">
+                    <i class="bi bi-house-door me-1"></i>Inicio
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <span class="text-muted">Inventario</span>
+            </li>
+            <li class="breadcrumb-item active fw-semibold text-dark" aria-current="page">
+                Requisiciones Internas
+            </li>
+        </ol>
+    </nav>
+
+    <!-- Encabezado con Icono Enmarcado -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <div class="header-icon-box">
+                <i class="bi bi-send-check"></i>
+            </div>
+            <div>
+                <h1 class="h4 mb-0 fw-bold text-dark">Requisiciones Internas</h1>
+                <p class="text-muted small mb-0">Solicitudes de reposición desde sucursales hacia la matriz Carapungo.</p>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-brand-primary" @onclick="OpenCreateModal">
+                <i class="bi bi-plus-lg me-1"></i>
+                <span>Nueva Requisición</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Barra de Herramientas y Filtros -->
+    <div class="card p-3 mb-3">
+        <div class="row g-2 align-items-end">
+            <!-- Buscador -->
+            <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold text-muted mb-1">Buscar</label>
+                <div class="search-input-wrapper">
+                    <i class="bi bi-search search-icon"></i>
+                    <input type="text"
+                           class="form-control ps-5"
+                           placeholder="Código, sucursal, observación..."
+                           @bind="searchTerm"
+                           @bind:event="oninput"
+                           @bind:after="OnFilterChangedAsync" />
+                </div>
+            </div>
+
+            <!-- Filtro Sucursal Solicitante -->
+            <div class="col-12 col-md-3">
+                <label class="form-label small fw-semibold text-muted mb-1">Sucursal</label>
+                <select class="form-select" @bind="selectedWarehouseId" @bind:after="OnFilterChangedAsync">
+                    <option value="0">Todas las sucursales</option>
+                    @foreach (var w in warehouses)
+                    {
+                        <option value="@w.IdWarehouse">@w.Name</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Filtro Estado -->
+            <div class="col-12 col-md-2">
+                <label class="form-label small fw-semibold text-muted mb-1">Estado</label>
+                <select class="form-select" @bind="selectedStatusCode" @bind:after="OnFilterChangedAsync">
+                    <option value="all">Todos los estados</option>
+                    @foreach (var s in statuses)
+                    {
+                        <option value="@s.Code">@s.Name</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Filtro Tipo / Prioridad -->
+            <div class="col-12 col-md-3">
+                <label class="form-label small fw-semibold text-muted mb-1">Tipo de Solicitud</label>
+                <select class="form-select" @bind="selectedTypeId" @bind:after="OnFilterChangedAsync">
+                    <option value="0">Todos los tipos</option>
+                    @foreach (var t in types)
+                    {
+                        <option value="@t.IdRequisitionType">@t.Name</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Toggle Bandeja Carapungo (Priorizar por Urgencia) -->
+            <div class="col-12 mt-2 pt-2 border-top d-flex justify-content-between align-items-center">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="prioritizeSwitch" @bind="prioritizeByUrgency" @bind:after="OnFilterChangedAsync" />
+                    <label class="form-check-label small fw-semibold text-dark" for="prioritizeSwitch">
+                        <i class="bi bi-lightning-charge text-warning me-1"></i>Modo CEDI Carapungo: Priorizar automáticamente por Urgencia (SLA)
+                    </label>
+                </div>
+                <span class="text-muted small">Total: <strong>@totalCount</strong> requisiciones</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido Principal: Tabla o Empty State -->
+    @if (isLoading)
+    {
+        <div class="card p-5 text-center">
+            <div class="spinner-border text-primary mx-auto mb-2" role="status"></div>
+            <span class="text-muted small">Cargando requisiciones...</span>
+        </div>
+    }
+    else if (requisitions == null || !requisitions.Any())
+    {
+        <div class="empty-state-card">
+            <div class="empty-icon-circle">
+                <i class="bi bi-inbox"></i>
+            </div>
+            <h5 class="fw-bold text-dark mb-1">No hay requisiciones registradas</h5>
+            <p class="text-muted small mb-3 text-center" style="max-width: 440px;">
+                @(string.IsNullOrWhiteSpace(searchTerm)
+                    ? "Aún no se han enviado pedidos internos desde las sucursales hacia Carapungo."
+                    : $"No se encontraron pedidos que coincidan con los filtros aplicados.")
+            </p>
+            <button type="button" class="btn btn-brand-primary" @onclick="OpenCreateModal">
+                <i class="bi bi-plus-lg me-1"></i> Crear Primera Requisición
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="card p-0 overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-head-flat">
+                        <tr class="text-muted small text-uppercase">
+                            <th class="ps-3 py-3 border-0">Código</th>
+                            <th class="border-0">Fecha</th>
+                            <th class="border-0">Sucursal Solicitante</th>
+                            <th class="border-0">Tipo / SLA</th>
+                            <th class="border-0 text-center">Cant. Solicitada</th>
+                            <th class="border-0 text-center">Cant. Atendida</th>
+                            <th class="border-0 text-center">Estado</th>
+                            <th class="pe-3 border-0 text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in requisitions)
+                        {
+                            <tr>
+                                <td class="ps-3 fw-semibold">
+                                    <span class="code-badge">@item.RequisitionCode</span>
+                                </td>
+                                <td class="small text-muted">
+                                    @item.RequisitionDate.ToString("dd/MM/yyyy HH:mm")
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">@item.RequestingWarehouse?.Name</div>
+                                    <span class="text-muted small">Por: @(item.User?.Name ?? item.User?.Username)</span>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-1">
+                                        @if (item.RequisitionType?.PriorityLevel == 1)
+                                        {
+                                            <span class="badge bg-danger-subtle text-danger px-2 py-1">
+                                                <i class="bi bi-exclamation-triangle-fill me-1"></i>@item.RequisitionType?.Name
+                                            </span>
+                                        }
+                                        else if (item.RequisitionType?.PriorityLevel == 2)
+                                        {
+                                            <span class="badge bg-warning-subtle text-warning px-2 py-1">
+                                                @item.RequisitionType?.Name
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-light text-dark border px-2 py-1">
+                                                @item.RequisitionType?.Name
+                                            </span>
+                                        }
+                                    </div>
+                                    <span class="text-muted small" style="font-size: 0.72rem;">
+                                        SLA: @(item.RequisitionType?.MaxResponseHours)h max
+                                    </span>
+                                </td>
+                                <td class="text-center fw-bold text-dark">
+                                    @item.TotalRequestedQuantity un.
+                                </td>
+                                <td class="text-center fw-bold @(item.TotalDispatchedQuantity > 0 ? "text-success" : "text-muted")">
+                                    @item.TotalDispatchedQuantity un.
+                                </td>
+                                <td class="text-center">
+                                    <span class="status-pill status-@item.RequisitionStatus?.BadgeColor">
+                                        @item.RequisitionStatus?.Name
+                                    </span>
+                                </td>
+                                <td class="pe-3 text-end">
+                                    <div class="d-inline-flex gap-1">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2"
+                                                title="Ver detalle / Atender pedido"
+                                                @onclick="() => OpenDetailModal(item)">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <TablePagination TotalItems="@totalCount"
+                             @bind-CurrentPage="currentPage"
+                             @bind-PageSize="pageSize"
+                             OnPageChanged="LoadRequisitionsAsync" />
+        </div>
+    }
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL 1: CREAR NUEVA REQUISICIÓN INTERNA (SUCURSAL -> CARAPUNGO) -->
+<!-- ========================================================================= -->
+@if (showCreateModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModals"></div>
+    <div class="modal-card modal-lg">
+        <div class="modal-header">
+            <div class="d-flex align-items-center gap-2">
+                <div class="modal-icon-badge">
+                    <i class="bi bi-send-plus"></i>
+                </div>
+                <div>
+                    <h5 class="modal-title mb-0">Nueva Solicitud de Reabastecimiento</h5>
+                    <span class="text-muted small">Crea un pedido interno hacia la matriz Carapungo.</span>
+                </div>
+            </div>
+            <button type="button" class="btn-close" @onclick="CloseModals"></button>
+        </div>
+
+        <div class="modal-body">
+            @if (!string.IsNullOrWhiteSpace(createErrorMessage))
+            {
+                <div class="alert alert-danger py-2 px-3 small mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>@createErrorMessage
+                </div>
+            }
+
+            <div class="row g-3 mb-3">
+                <!-- Sucursal Solicitante -->
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold text-muted">
+                        Sucursal Solicitante <span class="text-danger">*</span>
+                    </label>
+                    <select class="form-select" @bind="newRequestingWarehouseId">
+                        <option value="0">Selecciona tu sucursal...</option>
+                        @foreach (var w in warehouses)
+                        {
+                            <option value="@w.IdWarehouse">@w.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Tipo de Requisición -->
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold text-muted">
+                        Tipo de Requerimiento (Prioridad) <span class="text-danger">*</span>
+                    </label>
+                    <select class="form-select" @bind="newRequisitionTypeId">
+                        @foreach (var t in types)
+                        {
+                            <option value="@t.IdRequisitionType">
+                                @t.Name (SLA: @t.MaxResponseHours h)
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Observaciones -->
+                <div class="col-12">
+                    <label class="form-label small fw-semibold text-muted">Observaciones / Justificación</label>
+                    <textarea class="form-control" rows="2"
+                              placeholder="Ej. Reabastecimiento por stock bajo para fin de semana o cirugías..."
+                              @bind="newObservation"></textarea>
+                </div>
+            </div>
+
+            <!-- Selector de Productos para la lista -->
+            <div class="card p-3 bg-light border border-light-subtle mb-3">
+                <span class="fw-semibold text-dark small mb-2 d-block">Agregar Productos a la Requisición</span>
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small text-muted mb-1">Producto</label>
+                        <select class="form-select form-select-sm" @bind="selectedProductId">
+                            <option value="0">Seleccionar producto...</option>
+                            @foreach (var p in availableProducts)
+                            {
+                                <option value="@p.IdProduct">@p.Code - @p.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small text-muted mb-1">Cantidad</label>
+                        <input type="number" class="form-control form-control-sm" min="1" max="10000" @bind="inputQuantity" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <button type="button" class="btn btn-brand-primary btn-sm w-100" @onclick="AddProductToDraft">
+                            <i class="bi bi-plus-lg me-1"></i> Agregar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de Ítems en Borrador -->
+            <div class="table-responsive border rounded mb-2">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr class="small text-muted">
+                            <th class="ps-3">Producto</th>
+                            <th class="text-center" style="width: 120px;">Cantidad</th>
+                            <th>Nota (opcional)</th>
+                            <th class="text-end pe-3" style="width: 60px;">Quitar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!draftDetails.Any())
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted small">
+                                    No has agregado productos a la solicitud aún.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in draftDetails)
+                            {
+                                var prod = availableProducts.FirstOrDefault(p => p.IdProduct == item.IdProduct);
+                                <tr>
+                                    <td class="ps-3">
+                                        <div class="fw-semibold text-dark small">@(prod?.Name ?? "Producto #" + item.IdProduct)</div>
+                                        <span class="text-muted" style="font-size: 0.72rem;">Código: @(prod?.Code)</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="number" class="form-control form-control-sm text-center" min="1" @bind="item.RequestedQuantity" />
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm" placeholder="Nota..." @bind="item.Note" />
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" @onclick="() => RemoveProductFromDraft(item.IdProduct)">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-end text-muted small pe-2">
+                Total ítems: <strong>@draftDetails.Count</strong> | Cantidad total: <strong>@draftDetails.Sum(d => d.RequestedQuantity)</strong>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" @onclick="CloseModals" disabled="@isSubmitting">
+                Cancelar
+            </button>
+            <button type="button" class="btn btn-brand-primary" @onclick="SubmitRequisitionAsync" disabled="@isSubmitting">
+                @if (isSubmitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    <span>Enviando...</span>
+                }
+                else
+                {
+                    <i class="bi bi-send me-1"></i>
+                    <span>Enviar Requisición a Carapungo</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+<!-- ========================================================================= -->
+<!-- MODAL 2: VER DETALLE Y GESTIÓN EN CARAPUNGO (DESPACHO / ESTADOS) -->
+<!-- ========================================================================= -->
+@if (showDetailModal && selectedRequisition != null)
+{
+    <div class="modal-backdrop" @onclick="CloseModals"></div>
+    <div class="modal-card modal-lg">
+        <div class="modal-header">
+            <div class="d-flex align-items-center gap-2">
+                <div class="modal-icon-badge">
+                    <i class="bi bi-clipboard2-check"></i>
+                </div>
+                <div>
+                    <h5 class="modal-title mb-0">Detalle de Requisición @selectedRequisition.RequisitionCode</h5>
+                    <span class="text-muted small">
+                        Solicitada por @selectedRequisition.RequestingWarehouse?.Name el @selectedRequisition.RequisitionDate.ToString("dd/MM/yyyy HH:mm")
+                    </span>
+                </div>
+            </div>
+            <button type="button" class="btn-close" @onclick="CloseModals"></button>
+        </div>
+
+        <div class="modal-body">
+            @if (!string.IsNullOrWhiteSpace(detailActionMessage))
+            {
+                <div class="alert @(isActionSuccess ? "alert-success" : "alert-danger") py-2 px-3 small mb-3">
+                    <i class="bi @(isActionSuccess ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-1"></i>@detailActionMessage
+                </div>
+            }
+
+            <!-- Resumen de Datos Clave -->
+            <div class="row g-2 mb-3 bg-light p-3 rounded border border-light-subtle">
+                <div class="col-6 col-md-3">
+                    <span class="text-muted small d-block">Estado Actual</span>
+                    <span class="status-pill status-@selectedRequisition.RequisitionStatus?.BadgeColor">
+                        @selectedRequisition.RequisitionStatus?.Name
+                    </span>
+                </div>
+                <div class="col-6 col-md-3">
+                    <span class="text-muted small d-block">Tipo / Prioridad</span>
+                    <span class="fw-bold text-dark small">@selectedRequisition.RequisitionType?.Name</span>
+                </div>
+                <div class="col-6 col-md-3">
+                    <span class="text-muted small d-block">Bodega Destino</span>
+                    <span class="fw-semibold text-dark small">@selectedRequisition.FulfillingWarehouse?.Name</span>
+                </div>
+                <div class="col-6 col-md-3">
+                    <span class="text-muted small d-block">Solicitante</span>
+                    <span class="text-dark small">@(selectedRequisition.User?.Name ?? selectedRequisition.User?.Username)</span>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(selectedRequisition.Observation))
+                {
+                    <div class="col-12 mt-2 pt-2 border-top">
+                        <span class="text-muted small fw-semibold">Observación:</span>
+                        <span class="small text-dark ms-1">@selectedRequisition.Observation</span>
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(selectedRequisition.ReviewNote))
+                {
+                    <div class="col-12 mt-1">
+                        <span class="text-muted small fw-semibold">Nota de Revisión:</span>
+                        <span class="small text-danger ms-1">@selectedRequisition.ReviewNote</span>
+                    </div>
+                }
+            </div>
+
+            <!-- Tabla de Productos Solicitados vs Despachados -->
+            <div class="table-responsive border rounded mb-3">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr class="small text-muted">
+                            <th class="ps-3 py-2">Producto</th>
+                            <th class="text-center" style="width: 140px;">Cant. Solicitada</th>
+                            <th class="text-center" style="width: 160px;">Cant. Despachar (CEDI)</th>
+                            <th>Nota</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var d in selectedRequisition.Details)
+                        {
+                            <tr>
+                                <td class="ps-3">
+                                    <div class="fw-bold text-dark small">@d.Product?.Name</div>
+                                    <span class="text-muted" style="font-size: 0.72rem;">Código: @d.Product?.Code | Categoría: @d.Product?.Category?.Name</span>
+                                </td>
+                                <td class="text-center fw-bold text-dark">
+                                    @d.RequestedQuantity un.
+                                </td>
+                                <td class="text-center">
+                                    @if (selectedRequisition.RequisitionStatus?.Code == "SOLICITADO" || selectedRequisition.RequisitionStatus?.Code == "EN_REVISION")
+                                    {
+                                        <input type="number"
+                                               class="form-control form-control-sm text-center mx-auto"
+                                               style="max-width: 100px;"
+                                               min="0"
+                                               max="@d.RequestedQuantity"
+                                               @bind="dispatchQuantities[d.IdProduct]" />
+                                    }
+                                    else
+                                    {
+                                        <span class="fw-bold @(d.DispatchedQuantity > 0 ? "text-success" : "text-muted")">
+                                            @d.DispatchedQuantity un.
+                                        </span>
+                                    }
+                                </td>
+                                <td class="small text-muted">
+                                    @(string.IsNullOrWhiteSpace(d.Note) ? "-" : d.Note)
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Acciones de Workflow para Carapungo / Administrador -->
+            @if (!selectedRequisition.RequisitionStatus?.IsFinal == true)
+            {
+                <div class="p-3 bg-light rounded border border-light-subtle">
+                    <span class="fw-semibold small text-dark d-block mb-2">Acciones de Gestión (Carapungo CEDI):</span>
+                    <div class="d-flex flex-wrap gap-2">
+                        @if (selectedRequisition.RequisitionStatus?.Code == "SOLICITADO")
+                        {
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick='() => ChangeStatusAsync("EN_REVISION")' disabled="@isActionProcessing">
+                                <i class="bi bi-search me-1"></i> Poner En Revisión
+                            </button>
+                        }
+
+                        @if (selectedRequisition.RequisitionStatus?.Code == "SOLICITADO" || selectedRequisition.RequisitionStatus?.Code == "EN_REVISION" || selectedRequisition.RequisitionStatus?.Code == "APROBADO_PARCIAL")
+                        {
+                            <button type="button" class="btn btn-brand-primary btn-sm" @onclick="ConfirmDispatchAsync" disabled="@isActionProcessing">
+                                <i class="bi bi-box-seam me-1"></i> Despachar Mercadería
+                            </button>
+                        }
+
+                        @if (selectedRequisition.RequisitionStatus?.Code == "DESPACHADO")
+                        {
+                            <button type="button" class="btn btn-success btn-sm" @onclick='() => ChangeStatusAsync("COMPLETADO")' disabled="@isActionProcessing">
+                                <i class="bi bi-check-circle me-1"></i> Confirmar Recepción en Sucursal
+                            </button>
+                        }
+
+                        @if (selectedRequisition.RequisitionStatus?.Code != "DESPACHADO" && selectedRequisition.RequisitionStatus?.Code != "COMPLETADO")
+                        {
+                            <button type="button" class="btn btn-outline-danger btn-sm ms-auto" @onclick="OpenRejectPrompt" disabled="@isActionProcessing">
+                                <i class="bi bi-x-circle me-1"></i> Rechazar Pedido
+                            </button>
+                        }
+                    </div>
+
+                    @if (showRejectInput)
+                    {
+                        <div class="mt-3 pt-3 border-top">
+                            <label class="form-label small text-danger fw-semibold">Motivo del Rechazo <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm mb-2" placeholder="Indica el motivo..." @bind="rejectReason" />
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-danger btn-sm" @onclick='() => ChangeStatusAsync("RECHAZADO", rejectReason)'>
+                                    Confirmar Rechazo
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showRejectInput = false">
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" @onclick="CloseModals">
+                Cerrar
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<InternalRequisition> requisitions = new();
+    private List<RequisitionStatus> statuses = new();
+    private List<RequisitionType> types = new();
+    private List<Warehouse> warehouses = new();
+    private List<Product> availableProducts = new();
+
+    private int totalCount = 0;
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private string searchTerm = "";
+    private int selectedWarehouseId = 0;
+    private string selectedStatusCode = "all";
+    private int selectedTypeId = 0;
+    private bool prioritizeByUrgency = false;
+    private bool isLoading = true;
+
+    // Modal Crear
+    private bool showCreateModal = false;
+    private int newRequestingWarehouseId = 0;
+    private int newRequisitionTypeId = 0;
+    private string newObservation = "";
+    private int selectedProductId = 0;
+    private int inputQuantity = 1;
+    private List<CreateInternalRequisitionDetailDto> draftDetails = new();
+    private bool isSubmitting = false;
+    private string createErrorMessage = "";
+
+    // Modal Detalle / Despacho
+    private bool showDetailModal = false;
+    private InternalRequisition? selectedRequisition;
+    private Dictionary<int, int> dispatchQuantities = new();
+    private bool isActionProcessing = false;
+    private string detailActionMessage = "";
+    private bool isActionSuccess = false;
+    private bool showRejectInput = false;
+    private string rejectReason = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCatalogsAsync();
+        await LoadRequisitionsAsync();
+    }
+
+    private async Task LoadCatalogsAsync()
+    {
+        try
+        {
+            var st = await CatalogRepo.GetStatusesAsync();
+            statuses = st.ToList();
+
+            var tp = await CatalogRepo.GetTypesAsync(activeOnly: true);
+            types = tp.ToList();
+
+            var wh = WarehouseRepo.GetWarehouses();
+            warehouses = wh.Where(w => w.IsActive).ToList();
+
+            var pr = ProductRepo.GetProducts();
+            availableProducts = pr.Where(p => p.IsActive).ToList();
+
+            if (types.Any())
+            {
+                // Preseleccionar Reposición Ordinaria por defecto
+                var defaultType = types.FirstOrDefault(t => t.Code == "REPOSICION_ORDINARIA") ?? types.First();
+                newRequisitionTypeId = defaultType.IdRequisitionType;
+            }
+
+            // Si el usuario pertenece a una sucursal, preseleccionarla
+            if (CurrentUserService.WarehouseId.HasValue && CurrentUserService.WarehouseId.Value > 0)
+            {
+                newRequestingWarehouseId = CurrentUserService.WarehouseId.Value;
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error cargando catálogos: {ex.Message}", "Catálogos");
+        }
+    }
+
+    private async Task LoadRequisitionsAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var paged = await RequisitionRepo.GetRequisitionsPagedAsync(
+                pageNumber: currentPage,
+                pageSize: pageSize,
+                requestingWarehouseId: selectedWarehouseId > 0 ? selectedWarehouseId : null,
+                statusCode: selectedStatusCode,
+                requisitionTypeId: selectedTypeId > 0 ? selectedTypeId : null,
+                search: searchTerm,
+                prioritizeByType: prioritizeByUrgency);
+
+            requisitions = paged.Items.ToList();
+            totalCount = paged.TotalCount;
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error al cargar requisiciones: {ex.Message}", "Error");
+            requisitions = new();
+            totalCount = 0;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnFilterChangedAsync()
+    {
+        currentPage = 1;
+        await LoadRequisitionsAsync();
+    }
+
+    private void OpenCreateModal()
+    {
+        draftDetails.Clear();
+        selectedProductId = 0;
+        inputQuantity = 1;
+        newObservation = "";
+        createErrorMessage = "";
+        if (CurrentUserService.WarehouseId.HasValue && CurrentUserService.WarehouseId.Value > 0)
+        {
+            newRequestingWarehouseId = CurrentUserService.WarehouseId.Value;
+        }
+        showCreateModal = true;
+    }
+
+    private void AddProductToDraft()
+    {
+        if (selectedProductId <= 0)
+        {
+            createErrorMessage = "Selecciona un producto de la lista.";
+            return;
+        }
+
+        if (inputQuantity <= 0)
+        {
+            createErrorMessage = "La cantidad debe ser mayor a 0.";
+            return;
+        }
+
+        createErrorMessage = "";
+
+        var existing = draftDetails.FirstOrDefault(d => d.IdProduct == selectedProductId);
+        if (existing != null)
+        {
+            existing.RequestedQuantity += inputQuantity;
+        }
+        else
+        {
+            draftDetails.Add(new CreateInternalRequisitionDetailDto
+            {
+                IdProduct = selectedProductId,
+                RequestedQuantity = inputQuantity,
+                Note = ""
+            });
+        }
+
+        selectedProductId = 0;
+        inputQuantity = 1;
+    }
+
+    private void RemoveProductFromDraft(int productId)
+    {
+        draftDetails.RemoveAll(d => d.IdProduct == productId);
+    }
+
+    private async Task SubmitRequisitionAsync()
+    {
+        createErrorMessage = "";
+
+        if (newRequestingWarehouseId <= 0)
+        {
+            createErrorMessage = "Debes seleccionar la sucursal solicitante.";
+            return;
+        }
+
+        if (!draftDetails.Any())
+        {
+            createErrorMessage = "Debes agregar al menos un producto a la requisición.";
+            return;
+        }
+
+        isSubmitting = true;
+        try
+        {
+            var dto = new CreateInternalRequisitionDto
+            {
+                IdRequestingWarehouse = newRequestingWarehouseId,
+                IdRequisitionType = newRequisitionTypeId,
+                Observation = newObservation,
+                Details = draftDetails
+            };
+
+            var userId = CurrentUserService.UserId > 0 ? CurrentUserService.UserId : 1;
+            var created = await RequisitionRepo.CreateRequisitionAsync(dto, userId);
+
+            ToastService.Success($"Requisición {created.RequisitionCode} enviada a Carapungo exitosamente.", "Pedido Enviado");
+            CloseModals();
+            await LoadRequisitionsAsync();
+        }
+        catch (Exception ex)
+        {
+            createErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void OpenDetailModal(InternalRequisition item)
+    {
+        selectedRequisition = item;
+        dispatchQuantities.Clear();
+        foreach (var d in item.Details)
+        {
+            // Inicializar con la cantidad solicitada para facilitar el despacho rápido
+            dispatchQuantities[d.IdProduct] = d.DispatchedQuantity > 0 ? d.DispatchedQuantity : d.RequestedQuantity;
+        }
+        detailActionMessage = "";
+        showRejectInput = false;
+        rejectReason = "";
+        showDetailModal = true;
+    }
+
+    private async Task ConfirmDispatchAsync()
+    {
+        if (selectedRequisition == null) return;
+
+        isActionProcessing = true;
+        detailActionMessage = "";
+        try
+        {
+            var userId = CurrentUserService.UserId > 0 ? CurrentUserService.UserId : 1;
+            await RequisitionRepo.UpdateDispatchedQuantitiesAsync(selectedRequisition.IdInternalRequisition, dispatchQuantities, userId);
+
+            ToastService.Success("Mercadería despachada correctamente desde Carapungo.", "Despacho Registrado");
+            isActionSuccess = true;
+            detailActionMessage = "Despacho registrado exitosamente.";
+
+            // Recargar datos actualizados
+            selectedRequisition = await RequisitionRepo.GetRequisitionByIdAsync(selectedRequisition.IdInternalRequisition);
+            await LoadRequisitionsAsync();
+        }
+        catch (Exception ex)
+        {
+            isActionSuccess = false;
+            detailActionMessage = ex.Message;
+        }
+        finally
+        {
+            isActionProcessing = false;
+        }
+    }
+
+    private void OpenRejectPrompt()
+    {
+        showRejectInput = true;
+        rejectReason = "";
+    }
+
+    private async Task ChangeStatusAsync(string statusCode, string? note = null)
+    {
+        if (selectedRequisition == null) return;
+
+        isActionProcessing = true;
+        detailActionMessage = "";
+        try
+        {
+            var userId = CurrentUserService.UserId > 0 ? CurrentUserService.UserId : 1;
+            await RequisitionRepo.UpdateStatusAsync(selectedRequisition.IdInternalRequisition, statusCode, userId, note);
+
+            ToastService.Success($"Estado actualizado a: {statusCode}", "Actualizado");
+            isActionSuccess = true;
+            detailActionMessage = $"Estado actualizado con éxito.";
+            showRejectInput = false;
+
+            selectedRequisition = await RequisitionRepo.GetRequisitionByIdAsync(selectedRequisition.IdInternalRequisition);
+            await LoadRequisitionsAsync();
+        }
+        catch (Exception ex)
+        {
+            isActionSuccess = false;
+            detailActionMessage = ex.Message;
+        }
+        finally
+        {
+            isActionProcessing = false;
+        }
+    }
+
+    private void CloseModals()
+    {
+        showCreateModal = false;
+        showDetailModal = false;
+        selectedRequisition = null;
+        showRejectInput = false;
+    }
+}

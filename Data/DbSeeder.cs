@@ -62,11 +62,12 @@ public static class DbSeeder
                 new Menu { Name = "Usuarios", Category = "Administración", Url = "/users", Icon = "bi bi-people-fill", Order = 8, IsActive = true, IdRole = adminRole.IdRole },
                 new Menu { Name = "Umbral de Stock", Category = "Administración", Url = "/thresholds", Icon = "bi bi-sliders", Order = 9, IsActive = true, IdRole = adminRole.IdRole },
                 new Menu { Name = "Control de Inventario", Category = "Inventario", Url = "/inventario", Icon = "bi bi-box-seam", Order = 10, IsActive = true, IdRole = adminRole.IdRole },
-                new Menu { Name = "Lotes", Category = "Inventario", Url = "/lots", Icon = "bi bi-boxes", Order = 11, IsActive = true, IdRole = adminRole.IdRole },
-                new Menu { Name = "Movimientos", Category = "Inventario", Url = "/movements", Icon = "bi bi-arrow-left-right", Order = 12, IsActive = true, IdRole = adminRole.IdRole },
-                new Menu { Name = "Análisis IA", Category = "Reportes", Url = "/analytics", Icon = "bi bi-stars", Order = 13, IsActive = true, IdRole = adminRole.IdRole },
-                new Menu { Name = "Reporte de stock", Category = "Reportes", Url = "/stockreport", Icon = "bi bi-clipboard-data", Order = 14, IsActive = true, IdRole = adminRole.IdRole },
-                new Menu { Name = "Kardex", Category = "Reportes", Url = "/kardex", Icon = "bi bi-journal-text", Order = 15, IsActive = true, IdRole = adminRole.IdRole }
+                new Menu { Name = "Requisiciones", Category = "Inventario", Url = "/requisitions", Icon = "bi bi-send-check", Order = 11, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Lotes", Category = "Inventario", Url = "/lots", Icon = "bi bi-boxes", Order = 12, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Movimientos", Category = "Inventario", Url = "/movements", Icon = "bi bi-arrow-left-right", Order = 13, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Análisis IA", Category = "Reportes", Url = "/analytics", Icon = "bi bi-stars", Order = 14, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Reporte de stock", Category = "Reportes", Url = "/stockreport", Icon = "bi bi-clipboard-data", Order = 15, IsActive = true, IdRole = adminRole.IdRole },
+                new Menu { Name = "Kardex", Category = "Reportes", Url = "/kardex", Icon = "bi bi-journal-text", Order = 16, IsActive = true, IdRole = adminRole.IdRole }
             });
         }
 
