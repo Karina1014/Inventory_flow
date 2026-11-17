@@ -5,30 +5,186 @@
 @using Inventory_Flow.Repository.IRepository
 @using RoleModel = Inventory_Flow.Models.Role
 @inject IRoleRepository RoleRepo
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
 
 <div class="page-container">
-    <div class="page-header">
+    <!-- ENCABEZADO CON ÍCONO EN CAJA REDONDEADA -->
+    <div class="page-header-block">
+        <div class="header-icon-box">
+            <i class="bi bi-shield-lock"></i>
+        </div>
         <div>
             <h1 class="title">Roles</h1>
-            <p class="subtitle">Gestión de roles y permisos del sistema</p>
+            <p class="subtitle">Gestión de roles y niveles de acceso del sistema.</p>
         </div>
-        <button class="btn-primary" @onclick="OpenCreate">
-            <i class="bi bi-plus-lg"></i>
-            Nuevo rol
-        </button>
     </div>
 
-    <div class="panel">
-        <div class="panel-header">
-            <span class="panel-title">Listado de roles</span>
-            <span class="record-count">@totalRolesCount registros</span>
+    <!-- BARRA DE HERRAMIENTAS: BÚSQUEDA Y FILTROS A LA IZQUIERDA + BOTÓN NUEVO A LA DERECHA -->
+    <div class="table-toolbar">
+        <div class="toolbar-left">
+            <!-- BUSCADOR -->
+            <div class="filter-search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" placeholder="Buscar rol o descripción..."
+                       @bind="searchTerm" @bind:event="oninput" @bind:after="OnFilterChangedAsync" />
+            </div>
+
+            <!-- SELECTOR DESPLEGABLE DE TIPO DE ACCESO -->
+            <div class="custom-select-container filter-access-width">
+                <button type="button"
+                        class="custom-select-trigger @(isAccessFilterOpen ? "open" : "")"
+                        @onclick="ToggleAccessFilterDropdown">
+                    <div class="trigger-content">
+                        <i class="bi bi-shield-check trigger-icon"></i>
+                        <span class="trigger-text">@GetAccessFilterName()</span>
+                    </div>
+                    <i class="bi bi-chevron-down trigger-chevron"></i>
+                </button>
+
+                @if (isAccessFilterOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="custom-select-menu">
+                        <button type="button"
+                                class="custom-select-option @(selectedAccessFilter == "all" ? "active" : "")"
+                                @onclick='() => SelectAccessFilterAsync("all")'>
+                            <span>Todos los accesos</span>
+                            @if (selectedAccessFilter == "all")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        <button type="button"
+                                class="custom-select-option @(selectedAccessFilter == "admin" ? "active" : "")"
+                                @onclick='() => SelectAccessFilterAsync("admin")'>
+                            <span>Acceso Total (Admin)</span>
+                            @if (selectedAccessFilter == "admin")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        <button type="button"
+                                class="custom-select-option @(selectedAccessFilter == "standard" ? "active" : "")"
+                                @onclick='() => SelectAccessFilterAsync("standard")'>
+                            <span>Estándar</span>
+                            @if (selectedAccessFilter == "standard")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                    </div>
+                }
+            </div>
+
+            <!-- SELECTOR DESPLEGABLE DE FECHAS TIPO CALENDARIO -->
+            <div class="custom-select-container filter-date-width">
+                <button type="button"
+                        class="custom-select-trigger @(isDateMenuOpen ? "open" : "")"
+                        @onclick="ToggleDateMenu">
+                    <div class="trigger-content">
+                        <i class="bi bi-calendar3 trigger-icon"></i>
+                        <span class="trigger-text">@GetDateFilterLabel()</span>
+                    </div>
+                    @if (selectedDatePreset != "all" || startDate.HasValue || endDate.HasValue)
+                    {
+                        <span class="clear-icon-wrapper" @onclick="ClearDateFilterAsync" @onclick:stopPropagation="true" title="Restablecer fechas">
+                            <i class="bi bi-x-circle-fill clear-filter-icon"></i>
+                        </span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-chevron-down trigger-chevron"></i>
+                    }
+                </button>
+
+                @if (isDateMenuOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="date-menu-popover">
+                        <div class="date-presets-list">
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "all" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("all")'>
+                                <i class="bi bi-infinity"></i>
+                                <span>Todas las fechas</span>
+                                @if (selectedDatePreset == "all")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "today" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("today")'>
+                                <i class="bi bi-calendar-day"></i>
+                                <span>Hoy</span>
+                                @if (selectedDatePreset == "today")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "week" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("week")'>
+                                <i class="bi bi-calendar-week"></i>
+                                <span>Últimos 7 días</span>
+                                @if (selectedDatePreset == "week")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "month" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("month")'>
+                                <i class="bi bi-calendar-month"></i>
+                                <span>Este mes</span>
+                                @if (selectedDatePreset == "month")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                        </div>
+
+                        <div class="date-menu-divider"></div>
+
+                        <!-- RANGO PERSONALIZADO -->
+                        <div class="custom-range-section">
+                            <div class="custom-range-title">Rango de fechas:</div>
+                            <div class="range-inputs-row">
+                                <div class="range-input-wrapper">
+                                    <span class="range-tag">Desde</span>
+                                    <input type="date" class="range-date-input" @bind="tempStartDate" />
+                                </div>
+                                <div class="range-input-wrapper">
+                                    <span class="range-tag">Hasta</span>
+                                    <input type="date" class="range-date-input" @bind="tempEndDate" />
+                                </div>
+                            </div>
+                            <div class="custom-range-actions">
+                                <button type="button" class="btn-apply-range" @onclick="ApplyCustomDateRangeAsync">
+                                    Aplicar filtro
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
         </div>
 
+        <div class="toolbar-right">
+            <button type="button" class="btn-primary" @onclick="OpenCreate">
+                <i class="bi bi-plus-lg"></i>
+                <span>Nuevo rol</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- TABLA PRINCIPAL ESTILO CUADRÍCULA LIMPIA (SIN COLUMNA ID) -->
+    <div class="panel">
         @if (roles.Count == 0)
         {
             <div class="empty-state">
                 <i class="bi bi-shield-lock"></i>
-                <span>No hay roles registrados</span>
+                <span>No se encontraron roles registrados</span>
             </div>
         }
         else
@@ -37,39 +193,54 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>#</th>
                             <th>Nombre</th>
                             <th>Descripción</th>
                             <th>Tipo de Acceso</th>
                             <th>Creado</th>
-                            <th>Acciones</th>
+                            <th class="col-actions-header">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var r in roles)
                         {
                             <tr>
-                                <td class="col-id">@r.IdRole</td>
                                 <td class="col-name">@r.Name</td>
-                                <td class="col-address">@r.Description</td>
+                                <td class="col-description" title="@r.Description">
+                                    @(string.IsNullOrWhiteSpace(r.Description) ? "Sin descripción" : r.Description)
+                                </td>
                                 <td>
                                     @if (r.IsAdmin)
                                     {
-                                        <span class="badge-active"><i class="bi bi-shield-check me-1"></i>Acceso Total</span>
+                                        <span class="badge-role badge-admin">
+                                            <i class="bi bi-shield-check"></i>
+                                            <span>Acceso Total</span>
+                                        </span>
                                     }
                                     else
                                     {
-                                        <span class="badge-inactive">Estándar</span>
+                                        <span class="badge-role badge-standard">
+                                            <i class="bi bi-person"></i>
+                                            <span>Estándar</span>
+                                        </span>
                                     }
                                 </td>
                                 <td class="col-date">@r.CreateDate.ToLocalTime().ToString("dd/MM/yyyy")</td>
                                 <td class="col-actions">
-                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(r)" title="Editar">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </button>
-                                    <button class="action-btn btn-delete" @onclick="() => OpenDelete(r)" title="Eliminar">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </button>
+                                    <!-- BOTONES DE ACCIÓN SOLO CON ÍCONOS COMPACTOS -->
+                                    <div class="actions-pill-group">
+                                        <button type="button"
+                                                class="btn-action-pill btn-pill-edit"
+                                                @onclick="() => OpenEdit(r)"
+                                                title="Editar @r.Name">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="btn-action-pill btn-pill-delete"
+                                                @onclick="() => OpenDelete(r)"
+                                                title="Eliminar @r.Name">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -77,6 +248,7 @@
                 </table>
             </div>
 
+            <!-- COMPONENTE DE PAGINACIÓN -->
             <TablePagination TotalItems="@totalRolesCount"
                              @bind-CurrentPage="currentPage"
                              @bind-PageSize="pageSize"
@@ -85,20 +257,23 @@
     </div>
 </div>
 
+<!-- MODAL CREAR / EDITAR ROL -->
 @if (showModal)
 {
     <div class="modal-backdrop" @onclick="CloseModal"></div>
     <div class="modal-box">
         <div class="modal-header">
             <span class="modal-title">@(isEditing ? "Editar rol" : "Nuevo rol")</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="modal-close" @onclick="CloseModal">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
         <div class="modal-body">
             <div class="form-group">
-                <label class="form-label">Nombre <span class="required">*</span></label>
+                <label class="form-label">Nombre del rol <span class="required">*</span></label>
                 <div class="input-box">
                     <i class="bi bi-shield-lock input-icon"></i>
-                    <input class="form-input" type="text" placeholder="Ej: Administrador, Vendedor"
+                    <input class="form-input" type="text" placeholder="Ej: Administrador, Veterinario, Recepcionista"
                            @bind="formName" @bind:event="oninput" />
                 </div>
                 @if (showValidation && string.IsNullOrWhiteSpace(formName))
@@ -111,55 +286,77 @@
                 <label class="form-label">Descripción</label>
                 <div class="input-box">
                     <i class="bi bi-card-text input-icon"></i>
-                    <input class="form-input" type="text" placeholder="Descripción de permisos"
+                    <input class="form-input" type="text" placeholder="Breve descripción del alcance del rol"
                            @bind="formDescription" @bind:event="oninput" />
                 </div>
             </div>
 
             <div class="form-group toggle-group">
-                <label class="form-label">Privilegios</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" @bind="formIsAdmin" />
-                    <span class="toggle-label">@(formIsAdmin ? "Administrador (Acceso Global)" : "Operativo / Estándar")</span>
+                <label class="form-label">Nivel de Acceso</label>
+                <label class="toggle-card @(formIsAdmin ? "admin-active" : "")">
+                    <input type="checkbox" @bind="formIsAdmin" class="toggle-input" />
+                    <div class="toggle-content">
+                        <i class="@(formIsAdmin ? "bi bi-shield-check toggle-icon-admin" : "bi bi-person toggle-icon-std")"></i>
+                        <div>
+                            <div class="toggle-title">@(formIsAdmin ? "Administrador (Acceso Total)" : "Rol Estándar (Operativo)")</div>
+                            <div class="toggle-sub">@(formIsAdmin ? "Control total sobre configuración, usuarios y movimientos." : "Acceso restringido a tareas operativas asignadas.")</div>
+                        </div>
+                    </div>
                 </label>
             </div>
 
             @if (!string.IsNullOrEmpty(errorMessage))
             {
-                <div class="alert-error">@errorMessage</div>
+                <div class="alert-error">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>@errorMessage</span>
+                </div>
             }
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-save" @onclick="Save" disabled="@isSaving">
                 @if (isSaving)
                 {
                     <span>Guardando...</span>
                 }
                 else
                 {
-                    <span>Guardar</span>
+                    <span>Guardar rol</span>
                 }
             </button>
         </div>
     </div>
 }
 
+<!-- MODAL CONFIRMAR ELIMINACIÓN -->
 @if (showDeleteModal)
 {
     <div class="modal-backdrop" @onclick="CloseModal"></div>
     <div class="modal-box modal-sm">
         <div class="modal-header">
             <span class="modal-title">Confirmar eliminación</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="modal-close" @onclick="CloseModal">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
         <div class="modal-body">
-            <p class="delete-msg">¿Deseas eliminar el rol <strong>@selectedRole?.Name</strong>? Esta acción no se puede deshacer.</p>
+            <p class="delete-msg">
+                ¿Estás seguro de que deseas eliminar el rol <strong>@selectedRole?.Name</strong>?
+                Esta acción no se puede deshacer.
+            </p>
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
-                @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span>Eliminando...</span>
+                }
+                else
+                {
+                    <span>Eliminar rol</span>
+                }
             </button>
         </div>
     </div>
@@ -171,12 +368,27 @@
     private int pageSize = 10;
     private int totalRolesCount;
 
+    // Filtros
+    private string searchTerm = string.Empty;
+    private string selectedAccessFilter = "all"; // all, admin, standard
+    private bool isAccessFilterOpen = false;
+
+    // Filtro de Fechas
+    private bool isDateMenuOpen = false;
+    private string selectedDatePreset = "all"; // all, today, week, month, custom
+    private DateTime? startDate = null;
+    private DateTime? endDate = null;
+    private DateTime? tempStartDate = null;
+    private DateTime? tempEndDate = null;
+
+    // Estado modales
     private bool showModal;
     private bool showDeleteModal;
     private bool isEditing;
     private bool isSaving;
     private bool showValidation;
 
+    // Formulario
     private string formName = string.Empty;
     private string formDescription = string.Empty;
     private bool formIsAdmin;
@@ -193,17 +405,149 @@
     {
         try
         {
-            var paged = await RoleRepo.GetRolesPagedAsync(currentPage, pageSize);
+            bool? adminFilter = selectedAccessFilter switch
+            {
+                "admin" => true,
+                "standard" => false,
+                _ => null
+            };
+
+            var paged = await RoleRepo.GetRolesPagedAsync(
+                currentPage,
+                pageSize,
+                searchTerm,
+                adminFilter,
+                startDate,
+                endDate);
+
             roles = paged.Items.ToList();
             totalRolesCount = paged.TotalCount;
             currentPage = paged.PageNumber;
         }
-        catch
+        catch (Exception ex)
         {
-            errorMessage = "No se pudieron cargar los roles.";
+            ToastService.ShowError("Error al cargar los roles: " + ex.Message);
         }
     }
 
+    private async Task OnFilterChangedAsync()
+    {
+        currentPage = 1;
+        await LoadRolesAsync();
+    }
+
+    // --- ACCESO FILTRO ---
+    private void ToggleAccessFilterDropdown()
+    {
+        isAccessFilterOpen = !isAccessFilterOpen;
+        if (isAccessFilterOpen) isDateMenuOpen = false;
+    }
+
+    private string GetAccessFilterName()
+    {
+        return selectedAccessFilter switch
+        {
+            "admin" => "Acceso Total",
+            "standard" => "Estándar",
+            _ => "Todos los accesos"
+        };
+    }
+
+    private async Task SelectAccessFilterAsync(string access)
+    {
+        selectedAccessFilter = access;
+        isAccessFilterOpen = false;
+        currentPage = 1;
+        await LoadRolesAsync();
+    }
+
+    // --- FECHAS FILTRO ---
+    private void ToggleDateMenu()
+    {
+        isDateMenuOpen = !isDateMenuOpen;
+        if (isDateMenuOpen)
+        {
+            isAccessFilterOpen = false;
+            tempStartDate = startDate;
+            tempEndDate = endDate;
+        }
+    }
+
+    private void CloseAllDropdowns()
+    {
+        isAccessFilterOpen = false;
+        isDateMenuOpen = false;
+    }
+
+    private string GetDateFilterLabel()
+    {
+        if (selectedDatePreset == "today") return "Hoy";
+        if (selectedDatePreset == "week") return "Últimos 7 días";
+        if (selectedDatePreset == "month") return "Este mes";
+        if (startDate.HasValue && endDate.HasValue)
+        {
+            return $"{startDate.Value:dd/MM/yy} - {endDate.Value:dd/MM/yy}";
+        }
+        if (startDate.HasValue) return $"Desde {startDate.Value:dd/MM/yy}";
+        if (endDate.HasValue) return $"Hasta {endDate.Value:dd/MM/yy}";
+        return "Todas las fechas";
+    }
+
+    private async Task SelectDatePresetAsync(string preset)
+    {
+        selectedDatePreset = preset;
+        var today = DateTime.Today;
+
+        switch (preset)
+        {
+            case "all":
+                startDate = null;
+                endDate = null;
+                break;
+            case "today":
+                startDate = today;
+                endDate = today;
+                break;
+            case "week":
+                startDate = today.AddDays(-7);
+                endDate = today;
+                break;
+            case "month":
+                startDate = new DateTime(today.Year, today.Month, 1);
+                endDate = today;
+                break;
+        }
+
+        tempStartDate = startDate;
+        tempEndDate = endDate;
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadRolesAsync();
+    }
+
+    private async Task ApplyCustomDateRangeAsync()
+    {
+        startDate = tempStartDate;
+        endDate = tempEndDate;
+        selectedDatePreset = (startDate.HasValue || endDate.HasValue) ? "custom" : "all";
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadRolesAsync();
+    }
+
+    private async Task ClearDateFilterAsync()
+    {
+        startDate = null;
+        endDate = null;
+        tempStartDate = null;
+        tempEndDate = null;
+        selectedDatePreset = "all";
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadRolesAsync();
+    }
+
+    // --- ACCIONES CRUD ---
     private void OpenCreate()
     {
         formName = string.Empty;
@@ -254,9 +598,20 @@
 
         try
         {
+            var trimmedName = formName.Trim();
+            if (!isEditing || (selectedRole != null && selectedRole.Name?.ToLower() != trimmedName.ToLower()))
+            {
+                if (!RoleRepo.IsUniqueName(trimmedName))
+                {
+                    errorMessage = "Ya existe un rol con este nombre.";
+                    isSaving = false;
+                    return;
+                }
+            }
+
             var dto = new CreateRoleDto
             {
-                Name = formName.Trim(),
+                Name = trimmedName,
                 Description = string.IsNullOrWhiteSpace(formDescription) ? null : formDescription.Trim(),
                 IsAdmin = formIsAdmin
             };
@@ -264,18 +619,20 @@
             if (isEditing && selectedRole != null)
             {
                 await RoleRepo.UpdateRole(selectedRole.IdRole, dto);
+                ToastService.ShowSuccess($"Rol '{dto.Name}' actualizado con éxito.");
             }
             else
             {
                 await RoleRepo.CreateRole(dto);
+                ToastService.ShowSuccess($"Rol '{dto.Name}' creado con éxito.");
             }
 
             await LoadRolesAsync();
             CloseModal();
         }
-        catch
+        catch (Exception ex)
         {
-            errorMessage = "Ocurrió un error al guardar. Intenta nuevamente.";
+            errorMessage = "Ocurrió un error al guardar: " + ex.Message;
             isSaving = false;
         }
     }
@@ -288,12 +645,13 @@
         try
         {
             RoleRepo.DeleteRole(selectedRole.IdRole);
+            ToastService.ShowSuccess($"Rol '{selectedRole.Name}' eliminado correctamente.");
             await LoadRolesAsync();
             CloseModal();
         }
-        catch
+        catch (Exception ex)
         {
-            errorMessage = "No se pudo eliminar el rol.";
+            errorMessage = "No se pudo eliminar el rol: " + ex.Message;
             isSaving = false;
         }
     }
