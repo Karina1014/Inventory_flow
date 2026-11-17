@@ -22,13 +22,36 @@ public class ThresholdInvetoryRepository : IThresholdInvetoryRepository
 
     public async Task<ICollection<ThresholdInvetory>> GetThresholdsAsync()
     {
-        return await _db.ThresholdInvetories.OrderByDescending(t => t.IdThresholdInvetory).ToListAsync();
+        return await _db.ThresholdInvetories
+            .OrderByDescending(t => t.CreatedAt)
+            .ThenByDescending(t => t.IdThresholdInvetory)
+            .ToListAsync();
     }
 
-    public async Task<PagedResultDto<ThresholdInvetory>> GetThresholdsPagedAsync(int pageNumber, int pageSize)
+    public async Task<PagedResultDto<ThresholdInvetory>> GetThresholdsPagedAsync(int pageNumber, int pageSize, bool? statusFilter = null, DateTime? startDate = null, DateTime? endDate = null)
     {
-        return await _db.ThresholdInvetories
-            .OrderByDescending(t => t.IdThresholdInvetory)
+        var query = _db.ThresholdInvetories.AsNoTracking().AsQueryable();
+
+        if (statusFilter.HasValue)
+        {
+            query = query.Where(t => t.IsActive == statusFilter.Value);
+        }
+
+        if (startDate.HasValue)
+        {
+            var start = startDate.Value.Date;
+            query = query.Where(t => t.CreatedAt >= start);
+        }
+
+        if (endDate.HasValue)
+        {
+            var end = endDate.Value.Date.AddDays(1);
+            query = query.Where(t => t.CreatedAt < end);
+        }
+
+        return await query
+            .OrderByDescending(t => t.CreatedAt)
+            .ThenByDescending(t => t.IdThresholdInvetory)
             .ToPagedResultAsync(pageNumber, pageSize);
     }
 

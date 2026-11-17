@@ -4,23 +4,24 @@
 @using Inventory_Flow.Models.Dtos
 @using Inventory_Flow.Repository.IRepository
 @inject IThresholdInvetoryRepository ThresholdRepo
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
 
 <div class="page-container">
-    <div class="page-header">
-        <div>
-            <h1 class="title">Umbral de Inventario</h1>
-            <p class="subtitle">Configuración del stock mínimo para alertas y reposición</p>
+    <!-- ENCABEZADO CON ÍCONO EN CAJA REDONDEADA -->
+    <div class="page-header-block">
+        <div class="header-icon-box">
+            <i class="bi bi-shield-exclamation"></i>
         </div>
-        <button class="btn-primary" @onclick="OpenCreate">
-            <i class="bi bi-plus-lg"></i>
-            Nuevo umbral
-        </button>
+        <div>
+            <h1 class="title">Umbrales de inventario</h1>
+            <p class="subtitle">Configuración del stock mínimo para alertas automáticas y reposición de inventario.</p>
+        </div>
     </div>
 
-    <!-- Tarjeta de Umbral Actual Vigente -->
+    <!-- TARJETA DE UMBRAL ACTUAL VIGENTE -->
     <div class="current-threshold-card">
         <div class="threshold-badge-icon">
-            <i class="bi bi-shield-exclamation"></i>
+            <i class="bi bi-bell-fill"></i>
         </div>
         <div class="threshold-meta">
             <span class="threshold-label">Umbral activo vigente</span>
@@ -29,26 +30,174 @@
                 <span class="threshold-unit">unidades</span>
             </div>
             <span class="threshold-description">
-                Los productos con stock igual o menor a este valor se marcarán automáticamente en rojo en el Dashboard para su reposición.
+                Los productos con stock actual igual o menor a este valor se alertarán automáticamente en el Dashboard para su reposición oportuna.
             </span>
         </div>
-        <button class="btn-secondary-edit" @onclick="OpenCurrentEdit">
-            <i class="bi bi-pencil-fill"></i> Modificar valor
+        <button type="button" class="btn-secondary-edit" @onclick="OpenCurrentEdit">
+            <i class="bi bi-pencil-square"></i>
+            <span>Modificar valor</span>
         </button>
     </div>
 
-    <!-- Panel de Historial de Cambios -->
-    <div class="panel">
-        <div class="panel-header">
-            <span class="panel-title">Listado de umbrales</span>
-            <span class="record-count">@totalThresholdsCount registros</span>
+    <!-- BARRA DE HERRAMIENTAS: FILTROS A LA IZQUIERDA + BOTÓN NUEVO A LA DERECHA -->
+    <div class="table-toolbar">
+        <div class="toolbar-left">
+            <!-- SELECTOR DESPLEGABLE DE ESTADO -->
+            <div class="custom-select-container filter-status-width">
+                <button type="button"
+                        class="custom-select-trigger @(isStatusFilterOpen ? "open" : "")"
+                        @onclick="ToggleStatusFilterDropdown">
+                    <div class="trigger-content">
+                        <i class="bi bi-toggle-on trigger-icon"></i>
+                        <span class="trigger-text">@GetStatusFilterName()</span>
+                    </div>
+                    <i class="bi bi-chevron-down trigger-chevron"></i>
+                </button>
+
+                @if (isStatusFilterOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="custom-select-menu">
+                        <button type="button"
+                                class="custom-select-option @(selectedStatusFilter == "all" ? "active" : "")"
+                                @onclick='() => SelectStatusFilterAsync("all")'>
+                            <span>Todos los estados</span>
+                            @if (selectedStatusFilter == "all")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        <button type="button"
+                                class="custom-select-option @(selectedStatusFilter == "active" ? "active" : "")"
+                                @onclick='() => SelectStatusFilterAsync("active")'>
+                            <span>Activo (Vigente)</span>
+                            @if (selectedStatusFilter == "active")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        <button type="button"
+                                class="custom-select-option @(selectedStatusFilter == "inactive" ? "active" : "")"
+                                @onclick='() => SelectStatusFilterAsync("inactive")'>
+                            <span>Inactivo</span>
+                            @if (selectedStatusFilter == "inactive")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                    </div>
+                }
+            </div>
+
+            <!-- SELECTOR DESPLEGABLE DE FECHAS TIPO CALENDARIO -->
+            <div class="custom-select-container filter-date-width">
+                <button type="button"
+                        class="custom-select-trigger @(isDateMenuOpen ? "open" : "")"
+                        @onclick="ToggleDateMenu">
+                    <div class="trigger-content">
+                        <i class="bi bi-calendar3 trigger-icon"></i>
+                        <span class="trigger-text">@GetDateFilterLabel()</span>
+                    </div>
+                    @if (selectedDatePreset != "all" || startDate.HasValue || endDate.HasValue)
+                    {
+                        <span class="clear-icon-wrapper" @onclick="ClearDateFilterAsync" @onclick:stopPropagation="true" title="Restablecer fechas">
+                            <i class="bi bi-x-circle-fill clear-filter-icon"></i>
+                        </span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-chevron-down trigger-chevron"></i>
+                    }
+                </button>
+
+                @if (isDateMenuOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="date-menu-popover">
+                        <div class="date-presets-list">
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "all" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("all")'>
+                                <i class="bi bi-infinity"></i>
+                                <span>Todas las fechas</span>
+                                @if (selectedDatePreset == "all")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "today" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("today")'>
+                                <i class="bi bi-calendar-day"></i>
+                                <span>Hoy</span>
+                                @if (selectedDatePreset == "today")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "week" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("week")'>
+                                <i class="bi bi-calendar-week"></i>
+                                <span>Últimos 7 días</span>
+                                @if (selectedDatePreset == "week")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "month" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("month")'>
+                                <i class="bi bi-calendar-month"></i>
+                                <span>Este mes</span>
+                                @if (selectedDatePreset == "month")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                        </div>
+
+                        <div class="date-menu-divider"></div>
+
+                        <!-- RANGO PERSONALIZADO -->
+                        <div class="custom-range-section">
+                            <div class="custom-range-title">Rango de fechas:</div>
+                            <div class="range-inputs-row">
+                                <div class="range-input-wrapper">
+                                    <span class="range-tag">Desde</span>
+                                    <input type="date" class="range-date-input" @bind="tempStartDate" />
+                                </div>
+                                <div class="range-input-wrapper">
+                                    <span class="range-tag">Hasta</span>
+                                    <input type="date" class="range-date-input" @bind="tempEndDate" />
+                                </div>
+                            </div>
+                            <div class="custom-range-actions">
+                                <button type="button" class="btn-apply-range" @onclick="ApplyCustomDateRangeAsync">
+                                    Aplicar filtro
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
         </div>
 
+        <div class="toolbar-right">
+            <button type="button" class="btn-primary" @onclick="OpenCreate">
+                <i class="bi bi-plus-lg"></i>
+                <span>Nuevo umbral</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- TABLA PRINCIPAL ESTILO CUADRÍCULA LIMPIA (SIN COLUMNA ID) -->
+    <div class="panel">
         @if (thresholds.Count == 0)
         {
             <div class="empty-state">
                 <i class="bi bi-clock-history"></i>
-                <span>No hay registros de umbral configurados</span>
+                <span>No se encontraron registros de umbrales</span>
             </div>
         }
         else
@@ -57,44 +206,60 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>#</th>
                             <th>Valor Umbral</th>
                             <th>Estado</th>
                             <th>Fecha de Registro</th>
                             <th>Última Actualización</th>
-                            <th class="col-actions">Acciones</th>
+                            <th class="col-actions-header">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var t in thresholds)
                         {
                             <tr>
-                                <td class="col-id">@t.IdThresholdInvetory</td>
                                 <td class="col-threshold">
-                                    <strong>@t.Threshold</strong> unidades
+                                    <span class="threshold-pill">
+                                        <i class="bi bi-box-seam"></i>
+                                        <strong>@t.Threshold</strong> unidades
+                                    </span>
                                 </td>
                                 <td>
                                     @if (t.IsActive)
                                     {
-                                        <span class="badge badge-active">Activo (Vigente)</span>
+                                        <span class="badge badge-active">
+                                            <i class="bi bi-check-circle-fill"></i>
+                                            <span>Activo (Vigente)</span>
+                                        </span>
                                     }
                                     else
                                     {
-                                        <span class="badge badge-inactive">Inactivo</span>
+                                        <span class="badge badge-inactive">
+                                            <i class="bi bi-dash-circle"></i>
+                                            <span>Inactivo</span>
+                                        </span>
                                     }
                                 </td>
-                                <td class="col-date">@t.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
-                                <td class="col-date">@t.UpdatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="col-date">@t.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="col-date">@t.UpdatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
                                 <td class="col-actions">
-                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(t)" title="Editar">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </button>
-                                    @if (!t.IsActive)
-                                    {
-                                        <button class="action-btn btn-delete" @onclick="() => OpenDelete(t)" title="Eliminar">
-                                            <i class="bi bi-trash-fill"></i>
+                                    <!-- BOTONES DE ACCIÓN SOLO CON ÍCONOS COMPACTOS -->
+                                    <div class="actions-pill-group">
+                                        <button type="button"
+                                                class="btn-action-pill btn-pill-edit"
+                                                @onclick="() => OpenEdit(t)"
+                                                title="Editar umbral de @t.Threshold unidades">
+                                            <i class="bi bi-pencil-square"></i>
                                         </button>
-                                    }
+                                        @if (!t.IsActive)
+                                        {
+                                            <button type="button"
+                                                    class="btn-action-pill btn-pill-delete"
+                                                    @onclick="() => OpenDelete(t)"
+                                                    title="Eliminar umbral inactivo">
+                                                <i class="bi bi-trash3"></i>
+                                            </button>
+                                        }
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -102,6 +267,7 @@
                 </table>
             </div>
 
+            <!-- COMPONENTE DE PAGINACIÓN -->
             <TablePagination TotalItems="@totalThresholdsCount"
                              @bind-CurrentPage="currentPage"
                              @bind-PageSize="pageSize"
@@ -110,72 +276,94 @@
     </div>
 </div>
 
-<!-- Modal Crear / Editar -->
+<!-- MODAL CREAR / EDITAR UMBRAL -->
 @if (showModal)
 {
     <div class="modal-backdrop" @onclick="CloseModal"></div>
     <div class="modal-box">
         <div class="modal-header">
             <span class="modal-title">@(isEditing ? "Editar umbral" : "Nuevo umbral")</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="modal-close" @onclick="CloseModal">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
         <div class="modal-body">
             <div class="form-group">
                 <label class="form-label">Cantidad mínima para alerta de bajo stock <span class="required">*</span></label>
                 <div class="input-box">
                     <i class="bi bi-box-seam input-icon"></i>
-                    <input class="form-input" type="number" min="0" placeholder="Ej: 5, 10, 12..."
+                    <input class="form-input" type="number" min="0" placeholder="Ej: 5, 10, 15..."
                            @bind="formThreshold" @bind:event="oninput" />
                 </div>
-                <span class="field-hint">Al guardar activo, este valor gobernará las alertas del Dashboard.</span>
+                <span class="field-hint">Al guardar como activo, gobernará las alertas del Dashboard.</span>
             </div>
 
             <div class="form-group toggle-group">
-                <label class="form-label">Estado</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" @bind="formIsActive" />
-                    <span class="toggle-slider"></span>
-                    <span class="toggle-label">@(formIsActive ? "Activo (Vigente)" : "Inactivo")</span>
+                <label class="form-label">Estado del Umbral</label>
+                <label class="toggle-card @(formIsActive ? "active-active" : "")">
+                    <input type="checkbox" @bind="formIsActive" class="toggle-input" />
+                    <div class="toggle-content">
+                        <i class="@(formIsActive ? "bi bi-check-circle-fill toggle-icon-active" : "bi bi-dash-circle toggle-icon-inactive")"></i>
+                        <div>
+                            <div class="toggle-title">@(formIsActive ? "Activo (Vigente)" : "Inactivo")</div>
+                            <div class="toggle-sub">@(formIsActive ? "Este umbral pasará a regir el inventario inmediatamente." : "Se guardará como histórico sin afectar las alertas actuales.")</div>
+                        </div>
+                    </div>
                 </label>
             </div>
 
             @if (!string.IsNullOrEmpty(errorMessage))
             {
-                <div class="alert-error">@errorMessage</div>
+                <div class="alert-error">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>@errorMessage</span>
+                </div>
             }
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-save" @onclick="Save" disabled="@isSaving">
                 @if (isSaving)
                 {
                     <span>Guardando...</span>
                 }
                 else
                 {
-                    <span>Guardar</span>
+                    <span>Guardar umbral</span>
                 }
             </button>
         </div>
     </div>
 }
 
-<!-- Modal Confirmar Eliminar -->
+<!-- MODAL CONFIRMAR ELIMINACIÓN -->
 @if (showDeleteModal && selectedThreshold != null)
 {
     <div class="modal-backdrop" @onclick="CloseModal"></div>
     <div class="modal-box modal-sm">
         <div class="modal-header">
             <span class="modal-title">Confirmar eliminación</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="modal-close" @onclick="CloseModal">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
         <div class="modal-body">
-            <p class="delete-msg">¿Deseas eliminar el umbral inactivo de <strong>@selectedThreshold.Threshold unidades</strong>?</p>
+            <p class="delete-msg">
+                ¿Deseas eliminar el umbral inactivo de <strong>@selectedThreshold.Threshold unidades</strong>?
+                Esta acción no se puede deshacer.
+            </p>
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
-                @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span>Eliminando...</span>
+                }
+                else
+                {
+                    <span>Eliminar umbral</span>
+                }
             </button>
         </div>
     </div>
@@ -189,6 +377,19 @@
     private int pageSize = 10;
     private int totalThresholdsCount;
 
+    // Filtros
+    private string selectedStatusFilter = "all"; // all, active, inactive
+    private bool isStatusFilterOpen = false;
+
+    // Filtro de Fechas
+    private bool isDateMenuOpen = false;
+    private string selectedDatePreset = "all"; // all, today, week, month, custom
+    private DateTime? startDate = null;
+    private DateTime? endDate = null;
+    private DateTime? tempStartDate = null;
+    private DateTime? tempEndDate = null;
+
+    // Estado modales
     private int formThreshold = 5;
     private bool formIsActive = true;
     private bool showModal;
@@ -210,12 +411,147 @@
 
     private async Task LoadThresholdsPageAsync()
     {
-        var paged = await ThresholdRepo.GetThresholdsPagedAsync(currentPage, pageSize);
-        thresholds = paged.Items.ToList();
-        totalThresholdsCount = paged.TotalCount;
-        currentPage = paged.PageNumber;
+        try
+        {
+            bool? statusParam = selectedStatusFilter switch
+            {
+                "active" => true,
+                "inactive" => false,
+                _ => null
+            };
+
+            var paged = await ThresholdRepo.GetThresholdsPagedAsync(
+                currentPage,
+                pageSize,
+                statusParam,
+                startDate,
+                endDate);
+
+            thresholds = paged.Items.ToList();
+            totalThresholdsCount = paged.TotalCount;
+            currentPage = paged.PageNumber;
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al cargar los umbrales: " + ex.Message);
+        }
     }
 
+    // --- FILTRO ESTADO ---
+    private void ToggleStatusFilterDropdown()
+    {
+        var current = isStatusFilterOpen;
+        CloseAllDropdowns();
+        isStatusFilterOpen = !current;
+    }
+
+    private string GetStatusFilterName()
+    {
+        return selectedStatusFilter switch
+        {
+            "active" => "Activo (Vigente)",
+            "inactive" => "Inactivo",
+            _ => "Todos los estados"
+        };
+    }
+
+    private async Task SelectStatusFilterAsync(string status)
+    {
+        selectedStatusFilter = status;
+        CloseAllDropdowns();
+        currentPage = 1;
+        await LoadThresholdsPageAsync();
+        StateHasChanged();
+    }
+
+    // --- FILTRO FECHAS ---
+    private void ToggleDateMenu()
+    {
+        var current = isDateMenuOpen;
+        CloseAllDropdowns();
+        isDateMenuOpen = !current;
+        if (isDateMenuOpen)
+        {
+            tempStartDate = startDate;
+            tempEndDate = endDate;
+        }
+    }
+
+    private void CloseAllDropdowns()
+    {
+        isStatusFilterOpen = false;
+        isDateMenuOpen = false;
+    }
+
+    private string GetDateFilterLabel()
+    {
+        if (selectedDatePreset == "today") return "Hoy";
+        if (selectedDatePreset == "week") return "Últimos 7 días";
+        if (selectedDatePreset == "month") return "Este mes";
+        if (startDate.HasValue && endDate.HasValue)
+        {
+            return $"{startDate.Value:dd/MM/yy} - {endDate.Value:dd/MM/yy}";
+        }
+        if (startDate.HasValue) return $"Desde {startDate.Value:dd/MM/yy}";
+        if (endDate.HasValue) return $"Hasta {endDate.Value:dd/MM/yy}";
+        return "Todas las fechas";
+    }
+
+    private async Task SelectDatePresetAsync(string preset)
+    {
+        selectedDatePreset = preset;
+        var today = DateTime.Today;
+
+        switch (preset)
+        {
+            case "all":
+                startDate = null;
+                endDate = null;
+                break;
+            case "today":
+                startDate = today;
+                endDate = today;
+                break;
+            case "week":
+                startDate = today.AddDays(-7);
+                endDate = today;
+                break;
+            case "month":
+                startDate = new DateTime(today.Year, today.Month, 1);
+                endDate = today;
+                break;
+        }
+
+        tempStartDate = startDate;
+        tempEndDate = endDate;
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadThresholdsPageAsync();
+    }
+
+    private async Task ApplyCustomDateRangeAsync()
+    {
+        startDate = tempStartDate;
+        endDate = tempEndDate;
+        selectedDatePreset = (startDate.HasValue || endDate.HasValue) ? "custom" : "all";
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadThresholdsPageAsync();
+    }
+
+    private async Task ClearDateFilterAsync()
+    {
+        startDate = null;
+        endDate = null;
+        tempStartDate = null;
+        tempEndDate = null;
+        selectedDatePreset = "all";
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadThresholdsPageAsync();
+    }
+
+    // --- ACCIONES CRUD ---
     private void OpenCreate()
     {
         isEditing = false;
@@ -277,21 +613,23 @@
         {
             if (isEditing && selectedThreshold != null)
             {
-                var dto = new UpdateThresholdInvetoryDto 
-                { 
+                var dto = new UpdateThresholdInvetoryDto
+                {
                     Threshold = formThreshold,
-                    IsActive = formIsActive 
+                    IsActive = formIsActive
                 };
                 await ThresholdRepo.UpdateThresholdAsync(selectedThreshold.IdThresholdInvetory, dto);
+                ToastService.ShowSuccess($"Umbral de {dto.Threshold} unidades actualizado con éxito.");
             }
             else
             {
-                var dto = new CreateThresholdInvetoryDto 
-                { 
+                var dto = new CreateThresholdInvetoryDto
+                {
                     Threshold = formThreshold,
-                    IsActive = formIsActive 
+                    IsActive = formIsActive
                 };
                 await ThresholdRepo.CreateThresholdAsync(dto);
+                ToastService.ShowSuccess($"Umbral de {dto.Threshold} unidades creado con éxito.");
             }
 
             await LoadData();
@@ -299,7 +637,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            errorMessage = "Ocurrió un error al guardar: " + ex.Message;
             isSaving = false;
         }
     }
@@ -312,12 +650,13 @@
         try
         {
             await ThresholdRepo.DeleteThresholdAsync(selectedThreshold.IdThresholdInvetory);
+            ToastService.ShowSuccess($"Umbral inactivo eliminado correctamente.");
             await LoadData();
             CloseModal();
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            errorMessage = "No se pudo eliminar el umbral: " + ex.Message;
             isSaving = false;
         }
     }
