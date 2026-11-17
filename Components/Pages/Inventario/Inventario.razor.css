@@ -1,0 +1,122 @@
+/* Icono Enmarcado del Encabezado */
+.framed-header-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-sm, 8px);
+    border: 1px solid var(--border-color, #E2E8F0);
+    background-color: var(--sidebar-bg, #F8FAFC);
+    color: var(--brand-primary, #0066A1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    flex-shrink: 0;
+}
+
+/* Selector Segmentado Manejado con Estado en C# */
+.segmented-control {
+    display: flex;
+    background-color: #F1F5F9;
+    border-radius: var(--radius-sm, 8px);
+    padding: 3px;
+    border: 1px solid var(--border-color, #E2E8F0);
+    gap: 3px;
+}
+
+.segment-button {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-muted, #64748B);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.segment-button:hover {
+    color: var(--text-main, #1E293B);
+}
+
+.segment-button.active {
+    background-color: #FFFFFF;
+    color: var(--brand-primary, #0066A1);
+    font-weight: 600;
+    border: 1px solid var(--border-color, #E2E8F0);
+}
+
+/* Tarjeta de Estado Vacío (Empty State) */
+.empty-state-card {
+    border: 1px dashed var(--border-color, #E2E8F0);
+    background-color: #FAFAFA;
+    border-radius: var(--radius-card, 12px);
+    padding: 3.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-state-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background-color: #FFFFFF;
+    border: 1px solid var(--border-color, #E2E8F0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    color: var(--text-muted, #64748B);
+    margin-bottom: 1.25rem;
+}
+
+/* Tabla Flat Minimalista */
+.table-head-flat {
+    background-color: #F8FAFC;
+    border-bottom: 1px solid var(--border-color, #E2E8F0);
+}
+
+.sku-badge {
+    background-color: #F1F5F9;
+    color: var(--text-main, #1E293B);
+    border: 1px solid var(--border-color, #E2E8F0);
+    border-radius: 4px;
+    padding: 0.2rem 0.45rem;
+    font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.status-pill {
+    display: inline-block;
+    padding: 0.2rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status-ok {
+    background-color: #ECFDF5;
+    color: #059669;
+    border: 1px solid #A7F3D0;
+}
+
+.status-low {
+    background-color: #FFFBEB;
+    color: #D97706;
+    border: 1px solid #FDE68A;
+}
+
+.status-out {
+    background-color: #FEF2F2;
+    color: #DC2626;
+    border: 1px solid #FECACA;
+}
+
+.border-dashed {
+    border-style: dashed !important;
+}

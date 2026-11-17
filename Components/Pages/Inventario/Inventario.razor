@@ -1,0 +1,321 @@
+@page "/inventario"
+@layout MainLayout
+@inject NavigationManager NavigationManager
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
+
+<!-- Migas de Pan (Bootstrap Breadcrumb) -->
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="dashboard" class="text-decoration-none text-muted">
+                <i class="bi bi-house-door me-1"></i>Inicio
+            </a>
+        </li>
+        <li class="breadcrumb-item">
+            <span class="text-muted">Operaciones</span>
+        </li>
+        <li class="breadcrumb-item active fw-semibold text-dark" aria-current="page">
+            Control de Inventario
+        </li>
+    </ol>
+</nav>
+
+<!-- Encabezado con Icono Enmarcado, Título Principal y Subtítulo Descriptivo -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <div class="framed-header-icon">
+            <i class="bi bi-boxes"></i>
+        </div>
+        <div>
+            <h1 class="h4 mb-0 fw-bold text-dark">Control de Inventario</h1>
+            <p class="text-muted small mb-0">Gestiona las existencias en almacenes, monitoreo de rotación y estados de stock.</p>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-brand-primary" @onclick="CreateNewItem">
+            <i class="bi bi-plus-lg"></i>
+            <span>Nuevo Registro</span>
+        </button>
+    </div>
+</div>
+
+<!-- Barra de Filtros Principal Enlazada con @bind -->
+<div class="card p-3 mb-3">
+    <div class="row g-3 align-items-end">
+        <!-- Selector Segmentado Manejado con Estado en C# -->
+        <div class="col-12 col-lg-5">
+            <label class="form-label small fw-semibold text-muted mb-1">Filtro de Estado</label>
+            <div class="segmented-control">
+                @foreach (var tab in statusTabs)
+                {
+                    <button type="button" 
+                            class="segment-button @(currentStatusTab == tab ? "active" : "")" 
+                            @onclick="() => SelectStatusTab(tab)">
+                        @tab
+                    </button>
+                }
+            </div>
+        </div>
+
+        <!-- Select con asterisco rojo (*) para campos obligatorios y enlazado con @bind -->
+        <div class="col-12 col-md-6 col-lg-4">
+            <label class="form-label small fw-semibold text-muted mb-1">
+                Almacén / Sucursal <span class="text-danger fw-bold">*</span>
+            </label>
+            <select class="form-select" @bind="selectedWarehouse">
+                <option value="">Selecciona un almacén obligatorio...</option>
+                <option value="Almacén Central - Sede Matriz">Almacén Central - Sede Matriz</option>
+                <option value="Sucursal Norte - Quirófano">Sucursal Norte - Quirófano</option>
+                <option value="Cámara Fría #1 - Biológicos">Cámara Fría #1 - Biológicos</option>
+                <option value="Depósito Secundario - Insumos">Depósito Secundario - Insumos</option>
+            </select>
+        </div>
+
+        <!-- Botón Principal Azul (btn-brand-primary) -->
+        <div class="col-12 col-md-6 col-lg-3">
+            <button type="button" class="btn btn-brand-primary w-100" @onclick="ApplyFilters">
+                <i class="bi bi-funnel"></i>
+                <span>Aplicar Filtros</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Barra Secundaria con Botones btn-outline-secondary -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary" @onclick="ExportCsv">
+            <i class="bi bi-filetype-csv"></i>
+            <span>Exportar CSV</span>
+        </button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="ToggleAdvancedFilters">
+            <i class="bi bi-sliders"></i>
+            <span>Filtros @(isAdvancedFilterOpen ? "(-)" : "(+)")</span>
+        </button>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small">
+            Total en vista: <strong class="text-dark">@(filteredItems.Count)</strong> artículos
+        </span>
+        @if (Items.Any())
+        {
+            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" title="Vaciar para ver Empty State" @onclick="ClearItems">
+                <i class="bi bi-trash3 text-muted"></i> Limpiar vista
+            </button>
+        }
+    </div>
+</div>
+
+@if (isAdvancedFilterOpen)
+{
+    <div class="card p-3 mb-3 bg-light border-dashed">
+        <div class="row g-2 align-items-center">
+            <div class="col-md-6">
+                <input type="text" class="form-control" placeholder="Buscar por código SKU o nombre..." @bind="searchKeyword" @bind:event="oninput" />
+            </div>
+            <div class="col-md-6 text-md-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ResetFilters">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Restablecer
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Estado Vacío (Empty State): Renderizado Condicional (@if (Items == null || !Items.Any())) -->
+@if (Items == null || !Items.Any())
+{
+    <div class="empty-state-card">
+        <div class="empty-state-icon">
+            <i class="bi bi-inbox"></i>
+        </div>
+        <h5 class="fw-bold text-dark mb-1">No se encontraron artículos en inventario</h5>
+        <p class="text-muted small mb-4 text-center" style="max-width: 440px;">
+            No hay existencias registradas con los criterios seleccionados o aún no has cargado el inventario inicial para este almacén.
+        </p>
+        <div class="d-flex flex-wrap gap-2 justify-content-center">
+            <button type="button" class="btn btn-outline-secondary" @onclick="ResetFilters">
+                <i class="bi bi-arrow-counterclockwise"></i>
+                <span>Restablecer Filtros</span>
+            </button>
+            <button type="button" class="btn btn-brand-primary" @onclick="LoadSampleData">
+                <i class="bi bi-box-arrow-in-down"></i>
+                <span>Cargar Datos de Demostración</span>
+            </button>
+        </div>
+    </div>
+}
+else
+{
+    <!-- Tabla Plana Minimalista (Modern Flat) -->
+    <div class="card p-0 overflow-hidden">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-head-flat">
+                    <tr class="text-muted small text-uppercase">
+                        <th class="ps-3 py-3 border-0">Código SKU</th>
+                        <th class="border-0">Producto / Insumo</th>
+                        <th class="border-0">Almacén</th>
+                        <th class="border-0 text-center">Stock Físico</th>
+                        <th class="border-0">Estado</th>
+                        <th class="pe-3 border-0 text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in filteredItems)
+                    {
+                        <tr>
+                            <td class="ps-3 fw-semibold text-dark">
+                                <span class="sku-badge">@item.Sku</span>
+                            </td>
+                            <td>
+                                <div class="fw-medium text-dark">@item.Name</div>
+                                <span class="text-muted small">@item.Category</span>
+                            </td>
+                            <td class="text-muted small">@item.Warehouse</td>
+                            <td class="text-center fw-bold text-dark">@item.Stock</td>
+                            <td>
+                                @if (item.Stock == 0)
+                                {
+                                    <span class="status-pill status-out">Agotado</span>
+                                }
+                                else if (item.Stock <= item.MinThreshold)
+                                {
+                                    <span class="status-pill status-low">Stock Bajo</span>
+                                }
+                                else
+                                {
+                                    <span class="status-pill status-ok">En Stock</span>
+                                }
+                            </td>
+                            <td class="pe-3 text-end">
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" title="Ver detalles">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    // Definición de modelo
+    public class InventoryRow
+    {
+        public string Sku { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string Warehouse { get; set; } = string.Empty;
+        public int Stock { get; set; }
+        public int MinThreshold { get; set; }
+    }
+
+    // Pestañas del selector segmentado
+    private readonly string[] statusTabs = { "Todos", "En Stock", "Bajo Stock", "Agotados" };
+    private string currentStatusTab = "Todos";
+
+    // Campos enlazados con @bind
+    private string selectedWarehouse = "";
+    private string searchKeyword = "";
+    private bool isAdvancedFilterOpen = false;
+
+    // Lista de ítems (inicializada vacía para ilustrar Empty State de entrada)
+    private List<InventoryRow> Items = new();
+
+    private List<InventoryRow> filteredItems
+    {
+        get
+        {
+            var query = Items.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(selectedWarehouse))
+            {
+                query = query.Where(i => i.Warehouse.Equals(selectedWarehouse, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchKeyword))
+            {
+                query = query.Where(i => i.Name.Contains(searchKeyword, StringComparison.OrdinalIgnoreCase)
+                                      || i.Sku.Contains(searchKeyword, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (currentStatusTab == "En Stock")
+            {
+                query = query.Where(i => i.Stock > i.MinThreshold);
+            }
+            else if (currentStatusTab == "Bajo Stock")
+            {
+                query = query.Where(i => i.Stock > 0 && i.Stock <= i.MinThreshold);
+            }
+            else if (currentStatusTab == "Agotados")
+            {
+                query = query.Where(i => i.Stock == 0);
+            }
+
+            return query.ToList();
+        }
+    }
+
+    private void SelectStatusTab(string tab)
+    {
+        currentStatusTab = tab;
+    }
+
+    private void ApplyFilters()
+    {
+        if (string.IsNullOrWhiteSpace(selectedWarehouse))
+        {
+            ToastService.Warning("El campo 'Almacén / Sucursal' marcado con (*) es obligatorio.", "Validación de filtros");
+            return;
+        }
+
+        ToastService.Success($"Filtros aplicados para: {selectedWarehouse}", "Búsqueda completada");
+    }
+
+    private void ToggleAdvancedFilters()
+    {
+        isAdvancedFilterOpen = !isAdvancedFilterOpen;
+    }
+
+    private void ResetFilters()
+    {
+        currentStatusTab = "Todos";
+        selectedWarehouse = "";
+        searchKeyword = "";
+        ToastService.Info("Filtros restablecidos.", "Limpieza");
+    }
+
+    private void ClearItems()
+    {
+        Items.Clear();
+    }
+
+    private void LoadSampleData()
+    {
+        Items = new List<InventoryRow>
+        {
+            new() { Sku = "MED-001", Name = "Amoxicilina + Ácido Clavulánico 500mg", Category = "Antibióticos", Warehouse = "Almacén Central - Sede Matriz", Stock = 145, MinThreshold = 20 },
+            new() { Sku = "VAC-002", Name = "Vacuna Antirrábica Felina / Canina 1ml", Category = "Biológicos", Warehouse = "Cámara Fría #1 - Biológicos", Stock = 14, MinThreshold = 30 },
+            new() { Sku = "INS-003", Name = "Jeringas Descartables 3ml x 100", Category = "Material Quirúrgico", Warehouse = "Almacén Central - Sede Matriz", Stock = 0, MinThreshold = 10 },
+            new() { Sku = "ANE-004", Name = "Ketamina Solución Inyectable 50ml", Category = "Anestésicos", Warehouse = "Sucursal Norte - Quirófano", Stock = 8, MinThreshold = 15 },
+            new() { Sku = "VIT-005", Name = "Complejo B + Calcio Frasco 250ml", Category = "Vitaminas", Warehouse = "Almacén Central - Sede Matriz", Stock = 62, MinThreshold = 15 }
+        };
+
+        selectedWarehouse = "Almacén Central - Sede Matriz";
+        ToastService.Success("Se cargaron 5 artículos de demostración.", "Datos Listos");
+    }
+
+    private void ExportCsv()
+    {
+        ToastService.Info("Generando archivo CSV de inventario...", "Exportación");
+    }
+
+    private void CreateNewItem()
+    {
+        NavigationManager.NavigateTo("/products");
+    }
+}

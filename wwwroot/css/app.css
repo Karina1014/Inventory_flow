@@ -1,16 +1,103 @@
 :root {
-    --color-dark: #03045e;
-    --color-primary: #0077b6;
-    --color-primary-hover: #00b4d8;
-    --color-border: #90e0ef;
-    --color-bg: #caf0f8;
+    /* Paleta Corporativa Modern Flat */
+    --brand-primary: #0066A1;
+    --brand-primary-hover: #005080;
+    --brand-primary-light: #EBF4F9;
+    --sidebar-bg: #F8FAFC;
+    --border-color: #E2E8F0;
+    --text-main: #1E293B;
+    --text-muted: #64748B;
+    --active-bg: #E2E8F0;
+    --radius-sm: 8px;
+    --radius-card: 12px;
+
+    /* Compatibilidad con variables previas */
+    --color-dark: #1E293B;
+    --color-primary: #0066A1;
+    --color-primary-hover: #005080;
+    --color-border: #E2E8F0;
+    --color-bg: #F8FAFC;
 }
 
 body {
-    color: var(--color-dark);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background-color: #FFFFFF;
+    color: var(--text-main);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
     padding: 0;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================================================
+   Modern Flat Design - Sin sombras, bordes finos (1px solid #E2E8F0) y radios suaves
+   ========================================================================== */
+.card, .btn, .form-control, .form-select, .dropdown-menu, .input-group-text {
+    box-shadow: none !important;
+}
+
+.card {
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-card) !important;
+}
+
+.form-control, .form-select {
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-sm) !important;
+    color: var(--text-main);
+    font-size: 0.9rem;
+    padding: 0.55rem 0.85rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--brand-primary) !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Botón Principal Azul Corporativo */
+.btn-brand-primary {
+    background-color: var(--brand-primary) !important;
+    border: 1px solid var(--brand-primary) !important;
+    color: #FFFFFF !important;
+    border-radius: var(--radius-sm) !important;
+    font-weight: 500;
+    font-size: 0.9rem;
+    padding: 0.55rem 1.1rem;
+    box-shadow: none !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-brand-primary:hover, .btn-brand-primary:focus {
+    background-color: var(--brand-primary-hover) !important;
+    border-color: var(--brand-primary-hover) !important;
+    color: #FFFFFF !important;
+}
+
+/* Botón Secundario Outline con Borde Sutil */
+.btn-outline-secondary {
+    background-color: #FFFFFF !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-muted) !important;
+    border-radius: var(--radius-sm) !important;
+    font-weight: 500;
+    font-size: 0.9rem;
+    padding: 0.55rem 1rem;
+    box-shadow: none !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.15s ease;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #F1F5F9 !important;
+    border-color: #CBD5E1 !important;
+    color: var(--text-main) !important;
 }
 
 /* =========================================

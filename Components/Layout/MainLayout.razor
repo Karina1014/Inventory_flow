@@ -8,98 +8,238 @@
 
 <ToastContainer />
 
-<div class="app-layout">
+<div class="layout-container">
+    <!-- Sidebar Izquierdo Fijo (260px) con fondo gris claro #F8FAFC y borde fino #E2E8F0 -->
     <aside class="sidebar">
-        <div class="brand">
-            <span class="brand-title">MedVet</span>
-            <span class="brand-subtitle">Inventario</span>
+        <!-- Logotipo Arriba -->
+        <div class="sidebar-brand">
+            <div class="brand-icon">
+                <i class="bi bi-box-seam-fill"></i>
+            </div>
+            <div class="brand-text">
+                <span class="brand-title">Inventory Flow</span>
+                <span class="brand-subtitle">MedVet Enterprise</span>
+            </div>
         </div>
 
-        <nav class="nav-links">
-            @* Menús Raíz (sin categoría como Dashboard) *@
-            @foreach (var item in userMenus.Where(m => string.IsNullOrWhiteSpace(m.Category)))
-            {
-                <NavLink class="nav-item" href="@item.Url.TrimStart('/')" Match="@(item.Url == "/dashboard" ? NavLinkMatch.All : NavLinkMatch.Prefix)">
-                    <i class="@item.Icon"></i>
-                    <span>@item.Name</span>
-                </NavLink>
-            }
+        <!-- Enlaces de Navegación -->
+        <nav class="sidebar-nav">
+            <!-- 1. Enlace Raíz Principal: Dashboard -->
+            <NavLink class="nav-item-link" href="dashboard" Match="NavLinkMatch.All">
+                <i class="bi bi-grid-1x2"></i>
+                <span>Dashboard</span>
+            </NavLink>
 
-            @* Menús Agrupados por Categoría según el Rol del Usuario *@
-            @foreach (var group in userMenus.Where(m => !string.IsNullOrWhiteSpace(m.Category)).GroupBy(m => m.Category))
-            {
-                <details class="nav-group" open>
-                    <summary class="nav-group-title">
-                        <div class="nav-group-title-content">
-                            <i class="@GetCategoryIcon(group.Key)"></i>
-                            <span>@FormatCategoryTitle(group.Key)</span>
-                        </div>
-                        <i class="bi bi-chevron-down nav-group-chevron"></i>
-                    </summary>
+            <!-- 2. Enlace a Nuevo Módulo: Control de Inventario -->
+            <NavLink class="nav-item-link" href="inventario">
+                <i class="bi bi-boxes"></i>
+                <span>Control de Inventario</span>
+            </NavLink>
 
-                    <div class="nav-submenu">
-                        @foreach (var sub in group)
+            @if (userMenus != null && userMenus.Any())
+            {
+                @* Menús dinámicos cargados según el rol del usuario *@
+
+                @* Enlaces raíz adicionales sin categoría *@
+                @foreach (var item in userMenus.Where(m => string.IsNullOrWhiteSpace(m.Category) && !IsDefaultRoot(m.Url)))
+                {
+                    <NavLink class="nav-item-link" href="@item.Url.TrimStart('/')">
+                        <i class="@item.Icon"></i>
+                        <span>@item.Name</span>
+                    </NavLink>
+                }
+
+                @* Grupos por categoría (Operaciones, Administración, Reportes, etc.) *@
+                @foreach (var group in userMenus.Where(m => !string.IsNullOrWhiteSpace(m.Category)).GroupBy(m => m.Category))
+                {
+                    var catKey = group.Key!;
+                    var isOpen = IsCategoryOpen(catKey);
+
+                    <div class="nav-group">
+                        <button type="button" class="nav-item-link nav-group-toggle" @onclick="() => ToggleCategory(catKey)">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="@GetCategoryIcon(catKey)"></i>
+                                <span>@FormatCategoryTitle(catKey)</span>
+                            </div>
+                            <i class="bi @(isOpen ? "bi-chevron-up" : "bi-chevron-down") chevron-indicator"></i>
+                        </button>
+
+                        @if (isOpen)
                         {
-                            <NavLink class="nav-item nav-subitem" href="@sub.Url.TrimStart('/')">
-                                <i class="@sub.Icon"></i>
-                                <span>@sub.Name</span>
-                            </NavLink>
+                            <div class="submenu">
+                                @foreach (var sub in group)
+                                {
+                                    <NavLink class="submenu-link" href="@sub.Url.TrimStart('/')">
+                                        <i class="@sub.Icon"></i>
+                                        <span>@sub.Name</span>
+                                    </NavLink>
+                                }
+                            </div>
                         }
                     </div>
-                </details>
+                }
+            }
+            else
+            {
+                @* Estructura completa predeterminada con todas las categorías *@
+
+                <!-- GRUPO: OPERACIONES -->
+                <div class="nav-group">
+                    <button type="button" class="nav-item-link nav-group-toggle" @onclick='() => ToggleCategory("Operaciones")'>
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-arrow-left-right"></i>
+                            <span>Operaciones</span>
+                        </div>
+                        <i class="bi @(IsCategoryOpen("Operaciones") ? "bi-chevron-up" : "bi-chevron-down") chevron-indicator"></i>
+                    </button>
+
+                    @if (IsCategoryOpen("Operaciones"))
+                    {
+                        <div class="submenu">
+                            <NavLink class="submenu-link" href="movements">
+                                <i class="bi bi-arrow-left-right"></i>
+                                <span>Movimientos</span>
+                            </NavLink>
+                            <NavLink class="submenu-link" href="analytics">
+                                <i class="bi bi-graph-up"></i>
+                                <span>Análisis IA</span>
+                            </NavLink>
+                        </div>
+                    }
+                </div>
+
+                <!-- GRUPO: ADMINISTRACIÓN -->
+                <div class="nav-group">
+                    <button type="button" class="nav-item-link nav-group-toggle" @onclick='() => ToggleCategory("Administración")'>
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-sliders"></i>
+                            <span>Administración</span>
+                        </div>
+                        <i class="bi @(IsCategoryOpen("Administración") ? "bi-chevron-up" : "bi-chevron-down") chevron-indicator"></i>
+                    </button>
+
+                    @if (IsCategoryOpen("Administración"))
+                    {
+                        <div class="submenu">
+                            <NavLink class="submenu-link" href="products">
+                                <i class="bi bi-box-seam"></i>
+                                <span>Productos</span>
+                            </NavLink>
+                            <NavLink class="submenu-link" href="lots">
+                                <i class="bi bi-upc-scan"></i>
+                                <span>Control de Lotes</span>
+                            </NavLink>
+                            <NavLink class="submenu-link" href="categories">
+                                <i class="bi bi-tags"></i>
+                                <span>Categorías</span>
+                            </NavLink>
+                            <NavLink class="submenu-link" href="warehouses">
+                                <i class="bi bi-building"></i>
+                                <span>Sucursales</span>
+                            </NavLink>
+                            <NavLink class="submenu-link" href="movementtypes">
+                                <i class="bi bi-diagram-3"></i>
+                                <span>Tipos de Movimientos</span>
+                            </NavLink>
+                            <NavLink class="submenu-link" href="thresholds">
+                                <i class="bi bi-speedometer2"></i>
+                                <span>Umbral de Stock</span>
+                            </NavLink>
+                            <NavLink class="submenu-link" href="users">
+                                <i class="bi bi-people"></i>
+                                <span>Usuarios</span>
+                            </NavLink>
+                            <NavLink class="submenu-link" href="roles">
+                                <i class="bi bi-person-badge"></i>
+                                <span>Roles</span>
+                            </NavLink>
+                        </div>
+                    }
+                </div>
+
+                <!-- GRUPO: REPORTES -->
+                <div class="nav-group">
+                    <button type="button" class="nav-item-link nav-group-toggle" @onclick='() => ToggleCategory("Reportes")'>
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-file-earmark-bar-graph"></i>
+                            <span>Reportes</span>
+                        </div>
+                        <i class="bi @(IsCategoryOpen("Reportes") ? "bi-chevron-up" : "bi-chevron-down") chevron-indicator"></i>
+                    </button>
+
+                    @if (IsCategoryOpen("Reportes"))
+                    {
+                        <div class="submenu">
+                            <NavLink class="submenu-link" href="stockreport">
+                                <i class="bi bi-bar-chart"></i>
+                                <span>Reporte de Stock</span>
+                            </NavLink>
+                            <NavLink class="submenu-link" href="kardex">
+                                <i class="bi bi-journal-text"></i>
+                                <span>Kardex</span>
+                            </NavLink>
+                        </div>
+                    }
+                </div>
             }
 
-            <NavLink class="nav-item mt-2" href="profile">
+            <!-- Módulo Mi Perfil -->
+            <NavLink class="nav-item-link mt-2" href="profile">
                 <i class="bi bi-person-circle"></i>
                 <span>Mi Perfil</span>
             </NavLink>
         </nav>
 
+        <!-- Pie del Menú Lateral -->
         <div class="sidebar-footer">
-            © @DateTime.Now.Year Universidad Central del Ecuador
-            <span>Derechos de autor reservados</span>
+            <span class="text-muted small">&copy; @DateTime.Now.Year Universidad Central del Ecuador</span>
         </div>
     </aside>
 
+    <!-- Contenedor Principal (Topbar + Contenido) -->
     <div class="main-wrapper">
+        <!-- Topbar Fija (60px) -->
         <header class="topbar">
-            <div class="topbar-left">
-                <span class="page-title">Panel de Control</span>
+            <!-- Barra de búsqueda minimalista con insignia Ctrl K a la izquierda -->
+            <div class="search-box">
+                <i class="bi bi-search search-icon"></i>
+                <input type="text" class="search-input" placeholder="Buscar productos, lotes o SKU..." />
+                <kbd class="search-kbd">Ctrl K</kbd>
             </div>
 
-            <div class="topbar-right">
+            <!-- Avatar de usuario circular a la derecha -->
+            <div class="topbar-actions">
                 <div class="user-dropdown-container position-relative">
-                    <!-- Solo el Círculo de Usuario con indicador de estado -->
-                    <button type="button" class="topbar-avatar-btn" @onclick="ToggleDropdown" aria-label="Menú de usuario" style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #0077b6 0%, #033f63 100%); color: #ffffff; border: 2px solid #ffffff; display: flex; align-items: center; justify-content: center; font-size: 0.84rem; font-weight: 700; box-shadow: 0 2px 6px rgba(0, 119, 182, 0.25); cursor: pointer; padding: 0; outline: none; position: relative;">
-                        @(GetInitials(CurrentUserService.Name))
-                        <span class="avatar-status-dot" style="position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%; background-color: #22c55e; border: 2px solid #ffffff;"></span>
+                    <button type="button" class="topbar-avatar-btn" @onclick="ToggleDropdown" aria-label="Menú de usuario">
+                        <span>@(GetInitials(CurrentUserService.Name))</span>
+                        <span class="avatar-status-dot"></span>
                     </button>
 
                     @if (isDropdownOpen)
                     {
-                        <!-- Telón transparente para cerrar al hacer clic afuera -->
-                        <div class="dropdown-backdrop" @onclick="CloseDropdown" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1040; background: transparent;"></div>
+                        <div class="dropdown-backdrop" @onclick="CloseDropdown"></div>
 
-                        <!-- Submenú Desplegable Flotante Estilizado con Bootstrap y CSS -->
-                        <div class="user-menu-dropdown dropdown-menu show shadow-lg border" style="position: absolute; right: 0; top: calc(100% + 8px); min-width: 220px; z-index: 1050; border-radius: 12px; padding: 0.5rem 0; overflow: hidden; background: #ffffff;">
-                            <div class="px-3 py-2 bg-light border-bottom mb-1">
-                                <div class="fw-bold text-dark text-truncate" style="font-size: 0.88rem;">@CurrentUserService.Name</div>
-                                <div class="d-flex align-items-center gap-1 mt-1">
+                        <div class="user-menu-dropdown">
+                            <div class="user-menu-header">
+                                <div class="user-menu-name">@(string.IsNullOrWhiteSpace(CurrentUserService.Name) ? "Usuario" : CurrentUserService.Name)</div>
+                                <div class="user-menu-status">
                                     <span class="online-dot"></span>
-                                    <span class="text-muted fw-semibold" style="font-size: 0.74rem;">@GetRoleLabel(CurrentUserService.Role)</span>
+                                    <span class="user-menu-role">@GetRoleLabel(CurrentUserService.Role)</span>
                                 </div>
                             </div>
 
-                            <NavLink href="profile" class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-dark text-decoration-none" @onclick="CloseDropdown">
-                                <i class="bi bi-person-circle fs-6 text-primary"></i>
-                                <span style="font-size: 0.85rem; font-weight: 500;">Mi Perfil</span>
+                            <div class="user-menu-divider"></div>
+
+                            <NavLink href="profile" class="user-menu-item" @onclick="CloseDropdown">
+                                <i class="bi bi-person-circle"></i>
+                                <span>Mi Perfil</span>
                             </NavLink>
 
-                            <hr class="dropdown-divider my-1 opacity-25" />
+                            <div class="user-menu-divider"></div>
 
-                            <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-danger border-0 bg-transparent w-100 text-start" @onclick="Logout">
-                                <i class="bi bi-box-arrow-right fs-6"></i>
-                                <span style="font-size: 0.85rem; font-weight: 500;">Cerrar sesión</span>
+                            <button type="button" class="user-menu-item logout-item" @onclick="Logout">
+                                <i class="bi bi-box-arrow-right"></i>
+                                <span>Cerrar sesión</span>
                             </button>
                         </div>
                     }
@@ -107,23 +247,8 @@
             </div>
         </header>
 
-        <main class="content">
-            @{
-                var (category, pageName) = GetCurrentBreadcrumb();
-            }
-            @if (!string.IsNullOrWhiteSpace(pageName))
-            {
-                <nav class="app-breadcrumb" aria-label="Ruta de navegación">
-                    <a href="/dashboard" class="breadcrumb-link">Inicio</a>
-                    @if (!string.IsNullOrWhiteSpace(category))
-                    {
-                        <i class="bi bi-chevron-right breadcrumb-sep"></i>
-                        <span class="breadcrumb-category">@category</span>
-                    }
-                    <i class="bi bi-chevron-right breadcrumb-sep"></i>
-                    <span class="breadcrumb-current">@pageName</span>
-                </nav>
-            }
+        <!-- Contenido de las Páginas -->
+        <main class="page-content">
             @Body
         </main>
     </div>
@@ -133,14 +258,43 @@
     private bool isDropdownOpen;
     private List<MenuDto> userMenus = new();
 
+    // Gestión de estados de categorías abiertas en C#
+    private HashSet<string> openCategories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Operaciones",
+        "Administración",
+        "Reportes"
+    };
+
+    private bool IsCategoryOpen(string category) => openCategories.Contains(category);
+
+    private void ToggleCategory(string category)
+    {
+        if (openCategories.Contains(category))
+        {
+            openCategories.Remove(category);
+        }
+        else
+        {
+            openCategories.Add(category);
+        }
+    }
+
     private void ToggleDropdown() => isDropdownOpen = !isDropdownOpen;
     private void CloseDropdown() => isDropdownOpen = false;
+
+    private bool IsDefaultRoot(string url)
+    {
+        var clean = "/" + url.Trim('/');
+        return clean.Equals("/dashboard", StringComparison.OrdinalIgnoreCase) 
+            || clean.Equals("/inventario", StringComparison.OrdinalIgnoreCase)
+            || clean.Equals("/profile", StringComparison.OrdinalIgnoreCase);
+    }
 
     protected override async Task OnInitializedAsync()
     {
         CurrentUserService.OnChange += HandleUserChanged;
 
-        // Redirigir al login si el usuario no está autenticado
         if (!CurrentUserService.IsAuthenticated)
         {
             NavigationManager.NavigateTo("/login", replace: true);
@@ -173,7 +327,7 @@
             try
             {
                 var menus = await MenuRepo.GetMenusByUserId(CurrentUserService.UserId);
-                userMenus = menus.ToList();
+                userMenus = menus?.ToList() ?? new();
             }
             catch
             {
@@ -188,7 +342,7 @@
 
     private void ValidateRouteAccess()
     {
-        if (!CurrentUserService.IsAuthenticated || userMenus.Count == 0)
+        if (!CurrentUserService.IsAuthenticated)
         {
             return;
         }
@@ -197,16 +351,20 @@
         if (string.Equals(relativePath, "/dashboard", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/profile", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/login", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(relativePath, "/inventario", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
-        var hasAccess = userMenus.Any(m => string.Equals("/" + m.Url.Trim('/'), relativePath, StringComparison.OrdinalIgnoreCase));
-        if (!hasAccess)
+        if (userMenus != null && userMenus.Count > 0)
         {
-            ToastService.Warning("No tienes permisos para acceder a este módulo.", "Acceso restringido");
-            NavigationManager.NavigateTo("/dashboard", replace: true);
+            var hasAccess = userMenus.Any(m => string.Equals("/" + m.Url.Trim('/'), relativePath, StringComparison.OrdinalIgnoreCase));
+            if (!hasAccess)
+            {
+                ToastService.Warning("No tienes permisos para acceder a este módulo.", "Acceso restringido");
+                NavigationManager.NavigateTo("/dashboard", replace: true);
+            }
         }
     }
 
@@ -220,7 +378,7 @@
 
     private string GetInitials(string name)
     {
-        if (string.IsNullOrWhiteSpace(name)) return "??";
+        if (string.IsNullOrWhiteSpace(name)) return "KG";
         var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length >= 2)
         {
@@ -229,7 +387,7 @@
         return name.Substring(0, Math.Min(2, name.Length)).ToUpper();
     }
 
-    private string GetRoleLabel(string role) => string.IsNullOrWhiteSpace(role) ? "Sin rol" : role;
+    private string GetRoleLabel(string role) => string.IsNullOrWhiteSpace(role) ? "Administrador" : role;
 
     private string FormatCategoryTitle(string? cat)
     {
@@ -246,47 +404,8 @@
         var lower = cat?.Trim().ToLowerInvariant() ?? "";
         if (lower.Contains("admin")) return "bi bi-sliders";
         if (lower.Contains("operac") || lower.Contains("movim")) return "bi bi-arrow-left-right";
-        if (lower.Contains("report") || lower.Contains("analis")) return "bi bi-graph-up";
+        if (lower.Contains("report") || lower.Contains("analis")) return "bi bi-file-earmark-bar-graph";
         return "bi bi-folder2";
-    }
-
-    private (string Category, string PageName) GetCurrentBreadcrumb()
-    {
-        var relativePath = "/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('?')[0].Trim('/');
-
-        if (string.Equals(relativePath, "/dashboard", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(relativePath, "/", StringComparison.OrdinalIgnoreCase))
-        {
-            return (string.Empty, "Dashboard");
-        }
-
-        if (string.Equals(relativePath, "/profile", StringComparison.OrdinalIgnoreCase))
-        {
-            return ("Cuenta", "Mi Perfil");
-        }
-
-        var match = userMenus.FirstOrDefault(m => string.Equals("/" + m.Url.Trim('/'), relativePath, StringComparison.OrdinalIgnoreCase));
-        if (match != null)
-        {
-            return (match.Category ?? string.Empty, match.Name);
-        }
-
-        return relativePath.ToLowerInvariant() switch
-        {
-            "/warehouses"    => ("Administración", "Sucursales"),
-            "/categories"    => ("Administración", "Categorías"),
-            "/products"      => ("Administración", "Productos"),
-            "/movementtypes" => ("Administración", "Tipos de movimientos"),
-            "/roles"         => ("Administración", "Roles"),
-            "/users"         => ("Administración", "Usuarios"),
-            "/thresholds"    => ("Administración", "Umbral de Stock"),
-            "/lots"          => ("Administración", "Lotes"),
-            "/movements"     => ("Operaciones", "Movimientos"),
-            "/analytics"     => ("Operaciones", "Análisis IA"),
-            "/stockreport"   => ("Reportes", "Reporte de stock"),
-            "/kardex"        => ("Reportes", "Kardex"),
-            _                => (string.Empty, string.Empty)
-        };
     }
 
     public void Dispose()
