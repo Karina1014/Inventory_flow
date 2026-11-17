@@ -3,6 +3,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Inventory_Flow.Data;
+using Inventory_Flow.Extensions;
 using Inventory_Flow.Models;
 using Inventory_Flow.Models.Dtos;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,31 @@ public class UserRepository : IUserRepository
     public ICollection<User> GetUsers()
     {
         return _db.Users.Include(u => u.Role).Include(u => u.Warehouse).OrderBy(u => u.Username).ToList();
+    }
+
+    public async Task<PagedResultDto<User>> GetUsersPagedAsync(int pageNumber, int pageSize, string? search = null, int roleId = 0)
+    {
+        var query = _db.Users
+            .Include(u => u.Role)
+            .Include(u => u.Warehouse)
+            .AsQueryable();
+
+        if (roleId > 0)
+        {
+            query = query.Where(u => u.IdRole == roleId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(u =>
+                (u.Name != null && u.Name.ToLower().Contains(term)) ||
+                u.Username.ToLower().Contains(term));
+        }
+
+        return await query
+            .OrderBy(u => u.Username)
+            .ToPagedResultAsync(pageNumber, pageSize);
     }
 
     public bool IsUniqueUser(string username)

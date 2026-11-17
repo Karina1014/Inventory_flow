@@ -1,4 +1,5 @@
 using Inventory_Flow.Data;
+using Inventory_Flow.Extensions;
 using Inventory_Flow.Models;
 using Inventory_Flow.Models.Dtos;
 using Inventory_Flow.Repository.IRepository;
@@ -17,6 +18,13 @@ public class MovementTypeRepository : IMovementTypeRepository
     public ICollection<MovementType> GetMovementTypes()
     {
         return _db.MovementTypes.OrderByDescending(m => m.CreationDate).ToList();
+    }
+
+    public async Task<PagedResultDto<MovementType>> GetMovementTypesPagedAsync(int pageNumber, int pageSize)
+    {
+        return await _db.MovementTypes
+            .OrderByDescending(m => m.CreationDate)
+            .ToPagedResultAsync(pageNumber, pageSize);
     }
 
     public MovementType? GetMovementType(int IdMovementType)

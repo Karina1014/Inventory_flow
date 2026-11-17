@@ -1,4 +1,5 @@
 using Inventory_Flow.Data;
+using Inventory_Flow.Extensions;
 using Inventory_Flow.Models;
 using Inventory_Flow.Models.Dtos;
 using Inventory_Flow.Repository.IRepository;
@@ -28,6 +29,35 @@ public class LotRepository : ILotRepository
         }
 
         return query.OrderBy(l => l.ExpirationDate).ToList();
+    }
+
+    public async Task<PagedResultDto<Lot>> GetLotsPagedAsync(int pageNumber, int pageSize, string filter = "all", int alertDays = 30, int? warehouseId = null)
+    {
+        var today = DateTime.Today;
+        var limit = today.AddDays(alertDays + 1);
+
+        var query = _db.Lots
+            .Include(l => l.Product)
+            .Include(l => l.Warehouse)
+            .AsNoTracking();
+
+        if (warehouseId.HasValue)
+        {
+            query = query.Where(l => l.IdWarehouse == warehouseId.Value);
+        }
+
+        if (filter == "expired")
+        {
+            query = query.Where(l => l.ExpirationDate.Date < today);
+        }
+        else if (filter == "soon")
+        {
+            query = query.Where(l => l.ExpirationDate.Date >= today && l.ExpirationDate < limit);
+        }
+
+        return await query
+            .OrderBy(l => l.ExpirationDate)
+            .ToPagedResultAsync(pageNumber, pageSize);
     }
 
     public ICollection<Lot> GetExpiringLots(int days, int? warehouseId = null)

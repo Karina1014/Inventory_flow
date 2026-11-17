@@ -6,6 +6,7 @@ namespace Inventory_Flow.Repository.IRepository;
 public interface IMovementTypeRepository
 {
     ICollection<MovementType> GetMovementTypes();
+    Task<PagedResultDto<MovementType>> GetMovementTypesPagedAsync(int pageNumber, int pageSize);
     MovementType? GetMovementType(int IdMovementType);
     bool IsUniqueCode(string code);
     Task<MovementType> CreateMovementType(CreateMovementTypeDto createMovementTypeDto);

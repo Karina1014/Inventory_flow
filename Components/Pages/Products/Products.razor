@@ -21,7 +21,7 @@
     <div class="panel">
         <div class="panel-header">
             <span class="panel-title">Listado de productos</span>
-            <span class="record-count">@products.Count registros</span>
+            <span class="record-count">@totalProductsCount registros</span>
         </div>
 
         @if (products.Count == 0)
@@ -93,6 +93,11 @@
                     </tbody>
                 </table>
             </div>
+
+            <TablePagination TotalItems="@totalProductsCount"
+                             @bind-CurrentPage="currentPage"
+                             @bind-PageSize="pageSize"
+                             OnPageChanged="LoadProductsPageAsync" />
         }
     </div>
 </div>
@@ -234,6 +239,9 @@
 @code {
     private List<Product> products = new();
     private List<Category> categories = new();
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalProductsCount;
 
     private bool showModal;
     private bool showDeleteModal;
@@ -252,15 +260,23 @@
 
     private Product? selectedProduct;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        LoadData();
+        await LoadDataAsync();
     }
 
-    private void LoadData()
+    private async Task LoadDataAsync()
     {
-        products = ProductRepo.GetProducts().ToList();
         categories = CategoryRepo.GetCategories().ToList();
+        await LoadProductsPageAsync();
+    }
+
+    private async Task LoadProductsPageAsync()
+    {
+        var paged = await ProductRepo.GetProductsPagedAsync(currentPage, pageSize);
+        products = paged.Items.ToList();
+        totalProductsCount = paged.TotalCount;
+        currentPage = paged.PageNumber;
     }
 
     private string GetCategoryName(int idCategory)
@@ -355,7 +371,7 @@
                 await ProductRepo.CreateProduct(dto);
             }
 
-            LoadData();
+            await LoadProductsPageAsync();
             CloseModal();
         }
         catch
@@ -365,7 +381,7 @@
         }
     }
 
-    private void ConfirmDelete()
+    private async Task ConfirmDelete()
     {
         if (selectedProduct == null) return;
 
@@ -373,7 +389,7 @@
         try
         {
             ProductRepo.DeleteProduct(selectedProduct.IdProduct);
-            LoadData();
+            await LoadProductsPageAsync();
             CloseModal();
         }
         catch

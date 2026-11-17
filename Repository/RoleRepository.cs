@@ -1,4 +1,5 @@
 using Inventory_Flow.Data;
+using Inventory_Flow.Extensions;
 using Inventory_Flow.Models;
 using Inventory_Flow.Models.Dtos;
 using Inventory_Flow.Repository.IRepository;
@@ -18,6 +19,13 @@ public class RoleRepository : IRoleRepository
     public ICollection<Role> GetRoles()
     {
         return _db.Roles.OrderBy(r => r.Name).ToList();
+    }
+
+    public async Task<PagedResultDto<Role>> GetRolesPagedAsync(int pageNumber, int pageSize)
+    {
+        return await _db.Roles
+            .OrderBy(r => r.Name)
+            .ToPagedResultAsync(pageNumber, pageSize);
     }
 
     public Role? GetRole(int IdRole)

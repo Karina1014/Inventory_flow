@@ -20,7 +20,7 @@
     <div class="panel">
         <div class="panel-header">
             <span class="panel-title">Listado de categorías</span>
-            <span class="record-count">@categories.Count registros</span>
+            <span class="record-count">@totalCategoriesCount registros</span>
         </div>
 
         @if (categories.Count == 0)
@@ -64,6 +64,11 @@
                     </tbody>
                 </table>
             </div>
+
+            <TablePagination TotalItems="@totalCategoriesCount"
+                             @bind-CurrentPage="currentPage"
+                             @bind-PageSize="pageSize"
+                             OnPageChanged="LoadCategoriesAsync" />
         }
     </div>
 </div>
@@ -146,6 +151,9 @@
 
 @code {
     private List<Category> categories = new();
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalCategoriesCount;
 
     private bool showModal;
     private bool showDeleteModal;
@@ -159,14 +167,17 @@
 
     private Category? selectedCategory;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        LoadCategories();
+        await LoadCategoriesAsync();
     }
 
-    private void LoadCategories()
+    private async Task LoadCategoriesAsync()
     {
-        categories = CategoryRepo.GetCategories().ToList();
+        var paged = await CategoryRepo.GetCategoriesPagedAsync(currentPage, pageSize);
+        categories = paged.Items.ToList();
+        totalCategoriesCount = paged.TotalCount;
+        currentPage = paged.PageNumber;
     }
 
     private void OpenCreate()
@@ -236,7 +247,7 @@
                 await CategoryRepo.CreateCategory(dto);
             }
 
-            LoadCategories();
+            await LoadCategoriesAsync();
             CloseModal();
         }
         catch
@@ -246,7 +257,7 @@
         }
     }
 
-    private void ConfirmDelete()
+    private async Task ConfirmDelete()
     {
         if (selectedCategory == null) return;
 
@@ -254,7 +265,7 @@
         try
         {
             CategoryRepo.DeleteCategory(selectedCategory.IdCategory);
-            LoadCategories();
+            await LoadCategoriesAsync();
             CloseModal();
         }
         catch

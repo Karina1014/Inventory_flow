@@ -1,4 +1,5 @@
 using Inventory_Flow.Data;
+using Inventory_Flow.Extensions;
 using Inventory_Flow.Models;
 using Inventory_Flow.Models.Dtos;
 using Inventory_Flow.Repository.IRepository;
@@ -18,6 +19,13 @@ public class WarehouseRepository : IWarehouseRepository
     public ICollection<Warehouse> GetWarehouses()
     {
         return _db.Warehouses.OrderBy(w => w.Name).ToList();
+    }
+
+    public async Task<PagedResultDto<Warehouse>> GetWarehousesPagedAsync(int pageNumber, int pageSize)
+    {
+        return await _db.Warehouses
+            .OrderBy(w => w.Name)
+            .ToPagedResultAsync(pageNumber, pageSize);
     }
 
     public Warehouse? GetWarehouse(int IdWarehouse)

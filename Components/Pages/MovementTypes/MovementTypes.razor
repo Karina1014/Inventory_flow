@@ -20,7 +20,7 @@
     <div class="panel">
         <div class="panel-header">
             <span class="panel-title">Listado de movimientos</span>
-            <span class="record-count">@movementTypes.Count registros</span>
+            <span class="record-count">@totalMovementTypesCount registros</span>
         </div>
 
         @if (movementTypes.Count == 0)
@@ -68,6 +68,11 @@
                     </tbody>
                 </table>
             </div>
+
+            <TablePagination TotalItems="@totalMovementTypesCount"
+                             @bind-CurrentPage="currentPage"
+                             @bind-PageSize="pageSize"
+                             OnPageChanged="LoadMovementTypesAsync" />
         }
     </div>
 </div>
@@ -159,6 +164,9 @@
 
 @code {
     private List<MovementType> movementTypes = new();
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalMovementTypesCount;
 
     private bool showModal;
     private bool showDeleteModal;
@@ -173,16 +181,19 @@
 
     private MovementType? selectedMovementType;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        LoadMovementTypes();
+        await LoadMovementTypesAsync();
     }
 
-    private void LoadMovementTypes()
+    private async Task LoadMovementTypesAsync()
     {
         try
         {
-            movementTypes = MovementRepo.GetMovementTypes().ToList();
+            var paged = await MovementRepo.GetMovementTypesPagedAsync(currentPage, pageSize);
+            movementTypes = paged.Items.ToList();
+            totalMovementTypesCount = paged.TotalCount;
+            currentPage = paged.PageNumber;
         }
         catch
         {
@@ -269,7 +280,7 @@
                 await MovementRepo.CreateMovementType(dto);
             }
 
-            LoadMovementTypes();
+            await LoadMovementTypesAsync();
             CloseModal();
         }
         catch
@@ -279,7 +290,7 @@
         }
     }
 
-    private void ConfirmDelete()
+    private async Task ConfirmDelete()
     {
         if (selectedMovementType == null) return;
 
@@ -287,7 +298,7 @@
         try
         {
             MovementRepo.DeleteMovementType(selectedMovementType.IdMovementType);
-            LoadMovementTypes();
+            await LoadMovementTypesAsync();
             CloseModal();
         }
         catch

@@ -7,6 +7,7 @@ namespace Inventory_Flow.Repository;
 public interface IUserRepository
 {
     ICollection<User> GetUsers();
+    Task<PagedResultDto<User>> GetUsersPagedAsync(int pageNumber, int pageSize, string? search = null, int roleId = 0);
     User? GetUser(int IdUser);
     bool IsUniqueUser(string username);
     Task<UserLoginResponseDto> Login(UserLoginDto userLoginDto);

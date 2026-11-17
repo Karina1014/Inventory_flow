@@ -25,20 +25,20 @@
         <div class="panel-header">
             <span class="panel-title">Listado de lotes</span>
             <div class="expiry-filters">
-                <button class="filter-pill @(expFilter == "all" ? "filter-pill-active" : "")" @onclick='() => expFilter = "all"'>
+                <button class="filter-pill @(expFilter == "all" ? "filter-pill-active" : "")" @onclick='() => SetLotFilterAsync("all")'>
                     Todos (@lots.Count)
                 </button>
-                <button class="filter-pill @(expFilter == "soon" ? "filter-pill-active" : "")" @onclick='() => expFilter = "soon"'>
+                <button class="filter-pill @(expFilter == "soon" ? "filter-pill-active" : "")" @onclick='() => SetLotFilterAsync("soon")'>
                     Por vencer (@CountExpiringSoon())
                 </button>
-                <button class="filter-pill @(expFilter == "expired" ? "filter-pill-active" : "")" @onclick='() => expFilter = "expired"'>
+                <button class="filter-pill @(expFilter == "expired" ? "filter-pill-active" : "")" @onclick='() => SetLotFilterAsync("expired")'>
                     Vencidos (@CountExpired())
                 </button>
-                <span class="record-count">@FilteredLots.Count() registros</span>
+                <span class="record-count">@totalLotsCount registros</span>
             </div>
         </div>
 
-        @if (!FilteredLots.Any())
+        @if (pagedLots.Count == 0)
         {
             <div class="empty-state">
                 <i class="bi bi-boxes"></i>
@@ -63,7 +63,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var l in FilteredLots)
+                        @foreach (var l in pagedLots)
                         {
                             <tr class="@RowClass(l)">
                                 <td class="col-id">@l.IdLot</td>
@@ -103,6 +103,11 @@
                     </tbody>
                 </table>
             </div>
+
+            <TablePagination TotalItems="@totalLotsCount"
+                             @bind-CurrentPage="currentPage"
+                             @bind-PageSize="pageSize"
+                             OnPageChanged="LoadLotsPageAsync" />
         }
     </div>
 </div>
@@ -247,22 +252,26 @@
     private string errorMessage = string.Empty;
 
     private Lot? selectedLot;
+    private List<Lot> pagedLots = new();
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalLotsCount;
 
     private int alertDays = LotExpiration.DefaultAlertDays;
     private string expFilter = "all";
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         alertDays = LotExpiration.GetAlertDays(Configuration);
-        LoadData();
+        await LoadDataAsync();
     }
 
-    private IEnumerable<Lot> FilteredLots => expFilter switch
+    private async Task SetLotFilterAsync(string filter)
     {
-        "soon" => lots.Where(IsExpiringSoon),
-        "expired" => lots.Where(IsExpired),
-        _ => lots
-    };
+        expFilter = filter;
+        currentPage = 1;
+        await LoadLotsPageAsync();
+    }
 
     private int CountExpiringSoon() => lots.Count(IsExpiringSoon);
     private int CountExpired() => lots.Count(IsExpired);
@@ -282,11 +291,20 @@
         return $"en {days} d";
     }
 
-    private void LoadData()
+    private async Task LoadDataAsync()
     {
         lots = LotRepo.GetLots().ToList();
         products = ProductRepo.GetProducts().ToList();
         warehouses = WarehouseRepo.GetWarehouses().ToList();
+        await LoadLotsPageAsync();
+    }
+
+    private async Task LoadLotsPageAsync()
+    {
+        var paged = await LotRepo.GetLotsPagedAsync(currentPage, pageSize, expFilter, alertDays);
+        pagedLots = paged.Items.ToList();
+        totalLotsCount = paged.TotalCount;
+        currentPage = paged.PageNumber;
     }
 
     private string GetProductName(int idProduct)
@@ -378,7 +396,7 @@
                 await LotRepo.CreateLot(dto);
             }
 
-            LoadData();
+            await LoadDataAsync();
             CloseModal();
         }
         catch
@@ -388,7 +406,7 @@
         }
     }
 
-    private void ConfirmDelete()
+    private async Task ConfirmDelete()
     {
         if (selectedLot == null) return;
 
@@ -396,7 +414,7 @@
         try
         {
             LotRepo.DeleteLot(selectedLot.IdLot);
-            LoadData();
+            await LoadDataAsync();
             CloseModal();
         }
         catch

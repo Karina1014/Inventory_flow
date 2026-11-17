@@ -1,4 +1,5 @@
 using Inventory_Flow.Data;
+using Inventory_Flow.Extensions;
 using Inventory_Flow.Models;
 using Inventory_Flow.Models.Dtos;
 using Inventory_Flow.Repository.IRepository;
@@ -17,6 +18,13 @@ public class CategoryRepository : ICategoryRepository
     public ICollection<Category> GetCategories()
     {
         return _db.Categories.OrderBy(c => c.Name).ToList();
+    }
+
+    public async Task<PagedResultDto<Category>> GetCategoriesPagedAsync(int pageNumber, int pageSize)
+    {
+        return await _db.Categories
+            .OrderBy(c => c.Name)
+            .ToPagedResultAsync(pageNumber, pageSize);
     }
 
     public Category? GetCategory(int IdCategory)

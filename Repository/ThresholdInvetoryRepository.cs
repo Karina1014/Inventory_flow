@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Inventory_Flow.Data;
+using Inventory_Flow.Extensions;
 using Inventory_Flow.Models;
 using Inventory_Flow.Models.Dtos;
 using Inventory_Flow.Repository.IRepository;
@@ -22,6 +23,13 @@ public class ThresholdInvetoryRepository : IThresholdInvetoryRepository
     public async Task<ICollection<ThresholdInvetory>> GetThresholdsAsync()
     {
         return await _db.ThresholdInvetories.OrderByDescending(t => t.IdThresholdInvetory).ToListAsync();
+    }
+
+    public async Task<PagedResultDto<ThresholdInvetory>> GetThresholdsPagedAsync(int pageNumber, int pageSize)
+    {
+        return await _db.ThresholdInvetories
+            .OrderByDescending(t => t.IdThresholdInvetory)
+            .ToPagedResultAsync(pageNumber, pageSize);
     }
 
     public async Task<ThresholdInvetory?> GetThresholdByIdAsync(int id)

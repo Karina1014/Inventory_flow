@@ -21,7 +21,7 @@
     <div class="panel">
         <div class="panel-header">
             <span class="panel-title">Listado de roles</span>
-            <span class="record-count">@roles.Count registros</span>
+            <span class="record-count">@totalRolesCount registros</span>
         </div>
 
         @if (roles.Count == 0)
@@ -76,6 +76,11 @@
                     </tbody>
                 </table>
             </div>
+
+            <TablePagination TotalItems="@totalRolesCount"
+                             @bind-CurrentPage="currentPage"
+                             @bind-PageSize="pageSize"
+                             OnPageChanged="LoadRolesAsync" />
         }
     </div>
 </div>
@@ -162,6 +167,9 @@
 
 @code {
     private List<RoleModel> roles = new();
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalRolesCount;
 
     private bool showModal;
     private bool showDeleteModal;
@@ -176,16 +184,19 @@
 
     private RoleModel? selectedRole;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        LoadRoles();
+        await LoadRolesAsync();
     }
 
-    private void LoadRoles()
+    private async Task LoadRolesAsync()
     {
         try
         {
-            roles = RoleRepo.GetRoles().ToList();
+            var paged = await RoleRepo.GetRolesPagedAsync(currentPage, pageSize);
+            roles = paged.Items.ToList();
+            totalRolesCount = paged.TotalCount;
+            currentPage = paged.PageNumber;
         }
         catch
         {
@@ -259,7 +270,7 @@
                 await RoleRepo.CreateRole(dto);
             }
 
-            LoadRoles();
+            await LoadRolesAsync();
             CloseModal();
         }
         catch
@@ -269,7 +280,7 @@
         }
     }
 
-    private void ConfirmDelete()
+    private async Task ConfirmDelete()
     {
         if (selectedRole == null) return;
 
@@ -277,7 +288,7 @@
         try
         {
             RoleRepo.DeleteRole(selectedRole.IdRole);
-            LoadRoles();
+            await LoadRolesAsync();
             CloseModal();
         }
         catch

@@ -8,6 +8,7 @@ namespace Inventory_Flow.Repository.IRepository;
 public interface IThresholdInvetoryRepository
 {
     Task<ICollection<ThresholdInvetory>> GetThresholdsAsync();
+    Task<PagedResultDto<ThresholdInvetory>> GetThresholdsPagedAsync(int pageNumber, int pageSize);
     Task<ThresholdInvetory?> GetThresholdByIdAsync(int id);
     Task<ThresholdInvetory?> GetCurrentThresholdAsync();
     Task<ThresholdInvetory> CreateThresholdAsync(CreateThresholdInvetoryDto dto);

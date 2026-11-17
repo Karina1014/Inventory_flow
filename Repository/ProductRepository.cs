@@ -1,4 +1,5 @@
 using Inventory_Flow.Data;
+using Inventory_Flow.Extensions;
 using Inventory_Flow.Models;
 using Inventory_Flow.Models.Dtos;
 using Inventory_Flow.Repository.IRepository;
@@ -17,6 +18,13 @@ public class ProductRepository : IProductRepository
     public ICollection<Product> GetProducts()
     {
         return _db.Products.OrderBy(p => p.Name).ToList();
+    }
+
+    public async Task<PagedResultDto<Product>> GetProductsPagedAsync(int pageNumber, int pageSize)
+    {
+        return await _db.Products
+            .OrderBy(p => p.Name)
+            .ToPagedResultAsync(pageNumber, pageSize);
     }
 
     public Product? GetProduct(int IdProduct)

@@ -29,6 +29,21 @@ namespace Inventory_Flow.Controllers
       return Ok(usersDto);
     }
 
+    [HttpGet("paged")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetUsersPaged([FromQuery] PaginationParamsDto pagination, [FromQuery] int roleId = 0)
+    {
+      var pagedUsers = await _userRepository.GetUsersPagedAsync(pagination.PageNumber, pagination.PageSize, pagination.Search, roleId);
+      var result = new PagedResultDto<UserDto>
+      {
+          Items = _mapper.Map<List<UserDto>>(pagedUsers.Items),
+          TotalCount = pagedUsers.TotalCount,
+          PageNumber = pagedUsers.PageNumber,
+          PageSize = pagedUsers.PageSize
+      };
+      return Ok(result);
+    }
+
     [HttpGet("{IdUser:int}", Name = "GetUser")]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

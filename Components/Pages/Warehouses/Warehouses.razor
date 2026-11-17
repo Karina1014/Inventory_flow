@@ -20,7 +20,7 @@
     <div class="panel">
         <div class="panel-header">
             <span class="panel-title">Listado de sucursales</span>
-            <span class="record-count">@warehouses.Count registros</span>
+            <span class="record-count">@totalWarehousesCount registros</span>
         </div>
 
         @if (warehouses.Count == 0)
@@ -75,6 +75,11 @@
                     </tbody>
                 </table>
             </div>
+
+            <TablePagination TotalItems="@totalWarehousesCount"
+                             @bind-CurrentPage="currentPage"
+                             @bind-PageSize="pageSize"
+                             OnPageChanged="LoadWarehousesAsync" />
         }
     </div>
 </div>
@@ -166,6 +171,9 @@
 
 @code {
     private List<Warehouse> warehouses = new();
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalWarehousesCount;
 
     private bool showModal;
     private bool showDeleteModal;
@@ -180,14 +188,17 @@
 
     private Warehouse? selectedWarehouse;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        LoadWarehouses();
+        await LoadWarehousesAsync();
     }
 
-    private void LoadWarehouses()
+    private async Task LoadWarehousesAsync()
     {
-        warehouses = WarehouseRepo.GetWarehouses().ToList();
+        var paged = await WarehouseRepo.GetWarehousesPagedAsync(currentPage, pageSize);
+        warehouses = paged.Items.ToList();
+        totalWarehousesCount = paged.TotalCount;
+        currentPage = paged.PageNumber;
     }
 
     private void OpenCreate()
@@ -261,7 +272,7 @@
                 await WarehouseRepo.CreateWarehouse(dto);
             }
 
-            LoadWarehouses();
+            await LoadWarehousesAsync();
             CloseModal();
         }
         catch
@@ -271,7 +282,7 @@
         }
     }
 
-    private void ConfirmDelete()
+    private async Task ConfirmDelete()
     {
         if (selectedWarehouse == null) return;
 
@@ -279,7 +290,7 @@
         try
         {
             WarehouseRepo.DeleteWarehouse(selectedWarehouse.IdWarehouse);
-            LoadWarehouses();
+            await LoadWarehousesAsync();
             CloseModal();
         }
         catch

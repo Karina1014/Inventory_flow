@@ -6,6 +6,7 @@ namespace Inventory_Flow.Repository.IRepository;
 public interface IProductRepository
 {
     ICollection<Product> GetProducts();
+    Task<PagedResultDto<Product>> GetProductsPagedAsync(int pageNumber, int pageSize);
     Product? GetProduct(int IdProduct);
     bool IsUniqueName(string name);
     Task<Product> CreateProduct(CreateProductDto createProductDto);

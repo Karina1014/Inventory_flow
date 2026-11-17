@@ -29,13 +29,13 @@
         <div class="panel-header list-header-bar">
             <div class="d-flex align-items-center gap-2">
                 <span class="panel-title">Listado de usuarios</span>
-                <span class="record-count">@FilteredUsers.Count() registros</span>
+                <span class="record-count">@totalUsersCount registros</span>
             </div>
 
             <div class="list-filters" @onclick:stopPropagation="true">
                 <div class="filter-search-box">
                     <i class="bi bi-search"></i>
-                    <input type="text" placeholder="Buscar nombre o usuario..." @bind="searchTerm" @bind:event="oninput" />
+                    <input type="text" placeholder="Buscar nombre o usuario..." @bind="searchTerm" @bind:event="oninput" @bind:after="OnFilterChangedAsync" />
                 </div>
 
                 <!-- FILTRO DE ROL ESTILIZADO CON PUNTAS REDONDAS -->
@@ -55,7 +55,7 @@
                         <div class="custom-select-menu">
                             <button type="button"
                                     class="custom-select-option @(filterRoleId == 0 ? "active" : "")"
-                                    @onclick="() => SelectFilterRole(0)">
+                                    @onclick="() => SelectFilterRoleAsync(0)">
                                 <span>Todos los roles</span>
                                 @if (filterRoleId == 0)
                                 {
@@ -66,7 +66,7 @@
                             {
                                 <button type="button"
                                         class="custom-select-option @(filterRoleId == role.IdRole ? "active" : "")"
-                                        @onclick="() => SelectFilterRole(role.IdRole)">
+                                        @onclick="() => SelectFilterRoleAsync(role.IdRole)">
                                     <span>@role.Name</span>
                                     @if (filterRoleId == role.IdRole)
                                     {
@@ -80,7 +80,7 @@
             </div>
         </div>
 
-        @if (!FilteredUsers.Any())
+        @if (users.Count == 0)
         {
             <div class="empty-state">
                 <i class="bi bi-people"></i>
@@ -104,7 +104,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var user in FilteredUsers)
+                        @foreach (var user in users)
                         {
                             var roleCount = GetRoleMenuCount(user.IdRole);
                             var extras = GetUserExtraMenuNames(user.IdUser);
@@ -164,6 +164,11 @@
                     </tbody>
                 </table>
             </div>
+
+            <TablePagination TotalItems="@totalUsersCount"
+                             @bind-CurrentPage="currentPage"
+                             @bind-PageSize="pageSize"
+                             OnPageChanged="LoadUsersPageAsync" />
         }
     </div>
 </div>
@@ -435,6 +440,9 @@
 
     private string searchTerm = string.Empty;
     private int filterRoleId;
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalUsersCount;
 
     private string formName = string.Empty;
     private string formUserName = string.Empty;
@@ -446,12 +454,6 @@
     private User? selectedUser;
     private string errorMessage = string.Empty;
 
-    private IEnumerable<User> FilteredUsers => users.Where(u =>
-        (filterRoleId == 0 || u.IdRole == filterRoleId) &&
-        (string.IsNullOrWhiteSpace(searchTerm) ||
-         (u.Name != null && u.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
-         u.Username.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
-
     protected override async Task OnInitializedAsync()
     {
         await LoadDataAsync();
@@ -461,7 +463,6 @@
     {
         try
         {
-            users = UserRepo.GetUsers().ToList();
             roles = RoleRepo.GetRoles().OrderBy(r => r.IdRole).ToList();
             warehouses = WarehouseRepo.GetWarehouses().OrderBy(w => w.Name).ToList();
             allCatalogMenus = (await MenuRepo.GetAllDistinctMenus()).ToList();
@@ -473,24 +474,40 @@
                 roleMenuCounts[r.IdRole] = rMenus.Count;
             }
 
-            userExtraMenuNames.Clear();
-            foreach (var u in users)
-            {
-                var urls = await MenuRepo.GetExtraMenuUrlsByUser(u.IdUser);
-                if (urls.Count > 0)
-                {
-                    var names = allCatalogMenus
-                        .Where(m => urls.Any(url => string.Equals(url.Trim(), m.Url.Trim(), StringComparison.OrdinalIgnoreCase)))
-                        .Select(m => m.Name)
-                        .ToList();
-                    userExtraMenuNames[u.IdUser] = names;
-                }
-            }
+            await LoadUsersPageAsync();
         }
         catch
         {
             errorMessage = "No se pudieron cargar los datos de usuarios.";
         }
+    }
+
+    private async Task LoadUsersPageAsync()
+    {
+        var paged = await UserRepo.GetUsersPagedAsync(currentPage, pageSize, searchTerm, filterRoleId);
+        users = paged.Items.ToList();
+        totalUsersCount = paged.TotalCount;
+        currentPage = paged.PageNumber;
+
+        userExtraMenuNames.Clear();
+        foreach (var u in users)
+        {
+            var urls = await MenuRepo.GetExtraMenuUrlsByUser(u.IdUser);
+            if (urls.Count > 0)
+            {
+                var names = allCatalogMenus
+                    .Where(m => urls.Any(url => string.Equals(url.Trim(), m.Url.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    .Select(m => m.Name)
+                    .ToList();
+                userExtraMenuNames[u.IdUser] = names;
+            }
+        }
+    }
+
+    private async Task OnFilterChangedAsync()
+    {
+        currentPage = 1;
+        await LoadUsersPageAsync();
     }
 
     private void CloseAllDropdowns()
@@ -511,10 +528,12 @@
         isFilterRoleOpen = !isFilterRoleOpen;
     }
 
-    private void SelectFilterRole(int idRole)
+    private async Task SelectFilterRoleAsync(int idRole)
     {
         filterRoleId = idRole;
         isFilterRoleOpen = false;
+        currentPage = 1;
+        await LoadUsersPageAsync();
     }
 
     private string GetFilterRoleName()

@@ -6,6 +6,7 @@ namespace Inventory_Flow.Repository.IRepository;
 public interface IWarehouseRepository
 {
     ICollection<Warehouse> GetWarehouses();
+    Task<PagedResultDto<Warehouse>> GetWarehousesPagedAsync(int pageNumber, int pageSize);
     Warehouse? GetWarehouse(int IdWarehouse);
     bool IsUniqueName(string name);
     Task<Warehouse> CreateWarehouse(CreateWarehouseDto createWarehouseDto);
