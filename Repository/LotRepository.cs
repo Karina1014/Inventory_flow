@@ -28,10 +28,13 @@ public class LotRepository : ILotRepository
             query = query.Where(l => l.IdWarehouse == warehouseId.Value);
         }
 
-        return query.OrderBy(l => l.ExpirationDate).ToList();
+        return query
+            .OrderByDescending(l => l.CreationDate)
+            .ThenByDescending(l => l.IdLot)
+            .ToList();
     }
 
-    public async Task<PagedResultDto<Lot>> GetLotsPagedAsync(int pageNumber, int pageSize, string filter = "all", int alertDays = 30, int? warehouseId = null)
+    public async Task<PagedResultDto<Lot>> GetLotsPagedAsync(int pageNumber, int pageSize, string filter = "all", int alertDays = 30, int? warehouseId = null, string? search = null, DateTime? startDate = null, DateTime? endDate = null)
     {
         var today = DateTime.Today;
         var limit = today.AddDays(alertDays + 1);
@@ -41,7 +44,17 @@ public class LotRepository : ILotRepository
             .Include(l => l.Warehouse)
             .AsNoTracking();
 
-        if (warehouseId.HasValue)
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(l =>
+                (l.LotNumber != null && l.LotNumber.Contains(term)) ||
+                (l.Product != null && l.Product.Name != null && l.Product.Name.Contains(term)) ||
+                (l.Product != null && l.Product.Code != null && l.Product.Code.Contains(term)) ||
+                (l.Warehouse != null && l.Warehouse.Name != null && l.Warehouse.Name.Contains(term)));
+        }
+
+        if (warehouseId.HasValue && warehouseId.Value > 0)
         {
             query = query.Where(l => l.IdWarehouse == warehouseId.Value);
         }
@@ -54,9 +67,26 @@ public class LotRepository : ILotRepository
         {
             query = query.Where(l => l.ExpirationDate.Date >= today && l.ExpirationDate < limit);
         }
+        else if (filter == "valid")
+        {
+            query = query.Where(l => l.ExpirationDate >= limit);
+        }
+
+        if (startDate.HasValue)
+        {
+            var start = startDate.Value.Date;
+            query = query.Where(l => l.CreationDate >= start);
+        }
+
+        if (endDate.HasValue)
+        {
+            var end = endDate.Value.Date.AddDays(1);
+            query = query.Where(l => l.CreationDate < end);
+        }
 
         return await query
-            .OrderBy(l => l.ExpirationDate)
+            .OrderByDescending(l => l.CreationDate)
+            .ThenByDescending(l => l.IdLot)
             .ToPagedResultAsync(pageNumber, pageSize);
     }
 

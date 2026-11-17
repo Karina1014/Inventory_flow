@@ -6,7 +6,7 @@ namespace Inventory_Flow.Repository.IRepository;
 public interface ILotRepository
 {
     ICollection<Lot> GetLots(int? warehouseId = null);
-    Task<PagedResultDto<Lot>> GetLotsPagedAsync(int pageNumber, int pageSize, string filter = "all", int alertDays = 30, int? warehouseId = null);
+    Task<PagedResultDto<Lot>> GetLotsPagedAsync(int pageNumber, int pageSize, string filter = "all", int alertDays = 30, int? warehouseId = null, string? search = null, DateTime? startDate = null, DateTime? endDate = null);
     ICollection<Lot> GetExpiringLots(int days, int? warehouseId = null);
     ICollection<Lot> GetExpiredLots(int? warehouseId = null);
     Lot? GetLot(int IdLot);
