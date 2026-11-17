@@ -1,0 +1,586 @@
+@page "/suppliers"
+@layout MainLayout
+@using Inventory_Flow.Models
+@using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Repository.IRepository
+@inject ISupplierRepository SupplierRepo
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
+
+<div class="page-container">
+    <!-- Migas de Pan (Breadcrumb) -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="dashboard" class="text-decoration-none text-muted">
+                    <i class="bi bi-house-door me-1"></i>Inicio
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <span class="text-muted">Administración</span>
+            </li>
+            <li class="breadcrumb-item active fw-semibold text-dark" aria-current="page">
+                Proveedores
+            </li>
+        </ol>
+    </nav>
+
+    <!-- Encabezado con Icono Enmarcado -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <div class="header-icon-box">
+                <i class="bi bi-truck"></i>
+            </div>
+            <div>
+                <h1 class="h4 mb-0 fw-bold text-dark">Proveedores</h1>
+                <p class="text-muted small mb-0">Gestión de laboratorios, distribuidores y tiempos de entrega para Carapungo.</p>
+            </div>
+        </div>
+
+        <div>
+            <button type="button" class="btn btn-brand-primary" @onclick="OpenCreateModal">
+                <i class="bi bi-plus-lg"></i>
+                <span>Nuevo Proveedor</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Barra de Herramientas: Búsqueda y Filtro de Estado -->
+    <div class="card p-3 mb-3">
+        <div class="row g-2 align-items-center">
+            <!-- Buscador -->
+            <div class="col-12 col-md-7 col-lg-8">
+                <div class="search-input-wrapper">
+                    <i class="bi bi-search search-icon"></i>
+                    <input type="text"
+                           class="form-control ps-5"
+                           placeholder="Buscar por RUC, razón social, contacto o correo..."
+                           @bind="searchTerm"
+                           @bind:event="oninput"
+                           @bind:after="OnSearchChangedAsync" />
+                </div>
+            </div>
+
+            <!-- Filtro de Estado -->
+            <div class="col-12 col-md-5 col-lg-4">
+                <select class="form-select" @bind="selectedFilterStatus" @bind:after="OnSearchChangedAsync">
+                    <option value="all">Todos los estados</option>
+                    <option value="active">Solo Activos</option>
+                    <option value="inactive">Solo Inactivos</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido Principal: Tabla o Empty State -->
+    @if (isLoading)
+    {
+        <div class="card p-5 text-center">
+            <div class="spinner-border text-primary mx-auto mb-2" role="status"></div>
+            <span class="text-muted small">Cargando proveedores...</span>
+        </div>
+    }
+    else if (suppliers == null || !suppliers.Any())
+    {
+        <div class="empty-state-card">
+            <div class="empty-icon-circle">
+                <i class="bi bi-truck"></i>
+            </div>
+            <h5 class="fw-bold text-dark mb-1">No se encontraron proveedores</h5>
+            <p class="text-muted small mb-3 text-center" style="max-width: 420px;">
+                @(string.IsNullOrWhiteSpace(searchTerm)
+                    ? "Aún no tienes proveedores o laboratorios registrados en el sistema."
+                    : $"No hay resultados que coincidan con '{searchTerm}'.")
+            </p>
+            <button type="button" class="btn btn-brand-primary" @onclick="OpenCreateModal">
+                <i class="bi bi-plus-lg me-1"></i> Registrar Primer Proveedor
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="card p-0 overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-head-flat">
+                        <tr class="text-muted small text-uppercase">
+                            <th class="ps-3 py-3 border-0">RUC / Identificación</th>
+                            <th class="border-0">Razón Social / Laboratorio</th>
+                            <th class="border-0">Contacto</th>
+                            <th class="border-0">Teléfono / Correo</th>
+                            <th class="border-0 text-center">Tiempo Entrega</th>
+                            <th class="border-0 text-center">Estado</th>
+                            <th class="pe-3 border-0 text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in suppliers)
+                        {
+                            <tr>
+                                <td class="ps-3 fw-semibold">
+                                    <span class="ruc-badge">@item.Ruc</span>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">@item.CompanyName</div>
+                                    <span class="text-muted small">@item.Address</span>
+                                </td>
+                                <td>
+                                    <span class="text-dark">@(string.IsNullOrWhiteSpace(item.ContactName) ? "-" : item.ContactName)</span>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column gap-1 small">
+                                        @if (!string.IsNullOrWhiteSpace(item.Phone))
+                                        {
+                                            <span class="text-dark">
+                                                <i class="bi bi-telephone text-muted me-1"></i>@item.Phone
+                                            </span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(item.Email))
+                                        {
+                                            <span class="text-muted">
+                                                <i class="bi bi-envelope text-muted me-1"></i>@item.Email
+                                            </span>
+                                        }
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="lead-time-pill" title="Días estimados para recibir la orden">
+                                        <i class="bi bi-clock-history me-1"></i>@item.DeliveryLeadTimeDays @(item.DeliveryLeadTimeDays == 1 ? "día" : "días")
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="status-badge @(item.IsActive ? "active" : "inactive")">
+                                        @(item.IsActive ? "Activo" : "Inactivo")
+                                    </span>
+                                </td>
+                                <td class="pe-3 text-end">
+                                    <div class="d-inline-flex gap-1">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" title="Editar" @onclick="() => OpenEditModal(item)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2" title="Eliminar" @onclick="() => OpenDeleteModal(item)">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginación con componente compartido -->
+            <TablePagination TotalItems="@totalSuppliersCount"
+                             @bind-CurrentPage="currentPage"
+                             @bind-PageSize="pageSize"
+                             OnPageChanged="LoadSuppliersAsync" />
+        </div>
+    }
+</div>
+
+<!-- Modal Flotante: Crear / Editar Proveedor -->
+@if (showFormModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModals"></div>
+    <div class="modal-card">
+        <div class="modal-header">
+            <div class="d-flex align-items-center gap-2">
+                <div class="modal-icon-badge">
+                    <i class="bi @(isEditing ? "bi-pencil-square" : "bi-plus-circle")"></i>
+                </div>
+                <div>
+                    <h5 class="modal-title mb-0">@(isEditing ? "Editar Proveedor" : "Nuevo Proveedor")</h5>
+                    <span class="text-muted small">@(isEditing ? "Actualiza los datos del proveedor o laboratorio." : "Registra un nuevo proveedor para compras centralizadas.")</span>
+                </div>
+            </div>
+            <button type="button" class="btn-close" @onclick="CloseModals"></button>
+        </div>
+
+        <div class="modal-body">
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="alert alert-danger py-2 px-3 small mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>@errorMessage
+                </div>
+            }
+
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold text-muted">
+                        RUC / Identificación <span class="text-danger">*</span>
+                    </label>
+                    <input type="text"
+                           class="form-control"
+                           placeholder="Ej. 1790012345001"
+                           maxlength="20"
+                           @bind="formRuc" />
+                    @if (showValidation && string.IsNullOrWhiteSpace(formRuc))
+                    {
+                        <span class="text-danger small">El RUC es obligatorio.</span>
+                    }
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold text-muted">
+                        Razón Social / Laboratorio <span class="text-danger">*</span>
+                    </label>
+                    <input type="text"
+                           class="form-control"
+                           placeholder="Ej. Laboratorios Bayer Animal Health"
+                           maxlength="150"
+                           @bind="formCompanyName" />
+                    @if (showValidation && string.IsNullOrWhiteSpace(formCompanyName))
+                    {
+                        <span class="text-danger small">La Razón Social es obligatoria.</span>
+                    }
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold text-muted">Persona de Contacto</label>
+                    <input type="text"
+                           class="form-control"
+                           placeholder="Ej. Ing. Juan Pérez"
+                           maxlength="100"
+                           @bind="formContactName" />
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold text-muted">Teléfono / WhatsApp</label>
+                    <input type="text"
+                           class="form-control"
+                           placeholder="Ej. 0991234567"
+                           maxlength="20"
+                           @bind="formPhone" />
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold text-muted">Correo Electrónico</label>
+                    <input type="email"
+                           class="form-control"
+                           placeholder="ventas@laboratorio.com"
+                           maxlength="100"
+                           @bind="formEmail" />
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold text-muted">
+                        Tiempo estimado de entrega (Días) <span class="text-danger">*</span>
+                    </label>
+                    <div class="input-group">
+                        <input type="number"
+                               class="form-control"
+                               min="0"
+                               max="90"
+                               @bind="formLeadTimeDays" />
+                        <span class="input-group-text bg-light text-muted small">días hábiles</span>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label small fw-semibold text-muted">Dirección / Ciudad</label>
+                    <input type="text"
+                           class="form-control"
+                           placeholder="Ej. Av. Panamericana Norte Km 12, Quito"
+                           maxlength="200"
+                           @bind="formAddress" />
+                </div>
+
+                <div class="col-12">
+                    <div class="form-check form-switch mt-1">
+                        <input class="form-check-input" type="checkbox" id="supplierActiveSwitch" @bind="formIsActive" />
+                        <label class="form-check-label small fw-semibold text-dark" for="supplierActiveSwitch">
+                            Proveedor Habilitado / Activo
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" @onclick="CloseModals" disabled="@isSaving">
+                Cancelar
+            </button>
+            <button type="button" class="btn btn-brand-primary" @onclick="SaveSupplierAsync" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    <span>Guardando...</span>
+                }
+                else
+                {
+                    <i class="bi bi-check-lg me-1"></i>
+                    <span>@(isEditing ? "Actualizar Proveedor" : "Guardar Proveedor")</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+<!-- Modal de Confirmación: Eliminar Proveedor -->
+@if (showDeleteModal && supplierToDelete != null)
+{
+    <div class="modal-backdrop" @onclick="CloseModals"></div>
+    <div class="modal-card modal-delete">
+        <div class="modal-header">
+            <div class="d-flex align-items-center gap-2">
+                <div class="delete-icon-badge">
+                    <i class="bi bi-trash3"></i>
+                </div>
+                <h5 class="modal-title mb-0">Eliminar Proveedor</h5>
+            </div>
+            <button type="button" class="btn-close" @onclick="CloseModals"></button>
+        </div>
+
+        <div class="modal-body">
+            <p class="text-muted small mb-2">
+                ¿Estás seguro de que deseas eliminar permanentemente al proveedor:
+            </p>
+            <div class="p-3 bg-light rounded border border-light-subtle mb-2">
+                <div class="fw-bold text-dark">@supplierToDelete.CompanyName</div>
+                <div class="text-muted small">RUC: @supplierToDelete.Ruc</div>
+            </div>
+            <p class="text-danger small mb-0">
+                <i class="bi bi-exclamation-circle me-1"></i>Esta acción no se puede deshacer.
+            </p>
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" @onclick="CloseModals" disabled="@isDeleting">
+                Cancelar
+            </button>
+            <button type="button" class="btn btn-danger" @onclick="ConfirmDeleteSupplierAsync" disabled="@isDeleting">
+                @if (isDeleting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    <span>Eliminando...</span>
+                }
+                else
+                {
+                    <i class="bi bi-trash3 me-1"></i>
+                    <span>Sí, Eliminar</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Supplier> suppliers = new();
+    private int totalSuppliersCount = 0;
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private string searchTerm = "";
+    private string selectedFilterStatus = "all";
+    private bool isLoading = true;
+
+    // Estado del modal de creación/edición
+    private bool showFormModal = false;
+    private bool isEditing = false;
+    private int editingSupplierId = 0;
+    private bool isSaving = false;
+    private bool showValidation = false;
+    private string errorMessage = "";
+
+    // Campos del formulario
+    private string formRuc = "";
+    private string formCompanyName = "";
+    private string formContactName = "";
+    private string formPhone = "";
+    private string formEmail = "";
+    private string formAddress = "";
+    private int formLeadTimeDays = 1;
+    private bool formIsActive = true;
+
+    // Estado de eliminación
+    private bool showDeleteModal = false;
+    private Supplier? supplierToDelete;
+    private bool isDeleting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSuppliersAsync();
+    }
+
+    private async Task LoadSuppliersAsync()
+    {
+        isLoading = true;
+        try
+        {
+            bool? activeOnly = selectedFilterStatus switch
+            {
+                "active" => true,
+                "inactive" => false,
+                _ => null
+            };
+
+            var pagedResult = await SupplierRepo.GetSuppliersPagedAsync(
+                pageNumber: currentPage,
+                pageSize: pageSize,
+                search: searchTerm,
+                activeOnly: activeOnly);
+
+            suppliers = pagedResult.Items?.ToList() ?? new();
+            totalSuppliersCount = pagedResult.TotalCount;
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error al cargar proveedores: {ex.Message}", "Error");
+            suppliers = new();
+            totalSuppliersCount = 0;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnSearchChangedAsync()
+    {
+        currentPage = 1;
+        await LoadSuppliersAsync();
+    }
+
+    private void OpenCreateModal()
+    {
+        isEditing = false;
+        editingSupplierId = 0;
+        formRuc = "";
+        formCompanyName = "";
+        formContactName = "";
+        formPhone = "";
+        formEmail = "";
+        formAddress = "";
+        formLeadTimeDays = 2;
+        formIsActive = true;
+        showValidation = false;
+        errorMessage = "";
+        showFormModal = true;
+    }
+
+    private void OpenEditModal(Supplier item)
+    {
+        isEditing = true;
+        editingSupplierId = item.IdSupplier;
+        formRuc = item.Ruc;
+        formCompanyName = item.CompanyName;
+        formContactName = item.ContactName;
+        formPhone = item.Phone;
+        formEmail = item.Email;
+        formAddress = item.Address;
+        formLeadTimeDays = item.DeliveryLeadTimeDays;
+        formIsActive = item.IsActive;
+        showValidation = false;
+        errorMessage = "";
+        showFormModal = true;
+    }
+
+    private async Task SaveSupplierAsync()
+    {
+        showValidation = true;
+        errorMessage = "";
+
+        if (string.IsNullOrWhiteSpace(formRuc) || string.IsNullOrWhiteSpace(formCompanyName))
+        {
+            errorMessage = "Completa los campos obligatorios marcados con (*).";
+            return;
+        }
+
+        // Validar unicidad del RUC
+        if (!SupplierRepo.IsUniqueRuc(formRuc, isEditing ? editingSupplierId : null))
+        {
+            errorMessage = "Ya existe un proveedor registrado con ese RUC / Identificación.";
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            if (isEditing)
+            {
+                var updateDto = new UpdateSupplierDto
+                {
+                    Ruc = formRuc,
+                    CompanyName = formCompanyName,
+                    ContactName = formContactName,
+                    Phone = formPhone,
+                    Email = formEmail,
+                    Address = formAddress,
+                    DeliveryLeadTimeDays = formLeadTimeDays,
+                    IsActive = formIsActive
+                };
+
+                await SupplierRepo.UpdateSupplier(editingSupplierId, updateDto);
+                ToastService.Success("Proveedor actualizado correctamente.", "Actualizado");
+            }
+            else
+            {
+                var createDto = new CreateSupplierDto
+                {
+                    Ruc = formRuc,
+                    CompanyName = formCompanyName,
+                    ContactName = formContactName,
+                    Phone = formPhone,
+                    Email = formEmail,
+                    Address = formAddress,
+                    DeliveryLeadTimeDays = formLeadTimeDays,
+                    IsActive = formIsActive
+                };
+
+                await SupplierRepo.CreateSupplier(createDto);
+                ToastService.Success("Proveedor registrado exitosamente.", "Registrado");
+            }
+
+            CloseModals();
+            await LoadSuppliersAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ocurrió un error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void OpenDeleteModal(Supplier item)
+    {
+        supplierToDelete = item;
+        showDeleteModal = true;
+    }
+
+    private async Task ConfirmDeleteSupplierAsync()
+    {
+        if (supplierToDelete == null) return;
+
+        isDeleting = true;
+        try
+        {
+            var success = SupplierRepo.DeleteSupplier(supplierToDelete.IdSupplier);
+            if (success)
+            {
+                ToastService.Success($"Proveedor '{supplierToDelete.CompanyName}' eliminado.", "Eliminado");
+                CloseModals();
+                await LoadSuppliersAsync();
+            }
+            else
+            {
+                ToastService.Error("No se pudo eliminar el proveedor.", "Error");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error al eliminar: {ex.Message}", "Error");
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    private void CloseModals()
+    {
+        showFormModal = false;
+        showDeleteModal = false;
+        supplierToDelete = null;
+    }
+}

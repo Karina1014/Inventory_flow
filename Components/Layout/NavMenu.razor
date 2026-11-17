@@ -53,7 +53,7 @@
     }
 
     <!-- 3. ADMINISTRACIÓN (Sección desplegable para catálogos y configuración maestra) -->
-    @if (HasCategoryAccess("/products", "/categories", "/thresholds", "/movementtypes", "/warehouses", "/users", "/roles"))
+    @if (HasCategoryAccess("/products", "/categories", "/thresholds", "/movementtypes", "/warehouses", "/suppliers", "/users", "/roles"))
     {
         <div class="nav-group">
             <button type="button" class="nav-item-link nav-group-toggle" @onclick="ToggleAdmin">
@@ -100,6 +100,13 @@
                         <NavLink class="submenu-link" href="warehouses" Match="NavLinkMatch.Prefix">
                             <i class="bi bi-building"></i>
                             <span>Sucursales</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/suppliers"))
+                    {
+                        <NavLink class="submenu-link" href="suppliers" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-truck"></i>
+                            <span>Proveedores</span>
                         </NavLink>
                     }
                     @if (HasAccess("/users"))
@@ -218,18 +225,43 @@
 
     private bool HasAccess(string url)
     {
-        // Si no hay restricciones específicas en DB, se permite el acceso
-        if (userMenus == null || userMenus.Count == 0)
+        // 1. Administrador siempre tiene acceso total a todos los módulos
+        if (string.Equals(CurrentUserService.Role, "Administrador", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(CurrentUserService.Role, "Admin", StringComparison.OrdinalIgnoreCase)
+            || (CurrentUserService.Role?.Contains("Admin", StringComparison.OrdinalIgnoreCase) == true))
         {
             return true;
         }
 
         var cleanTarget = url.TrimStart('/');
+
+        // 2. Módulos recién integrados visibles por defecto
+        if (string.Equals(cleanTarget, "suppliers", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(cleanTarget, "inventario", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(cleanTarget, "dashboard", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(cleanTarget, "profile", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        // 3. Validación de permisos por menú en BD
+        if (userMenus == null || userMenus.Count == 0)
+        {
+            return true;
+        }
+
         return userMenus.Any(m => string.Equals(m.Url.TrimStart('/'), cleanTarget, StringComparison.OrdinalIgnoreCase));
     }
 
     private bool HasCategoryAccess(params string[] urls)
     {
+        if (string.Equals(CurrentUserService.Role, "Administrador", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(CurrentUserService.Role, "Admin", StringComparison.OrdinalIgnoreCase)
+            || (CurrentUserService.Role?.Contains("Admin", StringComparison.OrdinalIgnoreCase) == true))
+        {
+            return true;
+        }
+
         if (userMenus == null || userMenus.Count == 0)
         {
             return true;
