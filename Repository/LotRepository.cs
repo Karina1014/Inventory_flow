@@ -28,7 +28,7 @@ public class LotRepository : ILotRepository
             query = query.Where(l => l.IdWarehouse == warehouseId.Value);
         }
 
-        return query
+                                                                                                                                                  return query
             .OrderByDescending(l => l.CreationDate)
             .ThenByDescending(l => l.IdLot)
             .ToList();

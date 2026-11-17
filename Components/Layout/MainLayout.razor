@@ -30,7 +30,10 @@
             {
                 <details class="nav-group" open>
                     <summary class="nav-group-title">
-                        <span>@group.Key</span>
+                        <div class="nav-group-title-content">
+                            <i class="@GetCategoryIcon(group.Key)"></i>
+                            <span>@FormatCategoryTitle(group.Key)</span>
+                        </div>
                         <i class="bi bi-chevron-down nav-group-chevron"></i>
                     </summary>
 
@@ -227,6 +230,25 @@
     }
 
     private string GetRoleLabel(string role) => string.IsNullOrWhiteSpace(role) ? "Sin rol" : role;
+
+    private string FormatCategoryTitle(string? cat)
+    {
+        if (string.IsNullOrWhiteSpace(cat)) return string.Empty;
+        var lower = cat.Trim().ToLowerInvariant();
+        if (lower == "administracion" || lower == "administración") return "Administración";
+        if (lower == "operaciones") return "Operaciones";
+        if (lower == "reportes") return "Reportes";
+        return char.ToUpper(lower[0]) + lower.Substring(1);
+    }
+
+    private string GetCategoryIcon(string? cat)
+    {
+        var lower = cat?.Trim().ToLowerInvariant() ?? "";
+        if (lower.Contains("admin")) return "bi bi-sliders";
+        if (lower.Contains("operac") || lower.Contains("movim")) return "bi bi-arrow-left-right";
+        if (lower.Contains("report") || lower.Contains("analis")) return "bi bi-graph-up";
+        return "bi bi-folder2";
+    }
 
     private (string Category, string PageName) GetCurrentBreadcrumb()
     {

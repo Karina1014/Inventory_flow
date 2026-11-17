@@ -8,41 +8,236 @@
 @inject IProductRepository ProductRepo
 @inject IWarehouseRepository WarehouseRepo
 @inject IConfiguration Configuration
+@inject IToastNotificationService ToastService
 
 <div class="page-container">
-    <div class="page-header">
+    <!-- ENCABEZADO CON ÍCONO EN CAJA REDONDEADA -->
+    <div class="page-header-block">
+        <div class="header-icon-box">
+            <i class="bi bi-boxes"></i>
+        </div>
         <div>
             <h1 class="title">Lotes</h1>
-            <p class="subtitle">Gestión de lotes, stock y fechas de caducidad</p>
+            <p class="subtitle">Gestión de lotes, control de existencias y fechas de caducidad.</p>
         </div>
-        <button class="btn-primary" @onclick="OpenCreate">
-            <i class="bi bi-plus-lg"></i>
-            Nuevo lote
-        </button>
     </div>
 
-    <div class="panel">
-        <div class="panel-header">
-            <span class="panel-title">Listado de lotes</span>
-            <div class="expiry-filters">
-                <button class="filter-pill @(expFilter == "all" ? "filter-pill-active" : "")" @onclick='() => SetLotFilterAsync("all")'>
-                    Todos (@lots.Count)
+    <!-- BARRA DE HERRAMIENTAS: BÚSQUEDA Y FILTROS A LA IZQUIERDA + BOTÓN NUEVO A LA DERECHA -->
+    <div class="table-toolbar">
+        <div class="toolbar-left">
+            <!-- BUSCADOR -->
+            <div class="filter-search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" placeholder="Buscar lote, producto o almacén..."
+                       @bind="searchTerm" @bind:event="oninput" @bind:after="OnFilterChangedAsync" />
+            </div>
+
+            <!-- SELECTOR DESPLEGABLE DE ESTADO / CADUCIDAD -->
+            <div class="custom-select-container filter-status-width">
+                <button type="button"
+                        class="custom-select-trigger @(isStatusFilterOpen ? "open" : "")"
+                        @onclick="ToggleStatusFilterDropdown">
+                    <div class="trigger-content">
+                        <i class="bi bi-hourglass-split trigger-icon"></i>
+                        <span class="trigger-text">@GetStatusFilterName()</span>
+                    </div>
+                    <i class="bi bi-chevron-down trigger-chevron"></i>
                 </button>
-                <button class="filter-pill @(expFilter == "soon" ? "filter-pill-active" : "")" @onclick='() => SetLotFilterAsync("soon")'>
-                    Por vencer (@CountExpiringSoon())
+
+                @if (isStatusFilterOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="custom-select-menu">
+                        <button type="button"
+                                class="custom-select-option @(expFilter == "all" ? "active" : "")"
+                                @onclick='() => SelectStatusFilterAsync("all")'>
+                            <span>Todos los estados</span>
+                            @if (expFilter == "all")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        <button type="button"
+                                class="custom-select-option @(expFilter == "valid" ? "active" : "")"
+                                @onclick='() => SelectStatusFilterAsync("valid")'>
+                            <span>Vigentes</span>
+                            @if (expFilter == "valid")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        <button type="button"
+                                class="custom-select-option @(expFilter == "soon" ? "active" : "")"
+                                @onclick='() => SelectStatusFilterAsync("soon")'>
+                            <span>Por vencer (@alertDays d)</span>
+                            @if (expFilter == "soon")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        <button type="button"
+                                class="custom-select-option @(expFilter == "expired" ? "active" : "")"
+                                @onclick='() => SelectStatusFilterAsync("expired")'>
+                            <span>Vencidos</span>
+                            @if (expFilter == "expired")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                    </div>
+                }
+            </div>
+
+            <!-- SELECTOR DESPLEGABLE DE ALMACÉN -->
+            <div class="custom-select-container filter-warehouse-width">
+                <button type="button"
+                        class="custom-select-trigger @(isWarehouseFilterOpen ? "open" : "")"
+                        @onclick="ToggleWarehouseFilterDropdown">
+                    <div class="trigger-content">
+                        <i class="bi bi-building trigger-icon"></i>
+                        <span class="trigger-text">@GetWarehouseFilterName()</span>
+                    </div>
+                    <i class="bi bi-chevron-down trigger-chevron"></i>
                 </button>
-                <button class="filter-pill @(expFilter == "expired" ? "filter-pill-active" : "")" @onclick='() => SetLotFilterAsync("expired")'>
-                    Vencidos (@CountExpired())
+
+                @if (isWarehouseFilterOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="custom-select-menu">
+                        <button type="button"
+                                class="custom-select-option @(selectedWarehouseId == 0 ? "active" : "")"
+                                @onclick="() => SelectWarehouseFilterAsync(0)">
+                            <span>Todos los almacenes</span>
+                            @if (selectedWarehouseId == 0)
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        @foreach (var w in warehouses)
+                        {
+                            <button type="button"
+                                    class="custom-select-option @(selectedWarehouseId == w.IdWarehouse ? "active" : "")"
+                                    @onclick="() => SelectWarehouseFilterAsync(w.IdWarehouse)">
+                                <span>@w.Name</span>
+                                @if (selectedWarehouseId == w.IdWarehouse)
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- SELECTOR DESPLEGABLE DE FECHAS TIPO CALENDARIO -->
+            <div class="custom-select-container filter-date-width">
+                <button type="button"
+                        class="custom-select-trigger @(isDateMenuOpen ? "open" : "")"
+                        @onclick="ToggleDateMenu">
+                    <div class="trigger-content">
+                        <i class="bi bi-calendar3 trigger-icon"></i>
+                        <span class="trigger-text">@GetDateFilterLabel()</span>
+                    </div>
+                    @if (selectedDatePreset != "all" || startDate.HasValue || endDate.HasValue)
+                    {
+                        <span class="clear-icon-wrapper" @onclick="ClearDateFilterAsync" @onclick:stopPropagation="true" title="Restablecer fechas">
+                            <i class="bi bi-x-circle-fill clear-filter-icon"></i>
+                        </span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-chevron-down trigger-chevron"></i>
+                    }
                 </button>
-                <span class="record-count">@totalLotsCount registros</span>
+
+                @if (isDateMenuOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="date-menu-popover">
+                        <div class="date-presets-list">
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "all" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("all")'>
+                                <i class="bi bi-infinity"></i>
+                                <span>Todas las fechas</span>
+                                @if (selectedDatePreset == "all")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "today" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("today")'>
+                                <i class="bi bi-calendar-day"></i>
+                                <span>Hoy</span>
+                                @if (selectedDatePreset == "today")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "week" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("week")'>
+                                <i class="bi bi-calendar-week"></i>
+                                <span>Últimos 7 días</span>
+                                @if (selectedDatePreset == "week")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "month" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("month")'>
+                                <i class="bi bi-calendar-month"></i>
+                                <span>Este mes</span>
+                                @if (selectedDatePreset == "month")
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                        </div>
+
+                        <div class="date-menu-divider"></div>
+
+                        <!-- RANGO PERSONALIZADO -->
+                        <div class="custom-range-section">
+                            <div class="custom-range-title">Rango de creación:</div>
+                            <div class="range-inputs-row">
+                                <div class="range-input-wrapper">
+                                    <span class="range-tag">Desde</span>
+                                    <input type="date" class="range-date-input" @bind="tempStartDate" />
+                                </div>
+                                <div class="range-input-wrapper">
+                                    <span class="range-tag">Hasta</span>
+                                    <input type="date" class="range-date-input" @bind="tempEndDate" />
+                                </div>
+                            </div>
+                            <div class="custom-range-actions">
+                                <button type="button" class="btn-apply-range" @onclick="ApplyCustomDateRangeAsync">
+                                    Aplicar filtro
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
             </div>
         </div>
 
+        <div class="toolbar-right">
+            <button type="button" class="btn-primary" @onclick="OpenCreate">
+                <i class="bi bi-plus-lg"></i>
+                <span>Nuevo lote</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- TABLA PRINCIPAL ESTILO CUADRÍCULA LIMPIA (SIN COLUMNA ID) -->
+    <div class="panel">
         @if (pagedLots.Count == 0)
         {
             <div class="empty-state">
                 <i class="bi bi-boxes"></i>
-                <span>@(lots.Count == 0 ? "No hay lotes registrados" : "No hay lotes en este filtro")</span>
+                <span>No se encontraron lotes registrados con los filtros seleccionados</span>
             </div>
         }
         else
@@ -51,52 +246,79 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>#</th>
+                            <th>N° Lote</th>
                             <th>Producto</th>
                             <th>Almacén</th>
-                            <th>N° Lote</th>
                             <th>Cantidad</th>
                             <th>Caducidad</th>
                             <th>Estado</th>
                             <th>Creado</th>
-                            <th>Acciones</th>
+                            <th class="col-actions-header">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var l in pagedLots)
                         {
                             <tr class="@RowClass(l)">
-                                <td class="col-id">@l.IdLot</td>
-                                <td class="col-name">@GetProductName(l.IdProduct)</td>
-                                <td>@GetWarehouseName(l.IdWarehouse)</td>
-                                <td>@l.LotNumber</td>
-                                <td>@l.Quantity</td>
+                                <td class="col-lot">
+                                    <span class="lot-pill">@l.LotNumber</span>
+                                </td>
+                                <td class="col-product">
+                                    <span class="product-name">@GetProductName(l.IdProduct)</span>
+                                </td>
+                                <td>
+                                    <span class="warehouse-badge">
+                                        <i class="bi bi-building"></i>
+                                        <span>@GetWarehouseName(l.IdWarehouse)</span>
+                                    </span>
+                                </td>
+                                <td class="col-qty">
+                                    <strong>@l.Quantity</strong> uds.
+                                </td>
                                 <td class="col-date">
-                                    @l.ExpirationDate.ToString("dd/MM/yyyy")
-                                    <span class="exp-days">@GetDaysLabel(l)</span>
+                                    <span class="exp-date">@l.ExpirationDate.ToString("dd/MM/yyyy")</span>
+                                    <span class="exp-days @GetDaysClass(l)">@GetDaysLabel(l)</span>
                                 </td>
                                 <td>
                                     @if (IsExpired(l))
                                     {
-                                        <span class="badge badge-expired"><i class="bi bi-x-circle-fill"></i> Vencido</span>
+                                        <span class="badge badge-expired">
+                                            <i class="bi bi-x-circle-fill"></i>
+                                            <span>Vencido</span>
+                                        </span>
                                     }
                                     else if (IsExpiringSoon(l))
                                     {
-                                        <span class="badge badge-soon"><i class="bi bi-hourglass-split"></i> Por vencer</span>
+                                        <span class="badge badge-soon">
+                                            <i class="bi bi-hourglass-split"></i>
+                                            <span>Por vencer</span>
+                                        </span>
                                     }
                                     else
                                     {
-                                        <span class="badge badge-valid"><i class="bi bi-check-circle-fill"></i> Vigente</span>
+                                        <span class="badge badge-valid">
+                                            <i class="bi bi-check-circle-fill"></i>
+                                            <span>Vigente</span>
+                                        </span>
                                     }
                                 </td>
                                 <td class="col-date">@l.CreationDate.ToString("dd/MM/yyyy")</td>
                                 <td class="col-actions">
-                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(l)" title="Editar">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </button>
-                                    <button class="action-btn btn-delete" @onclick="() => OpenDelete(l)" title="Eliminar">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </button>
+                                    <!-- BOTONES DE ACCIÓN SOLO CON ÍCONOS COMPACTOS -->
+                                    <div class="actions-pill-group">
+                                        <button type="button"
+                                                class="btn-action-pill btn-pill-edit"
+                                                @onclick="() => OpenEdit(l)"
+                                                title="Editar lote @l.LotNumber">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="btn-action-pill btn-pill-delete"
+                                                @onclick="() => OpenDelete(l)"
+                                                title="Eliminar lote @l.LotNumber">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -104,6 +326,7 @@
                 </table>
             </div>
 
+            <!-- COMPONENTE DE PAGINACIÓN -->
             <TablePagination TotalItems="@totalLotsCount"
                              @bind-CurrentPage="currentPage"
                              @bind-PageSize="pageSize"
@@ -112,13 +335,16 @@
     </div>
 </div>
 
+<!-- MODAL CREAR / EDITAR LOTE -->
 @if (showModal)
 {
     <div class="modal-backdrop" @onclick="CloseModal"></div>
     <div class="modal-box">
         <div class="modal-header">
             <span class="modal-title">@(isEditing ? "Editar lote" : "Nuevo lote")</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="modal-close" @onclick="CloseModal">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
         <div class="modal-body">
             <div class="form-group">
@@ -140,7 +366,7 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label">Almacén <span class="required">*</span></label>
+                <label class="form-label">Almacén / Sucursal <span class="required">*</span></label>
                 <div class="input-box">
                     <i class="bi bi-building input-icon"></i>
                     <select class="form-input" @bind="formIdWarehouse">
@@ -158,19 +384,23 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label">N° Lote</label>
+                <label class="form-label">Número de Lote <span class="required">*</span></label>
                 <div class="input-box">
                     <i class="bi bi-upc-scan input-icon"></i>
-                    <input class="form-input" type="text" placeholder="Número de lote"
+                    <input class="form-input" type="text" placeholder="Ej: LOT-2026-A1"
                            @bind="formLotNumber" @bind:event="oninput" />
                 </div>
+                @if (showValidation && string.IsNullOrWhiteSpace(formLotNumber))
+                {
+                    <span class="field-error">El número de lote es requerido.</span>
+                }
             </div>
 
             <div class="form-group">
-                <label class="form-label">Cantidad <span class="required">*</span></label>
+                <label class="form-label">Cantidad Inicial <span class="required">*</span></label>
                 <div class="input-box">
                     <i class="bi bi-123 input-icon"></i>
-                    <input class="form-input" type="number" min="0" placeholder="Cantidad"
+                    <input class="form-input" type="number" min="0" placeholder="Cantidad de unidades"
                            @bind="formQuantity" />
                 </div>
                 @if (showValidation && formQuantity < 0)
@@ -194,47 +424,63 @@
 
             @if (!string.IsNullOrEmpty(errorMessage))
             {
-                <div class="alert-error">@errorMessage</div>
+                <div class="alert-error">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>@errorMessage</span>
+                </div>
             }
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-save" @onclick="Save" disabled="@isSaving">
                 @if (isSaving)
                 {
                     <span>Guardando...</span>
                 }
                 else
                 {
-                    <span>Guardar</span>
+                    <span>Guardar lote</span>
                 }
             </button>
         </div>
     </div>
 }
 
+<!-- MODAL CONFIRMAR ELIMINACIÓN -->
 @if (showDeleteModal)
 {
     <div class="modal-backdrop" @onclick="CloseModal"></div>
     <div class="modal-box modal-sm">
         <div class="modal-header">
             <span class="modal-title">Confirmar eliminación</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="modal-close" @onclick="CloseModal">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
         <div class="modal-body">
-            <p class="delete-msg">¿Deseas eliminar el lote <strong>@selectedLot?.LotNumber</strong>? Esta acción no se puede deshacer.</p>
+            <p class="delete-msg">
+                ¿Deseas eliminar el lote <strong>@selectedLot?.LotNumber</strong>?
+                Esta acción no se puede deshacer.
+            </p>
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
-                @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span>Eliminando...</span>
+                }
+                else
+                {
+                    <span>Eliminar lote</span>
+                }
             </button>
         </div>
     </div>
 }
 
 @code {
-    private List<Lot> lots = new();
+    private List<Lot> pagedLots = new();
     private List<Product> products = new();
     private List<Warehouse> warehouses = new();
 
@@ -252,30 +498,213 @@
     private string errorMessage = string.Empty;
 
     private Lot? selectedLot;
-    private List<Lot> pagedLots = new();
     private int currentPage = 1;
     private int pageSize = 10;
     private int totalLotsCount;
 
+    // Filtros
+    private string searchTerm = string.Empty;
+    private string expFilter = "all"; // all, valid, soon, expired
+    private bool isStatusFilterOpen = false;
+
+    private int selectedWarehouseId = 0;
+    private bool isWarehouseFilterOpen = false;
+
+    // Filtro de Fechas
+    private bool isDateMenuOpen = false;
+    private string selectedDatePreset = "all"; // all, today, week, month, custom
+    private DateTime? startDate = null;
+    private DateTime? endDate = null;
+    private DateTime? tempStartDate = null;
+    private DateTime? tempEndDate = null;
+
     private int alertDays = LotExpiration.DefaultAlertDays;
-    private string expFilter = "all";
 
     protected override async Task OnInitializedAsync()
     {
         alertDays = LotExpiration.GetAlertDays(Configuration);
-        await LoadDataAsync();
+        await LoadCatalogsAsync();
+        await LoadLotsPageAsync();
     }
 
-    private async Task SetLotFilterAsync(string filter)
+    private async Task LoadCatalogsAsync()
     {
-        expFilter = filter;
+        products = ProductRepo.GetProducts().ToList();
+        warehouses = WarehouseRepo.GetWarehouses().ToList();
+    }
+
+    private async Task LoadLotsPageAsync()
+    {
+        try
+        {
+            int? whParam = selectedWarehouseId > 0 ? selectedWarehouseId : null;
+
+            var paged = await LotRepo.GetLotsPagedAsync(
+                currentPage,
+                pageSize,
+                expFilter,
+                alertDays,
+                whParam,
+                searchTerm,
+                startDate,
+                endDate);
+
+            pagedLots = paged.Items.ToList();
+            totalLotsCount = paged.TotalCount;
+            currentPage = paged.PageNumber;
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al cargar los lotes: " + ex.Message);
+        }
+    }
+
+    private async Task OnFilterChangedAsync()
+    {
         currentPage = 1;
         await LoadLotsPageAsync();
     }
 
-    private int CountExpiringSoon() => lots.Count(IsExpiringSoon);
-    private int CountExpired() => lots.Count(IsExpired);
+    // --- FILTRO ESTADO / CADUCIDAD ---
+    private void ToggleStatusFilterDropdown()
+    {
+        var current = isStatusFilterOpen;
+        CloseAllDropdowns();
+        isStatusFilterOpen = !current;
+    }
 
+    private string GetStatusFilterName() => expFilter switch
+    {
+        "valid" => "Vigentes",
+        "soon" => $"Por vencer ({alertDays} d)",
+        "expired" => "Vencidos",
+        _ => "Todos los estados"
+    };
+
+    private async Task SelectStatusFilterAsync(string filter)
+    {
+        expFilter = filter;
+        CloseAllDropdowns();
+        currentPage = 1;
+        await LoadLotsPageAsync();
+        StateHasChanged();
+    }
+
+    // --- FILTRO ALMACÉN ---
+    private void ToggleWarehouseFilterDropdown()
+    {
+        var current = isWarehouseFilterOpen;
+        CloseAllDropdowns();
+        isWarehouseFilterOpen = !current;
+    }
+
+    private string GetWarehouseFilterName()
+    {
+        if (selectedWarehouseId == 0) return "Todos los almacenes";
+        return warehouses.FirstOrDefault(w => w.IdWarehouse == selectedWarehouseId)?.Name ?? "Almacén";
+    }
+
+    private async Task SelectWarehouseFilterAsync(int idWarehouse)
+    {
+        selectedWarehouseId = idWarehouse;
+        CloseAllDropdowns();
+        currentPage = 1;
+        await LoadLotsPageAsync();
+        StateHasChanged();
+    }
+
+    // --- FILTRO FECHAS ---
+    private void ToggleDateMenu()
+    {
+        var current = isDateMenuOpen;
+        CloseAllDropdowns();
+        isDateMenuOpen = !current;
+        if (isDateMenuOpen)
+        {
+            tempStartDate = startDate;
+            tempEndDate = endDate;
+        }
+    }
+
+    private void CloseAllDropdowns()
+    {
+        isStatusFilterOpen = false;
+        isWarehouseFilterOpen = false;
+        isDateMenuOpen = false;
+    }
+
+    private string GetDateFilterLabel()
+    {
+        if (selectedDatePreset == "today") return "Hoy";
+        if (selectedDatePreset == "week") return "Últimos 7 días";
+        if (selectedDatePreset == "month") return "Este mes";
+        if (startDate.HasValue && endDate.HasValue)
+        {
+            return $"{startDate.Value:dd/MM/yy} - {endDate.Value:dd/MM/yy}";
+        }
+        if (startDate.HasValue) return $"Desde {startDate.Value:dd/MM/yy}";
+        if (endDate.HasValue) return $"Hasta {endDate.Value:dd/MM/yy}";
+        return "Todas las fechas";
+    }
+
+    private async Task SelectDatePresetAsync(string preset)
+    {
+        selectedDatePreset = preset;
+        var today = DateTime.Today;
+
+        switch (preset)
+        {
+            case "all":
+                startDate = null;
+                endDate = null;
+                break;
+            case "today":
+                startDate = today;
+                endDate = today;
+                break;
+            case "week":
+                startDate = today.AddDays(-7);
+                endDate = today;
+                break;
+            case "month":
+                startDate = new DateTime(today.Year, today.Month, 1);
+                endDate = today;
+                break;
+        }
+
+        tempStartDate = startDate;
+        tempEndDate = endDate;
+        CloseAllDropdowns();
+        currentPage = 1;
+        await LoadLotsPageAsync();
+        StateHasChanged();
+    }
+
+    private async Task ApplyCustomDateRangeAsync()
+    {
+        startDate = tempStartDate;
+        endDate = tempEndDate;
+        selectedDatePreset = (startDate.HasValue || endDate.HasValue) ? "custom" : "all";
+        CloseAllDropdowns();
+        currentPage = 1;
+        await LoadLotsPageAsync();
+        StateHasChanged();
+    }
+
+    private async Task ClearDateFilterAsync()
+    {
+        startDate = null;
+        endDate = null;
+        tempStartDate = null;
+        tempEndDate = null;
+        selectedDatePreset = "all";
+        CloseAllDropdowns();
+        currentPage = 1;
+        await LoadLotsPageAsync();
+        StateHasChanged();
+    }
+
+    // --- CADUCIDAD HELPERS ---
     private bool IsExpired(Lot l) => LotExpiration.DaysToExpire(l.ExpirationDate) < 0;
 
     private bool IsExpiringSoon(Lot l) =>
@@ -291,39 +720,27 @@
         return $"en {days} d";
     }
 
-    private async Task LoadDataAsync()
+    private string GetDaysClass(Lot l)
     {
-        lots = LotRepo.GetLots().ToList();
-        products = ProductRepo.GetProducts().ToList();
-        warehouses = WarehouseRepo.GetWarehouses().ToList();
-        await LoadLotsPageAsync();
+        if (IsExpired(l)) return "days-expired";
+        if (IsExpiringSoon(l)) return "days-soon";
+        return "days-valid";
     }
 
-    private async Task LoadLotsPageAsync()
-    {
-        var paged = await LotRepo.GetLotsPagedAsync(currentPage, pageSize, expFilter, alertDays);
-        pagedLots = paged.Items.ToList();
-        totalLotsCount = paged.TotalCount;
-        currentPage = paged.PageNumber;
-    }
+    private string GetProductName(int idProduct) =>
+        products.FirstOrDefault(p => p.IdProduct == idProduct)?.Name ?? "-";
 
-    private string GetProductName(int idProduct)
-    {
-        return products.FirstOrDefault(p => p.IdProduct == idProduct)?.Name ?? "-";
-    }
+    private string GetWarehouseName(int idWarehouse) =>
+        warehouses.FirstOrDefault(w => w.IdWarehouse == idWarehouse)?.Name ?? "-";
 
-    private string GetWarehouseName(int idWarehouse)
-    {
-        return warehouses.FirstOrDefault(w => w.IdWarehouse == idWarehouse)?.Name ?? "-";
-    }
-
+    // --- ACCIONES CRUD ---
     private void OpenCreate()
     {
         formIdProduct = 0;
         formIdWarehouse = 0;
         formLotNumber = string.Empty;
         formQuantity = 0;
-        formExpirationDate = DateTime.Today;
+        formExpirationDate = DateTime.Today.AddMonths(6);
         errorMessage = string.Empty;
         showValidation = false;
         isEditing = false;
@@ -355,15 +772,15 @@
     {
         showModal = false;
         showDeleteModal = false;
-        isSaving = false;
         errorMessage = string.Empty;
+        isSaving = false;
     }
 
     private async Task Save()
     {
         showValidation = true;
 
-        if (formIdProduct == 0 || formIdWarehouse == 0 || formQuantity < 0 || formExpirationDate == default)
+        if (formIdProduct == 0 || formIdWarehouse == 0 || string.IsNullOrWhiteSpace(formLotNumber) || formQuantity < 0)
             return;
 
         isSaving = true;
@@ -377,11 +794,12 @@
                 {
                     IdProduct = formIdProduct,
                     IdWarehouse = formIdWarehouse,
-                    LotNumber = formLotNumber?.Trim() ?? string.Empty,
+                    LotNumber = formLotNumber.Trim(),
                     Quantity = formQuantity,
                     ExpirationDate = formExpirationDate
                 };
                 await LotRepo.UpdateLot(selectedLot.IdLot, dto);
+                ToastService.ShowSuccess($"Lote '{dto.LotNumber}' actualizado con éxito.");
             }
             else
             {
@@ -389,19 +807,20 @@
                 {
                     IdProduct = formIdProduct,
                     IdWarehouse = formIdWarehouse,
-                    LotNumber = formLotNumber?.Trim() ?? string.Empty,
+                    LotNumber = formLotNumber.Trim(),
                     Quantity = formQuantity,
                     ExpirationDate = formExpirationDate
                 };
                 await LotRepo.CreateLot(dto);
+                ToastService.ShowSuccess($"Lote '{dto.LotNumber}' creado con éxito.");
             }
 
-            await LoadDataAsync();
+            await LoadLotsPageAsync();
             CloseModal();
         }
-        catch
+        catch (Exception ex)
         {
-            errorMessage = "Ocurrió un error al guardar. Intenta nuevamente.";
+            errorMessage = "Ocurrió un error al guardar: " + ex.Message;
             isSaving = false;
         }
     }
@@ -414,12 +833,13 @@
         try
         {
             LotRepo.DeleteLot(selectedLot.IdLot);
-            await LoadDataAsync();
+            ToastService.ShowSuccess($"Lote '{selectedLot.LotNumber}' eliminado correctamente.");
+            await LoadLotsPageAsync();
             CloseModal();
         }
-        catch
+        catch (Exception ex)
         {
-            errorMessage = "No se pudo eliminar el lote.";
+            errorMessage = "No se pudo eliminar el lote: " + ex.Message;
             isSaving = false;
         }
     }
