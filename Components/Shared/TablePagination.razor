@@ -1,0 +1,156 @@
+<div class="pagination-bar" @onclick="CloseSizeDropdown">
+    <div class="pagination-left" @onclick:stopPropagation="true">
+        <span class="pagination-label">Filas por página:</span>
+
+        <div class="page-size-select-wrapper">
+            <button type="button"
+                    class="page-size-trigger @(isSizeMenuOpen ? "open" : "")"
+                    @onclick="ToggleSizeDropdown">
+                <span>@PageSize</span>
+                <i class="bi bi-chevron-down trigger-chevron"></i>
+            </button>
+
+            @if (isSizeMenuOpen)
+            {
+                <div class="page-size-menu">
+                    @foreach (var size in pageSizeOptions)
+                    {
+                        <button type="button"
+                                class="page-size-option @(PageSize == size ? "active" : "")"
+                                @onclick="() => SelectPageSizeAsync(size)">
+                            <span>@size</span>
+                            @if (PageSize == size)
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+
+        <span class="pagination-range">
+            @if (TotalItems == 0)
+            {
+                <span>0 registros</span>
+            }
+            else
+            {
+                <span>Mostrando <strong>@StartItem–@EndItem</strong> de <strong>@TotalItems</strong></span>
+            }
+        </span>
+    </div>
+
+    @if (TotalPages > 1)
+    {
+        <div class="pagination-controls">
+            <button type="button"
+                    class="page-btn"
+                    disabled="@(SafeCurrentPage <= 1)"
+                    @onclick="() => ChangePageAsync(1)"
+                    title="Primera página">
+                <i class="bi bi-chevron-double-left"></i>
+            </button>
+
+            <button type="button"
+                    class="page-btn"
+                    disabled="@(SafeCurrentPage <= 1)"
+                    @onclick="() => ChangePageAsync(SafeCurrentPage - 1)"
+                    title="Página anterior">
+                <i class="bi bi-chevron-left"></i>
+            </button>
+
+            @foreach (var p in GetVisiblePages())
+            {
+                <button type="button"
+                        class="page-btn page-num @(p == SafeCurrentPage ? "active" : "")"
+                        @onclick="() => ChangePageAsync(p)">
+                    @p
+                </button>
+            }
+
+            <button type="button"
+                    class="page-btn"
+                    disabled="@(SafeCurrentPage >= TotalPages)"
+                    @onclick="() => ChangePageAsync(SafeCurrentPage + 1)"
+                    title="Página siguiente">
+                <i class="bi bi-chevron-right"></i>
+            </button>
+
+            <button type="button"
+                    class="page-btn"
+                    disabled="@(SafeCurrentPage >= TotalPages)"
+                    @onclick="() => ChangePageAsync(TotalPages)"
+                    title="Última página">
+                <i class="bi bi-chevron-double-right"></i>
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly int[] pageSizeOptions = new[] { 10, 20, 50, 100 };
+    private bool isSizeMenuOpen;
+
+    [Parameter] public int TotalItems { get; set; }
+    [Parameter] public int CurrentPage { get; set; } = 1;
+    [Parameter] public EventCallback<int> CurrentPageChanged { get; set; }
+    [Parameter] public int PageSize { get; set; } = 10;
+    [Parameter] public EventCallback<int> PageSizeChanged { get; set; }
+
+    private int TotalPages => TotalItems <= 0 ? 1 : (int)Math.Ceiling((double)TotalItems / Math.Max(1, PageSize));
+    private int SafeCurrentPage => Math.Clamp(CurrentPage, 1, TotalPages);
+    private int StartItem => TotalItems == 0 ? 0 : ((SafeCurrentPage - 1) * PageSize) + 1;
+    private int EndItem => Math.Min(SafeCurrentPage * PageSize, TotalItems);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (CurrentPage > TotalPages && TotalPages >= 1)
+        {
+            CurrentPage = 1;
+            await CurrentPageChanged.InvokeAsync(CurrentPage);
+        }
+    }
+
+    private void ToggleSizeDropdown() => isSizeMenuOpen = !isSizeMenuOpen;
+    private void CloseSizeDropdown() => isSizeMenuOpen = false;
+
+    private async Task SelectPageSizeAsync(int newSize)
+    {
+        isSizeMenuOpen = false;
+        if (PageSize != newSize)
+        {
+            PageSize = newSize;
+            CurrentPage = 1;
+            await PageSizeChanged.InvokeAsync(PageSize);
+            await CurrentPageChanged.InvokeAsync(CurrentPage);
+        }
+    }
+
+    private async Task ChangePageAsync(int page)
+    {
+        var target = Math.Clamp(page, 1, TotalPages);
+        if (CurrentPage != target)
+        {
+            CurrentPage = target;
+            await CurrentPageChanged.InvokeAsync(CurrentPage);
+        }
+    }
+
+    private IEnumerable<int> GetVisiblePages()
+    {
+        const int maxButtons = 5;
+        int start = Math.Max(1, SafeCurrentPage - 2);
+        int end = Math.Min(TotalPages, start + maxButtons - 1);
+
+        if (end - start + 1 < maxButtons)
+        {
+            start = Math.Max(1, end - maxButtons + 1);
+        }
+
+        for (int i = start; i <= end; i++)
+        {
+            yield return i;
+        }
+    }
+}

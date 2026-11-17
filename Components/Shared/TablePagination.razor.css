@@ -1,0 +1,182 @@
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.7rem 1.2rem;
+    background: #fafbfc;
+    border-top: 1px solid #f1f5f9;
+    border-radius: 0 0 12px 12px;
+    font-size: 0.8rem;
+    color: #475569;
+}
+
+.pagination-left {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.pagination-label {
+    font-size: 0.78rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* SELECTOR PERSONALIZADO DE FILAS POR PÁGINA CON PUNTAS REDONDAS */
+.page-size-select-wrapper {
+    position: relative;
+}
+
+.page-size-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.45rem;
+    min-width: 64px;
+    padding: 0.3rem 0.65rem;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #1e293b;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.page-size-trigger:hover {
+    border-color: #94a3b8;
+}
+
+.page-size-trigger.open {
+    border-color: #0077b6;
+    box-shadow: 0 0 0 3px rgba(0, 119, 182, 0.12);
+}
+
+.trigger-chevron {
+    font-size: 0.68rem;
+    color: #64748b;
+    transition: transform 0.2s ease;
+}
+
+.page-size-trigger.open .trigger-chevron {
+    transform: rotate(180deg);
+    color: #0077b6;
+}
+
+.page-size-menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    min-width: 82px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.14), 0 8px 10px -6px rgba(15, 23, 42, 0.06);
+    padding: 0.3rem;
+    z-index: 1250;
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    animation: pageSizePopUp 0.14s ease-out;
+}
+
+@keyframes pageSizePopUp {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.page-size-option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.38rem 0.6rem;
+    border: none;
+    background: transparent;
+    border-radius: 7px;
+    font-size: 0.78rem;
+    color: #334155;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.12s, color 0.12s;
+}
+
+.page-size-option:hover {
+    background: #f0f9ff;
+    color: #0077b6;
+}
+
+.page-size-option.active {
+    background: #e0f2fe;
+    color: #0369a1;
+    font-weight: 600;
+}
+
+.option-check {
+    font-size: 0.85rem;
+    color: #0077b6;
+}
+
+.pagination-range {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-left: 0.2rem;
+}
+
+.pagination-range strong {
+    color: #1e293b;
+    font-weight: 600;
+}
+
+/* BOTONES DE NAVEGACIÓN DE PÁGINAS */
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.page-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    height: 30px;
+    padding: 0 0.45rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.page-btn:hover:not(:disabled):not(.active) {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+    color: #0077b6;
+}
+
+.page-btn.active {
+    background: #0077b6;
+    border-color: #0077b6;
+    color: #ffffff;
+    box-shadow: 0 2px 5px rgba(0, 119, 182, 0.22);
+}
+
+.page-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: #f8fafc;
+}
