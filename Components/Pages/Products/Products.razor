@@ -5,30 +5,215 @@
 @using Inventory_Flow.Repository.IRepository
 @inject IProductRepository ProductRepo
 @inject ICategoryRepository CategoryRepo
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
 
 <div class="page-container">
-    <div class="page-header">
+    <!-- ENCABEZADO CON ÍCONO EN CAJA REDONDEADA -->
+    <div class="page-header-block">
+        <div class="header-icon-box">
+            <i class="bi bi-box-seam"></i>
+        </div>
         <div>
             <h1 class="title">Productos</h1>
-            <p class="subtitle">Gestión de productos del inventario</p>
+            <p class="subtitle">Catálogo y gestión de los productos del inventario.</p>
         </div>
-        <button class="btn-primary" @onclick="OpenCreate">
-            <i class="bi bi-plus-lg"></i>
-            Nuevo producto
-        </button>
     </div>
 
-    <div class="panel">
-        <div class="panel-header">
-            <span class="panel-title">Listado de productos</span>
-            <span class="record-count">@totalProductsCount registros</span>
+    <!-- BARRA DE HERRAMIENTAS EN UNA SOLA LÍNEA CON FILTROS Y BOTÓN AÑADIR -->
+    <div class="table-toolbar">
+        <div class="toolbar-left">
+            <!-- BUSCADOR -->
+            <div class="filter-search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" placeholder="Buscar código, nombre o descripción..."
+                       @bind="searchTerm" @bind:event="oninput" @bind:after="OnFilterChangedAsync" />
+            </div>
+
+            <!-- SELECTOR DESPLEGABLE DE CATEGORÍA -->
+            <div class="custom-select-container filter-category-width">
+                <button type="button"
+                        class="custom-select-trigger @(isCategoryFilterOpen ? "open" : "")"
+                        @onclick="ToggleCategoryFilterDropdown">
+                    <div class="trigger-content">
+                        <i class="bi bi-tag trigger-icon"></i>
+                        <span class="trigger-text">@GetCategoryFilterName()</span>
+                    </div>
+                    <i class="bi bi-chevron-down trigger-chevron"></i>
+                </button>
+
+                @if (isCategoryFilterOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="custom-select-menu">
+                        <button type="button"
+                                class="custom-select-option @(filterCategoryId == 0 ? "active" : "")"
+                                @onclick="() => SelectCategoryFilterAsync(0)">
+                            <span>Todas las categorías</span>
+                            @if (filterCategoryId == 0)
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        @foreach (var cat in categories)
+                        {
+                            <button type="button"
+                                    class="custom-select-option @(filterCategoryId == cat.IdCategory ? "active" : "")"
+                                    @onclick="() => SelectCategoryFilterAsync(cat.IdCategory)">
+                                <span>@cat.Name</span>
+                                @if (filterCategoryId == cat.IdCategory)
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- SELECTOR DESPLEGABLE DE ESTADO -->
+            <div class="custom-select-container filter-status-width">
+                <button type="button"
+                        class="custom-select-trigger @(isStatusFilterOpen ? "open" : "")"
+                        @onclick="ToggleStatusFilterDropdown">
+                    <div class="trigger-content">
+                        <i class="bi bi-sliders trigger-icon"></i>
+                        <span class="trigger-text">@GetStatusFilterName()</span>
+                    </div>
+                    <i class="bi bi-chevron-down trigger-chevron"></i>
+                </button>
+
+                @if (isStatusFilterOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="custom-select-menu">
+                        <button type="button"
+                                class="custom-select-option @(statusFilter == "all" ? "active" : "")"
+                                @onclick='() => SelectStatusFilterAsync("all")'>
+                            <span>Todos los estados</span>
+                            @if (statusFilter == "all")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        <button type="button"
+                                class="custom-select-option @(statusFilter == "active" ? "active" : "")"
+                                @onclick='() => SelectStatusFilterAsync("active")'>
+                            <span>Activos</span>
+                            @if (statusFilter == "active")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                        <button type="button"
+                                class="custom-select-option @(statusFilter == "inactive" ? "active" : "")"
+                                @onclick='() => SelectStatusFilterAsync("inactive")'>
+                            <span>Inactivos</span>
+                            @if (statusFilter == "inactive")
+                            {
+                                <i class="bi bi-check2 option-check"></i>
+                            }
+                        </button>
+                    </div>
+                }
+            </div>
+
+            <!-- SELECTOR DESPLEGABLE DE FECHAS TIPO CALENDARIO -->
+            <div class="custom-select-container filter-date-width">
+                <button type="button"
+                        class="custom-select-trigger @(isDateMenuOpen ? "open" : "")"
+                        @onclick="ToggleDateMenu">
+                    <div class="trigger-content">
+                        <i class="bi bi-calendar3 trigger-icon"></i>
+                        <span class="trigger-text">@GetDateFilterLabel()</span>
+                    </div>
+                    @if (selectedDatePreset != "all" || startDate.HasValue || endDate.HasValue)
+                    {
+                        <span class="clear-icon-wrapper" @onclick="ClearDateFilterAsync" @onclick:stopPropagation="true" title="Restablecer fechas">
+                            <i class="bi bi-x-circle-fill clear-filter-icon"></i>
+                        </span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-chevron-down trigger-chevron"></i>
+                    }
+                </button>
+
+                @if (isDateMenuOpen)
+                {
+                    <div class="dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                    <div class="date-menu-popover">
+                        <div class="date-presets-list">
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "all" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("all")'>
+                                <i class="bi bi-infinity"></i>
+                                <span>Todas las fechas</span>
+                                @if (selectedDatePreset == "all") { <i class="bi bi-check2 option-check"></i> }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "today" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("today")'>
+                                <i class="bi bi-calendar-day"></i>
+                                <span>Hoy</span>
+                                @if (selectedDatePreset == "today") { <i class="bi bi-check2 option-check"></i> }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "week" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("week")'>
+                                <i class="bi bi-calendar-week"></i>
+                                <span>Últimos 7 días</span>
+                                @if (selectedDatePreset == "week") { <i class="bi bi-check2 option-check"></i> }
+                            </button>
+                            <button type="button"
+                                    class="date-preset-btn @(selectedDatePreset == "month" ? "active" : "")"
+                                    @onclick='() => SelectDatePresetAsync("month")'>
+                                <i class="bi bi-calendar-month"></i>
+                                <span>Este mes</span>
+                                @if (selectedDatePreset == "month") { <i class="bi bi-check2 option-check"></i> }
+                            </button>
+                        </div>
+
+                        <div class="date-menu-divider"></div>
+
+                        <!-- RANGO PERSONALIZADO -->
+                        <div class="custom-range-section">
+                            <span class="custom-range-title">Rango de fechas específico</span>
+                            <div class="custom-range-fields">
+                                <div class="date-range-field">
+                                    <label>Desde:</label>
+                                    <input type="date" @bind="customStartDate" />
+                                </div>
+                                <div class="date-range-field">
+                                    <label>Hasta:</label>
+                                    <input type="date" @bind="customEndDate" />
+                                </div>
+                            </div>
+                            <div class="custom-range-actions">
+                                <button type="button" class="btn-apply-range" @onclick="ApplyCustomDateRangeAsync">
+                                    Aplicar filtro
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
         </div>
 
+        <div class="toolbar-right">
+            <button type="button" class="btn-primary" @onclick="OpenCreate">
+                <i class="bi bi-plus-lg"></i>
+                <span>Nuevo producto</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- TABLA PRINCIPAL ESTILO CUADRÍCULA LIMPIA (SIN COLUMNA ID) -->
+    <div class="panel">
         @if (products.Count == 0)
         {
             <div class="empty-state">
                 <i class="bi bi-box-seam"></i>
-                <span>No hay productos registrados</span>
+                <span>No se encontraron productos registrados</span>
             </div>
         }
         else
@@ -37,27 +222,35 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            @* <th>#</th> *@
                             <th>Código</th>
                             <th>Nombre</th>
-                            <th>Descripción</th>
                             <th>Categoría</th>
                             <th>Precio</th>
                             <th>IVA</th>
                             <th>Estado</th>
-                            @* <th>Creado</th> *@
-                            <th>Acciones</th>
+                            <th>Creado</th>
+                            <th class="col-actions-header">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var p in products)
                         {
                             <tr>
-                                @* <td class="col-id">@p.IdProduct</td> *@
-                                <td class="col-code">@p.Code</td>
-                                <td class="col-name">@p.Name</td>
-                                <td class="col-address">@p.Description</td>
-                                <td>@GetCategoryName(p.IdCategory)</td>
+                                <td class="col-code">
+                                    <span class="code-pill">@p.Code</span>
+                                </td>
+                                <td class="col-name">
+                                    <div class="product-name-block">
+                                        <span class="name-main">@p.Name</span>
+                                        @if (!string.IsNullOrWhiteSpace(p.Description))
+                                        {
+                                            <span class="name-desc" title="@p.Description">@p.Description</span>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="category-pill">@(p.Category?.Name ?? GetCategoryName(p.IdCategory))</span>
+                                </td>
                                 <td class="col-price">@p.SuggestedPrice.ToString("C2")</td>
                                 <td>
                                     @if (p.Iva)
@@ -79,14 +272,23 @@
                                         <span class="badge badge-inactive">Inactivo</span>
                                     }
                                 </td>
-                                @* <td class="col-date">@p.CreationDate.ToString("dd/MM/yyyy")</td> *@
+                                <td class="col-date">@p.CreationDate.ToString("dd/MM/yyyy")</td>
                                 <td class="col-actions">
-                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(p)" title="Editar">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </button>
-                                    <button class="action-btn btn-delete" @onclick="() => OpenDelete(p)" title="Eliminar">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </button>
+                                    <!-- BOTONES DE ACCIÓN DIRECTOS, CLAROS Y ATRACTIVOS (PILLS) -->
+                                    <div class="actions-pill-group">
+                                        <button type="button"
+                                                class="btn-action-pill btn-pill-edit"
+                                                @onclick="() => OpenEdit(p)"
+                                                title="Editar @p.Name">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="btn-action-pill btn-pill-delete"
+                                                @onclick="() => OpenDelete(p)"
+                                                title="Eliminar @p.Name">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -105,94 +307,106 @@
 @if (showModal)
 {
     <div class="modal-backdrop" @onclick="CloseModal"></div>
-    <div class="modal-box">
+    <div class="modal-box modal-lg">
         <div class="modal-header">
             <span class="modal-title">@(isEditing ? "Editar producto" : "Nuevo producto")</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body">
-            <div class="form-group">
-                <label class="form-label">Nombre <span class="required">*</span></label>
-                <div class="input-box">
-                    <i class="bi bi-box-seam input-icon"></i>
-                    <input class="form-input" type="text" placeholder="Nombre del producto"
-                           @bind="formName" @bind:event="oninput" />
+            <div class="form-row-2">
+                <div class="form-group">
+                    <label class="form-label">Código <span class="required">*</span></label>
+                    <div class="input-box">
+                        <i class="bi bi-upc-scan input-icon"></i>
+                        <input class="form-input" type="text" placeholder="Ej: PROD-001"
+                               @bind="formCode" @bind:event="oninput" />
+                    </div>
+                    @if (showValidation && string.IsNullOrWhiteSpace(formCode))
+                    {
+                        <span class="field-error">El código es requerido.</span>
+                    }
                 </div>
-                @if (showValidation && string.IsNullOrWhiteSpace(formName))
-                {
-                    <span class="field-error">El nombre es requerido.</span>
-                }
+
+                <div class="form-group">
+                    <label class="form-label">Nombre <span class="required">*</span></label>
+                    <div class="input-box">
+                        <i class="bi bi-box-seam input-icon"></i>
+                        <input class="form-input" type="text" placeholder="Nombre del producto"
+                               @bind="formName" @bind:event="oninput" />
+                    </div>
+                    @if (showValidation && string.IsNullOrWhiteSpace(formName))
+                    {
+                        <span class="field-error">El nombre es requerido.</span>
+                    }
+                </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label">Código <span class="required">*</span></label>
-                <div class="input-box">
-                    <i class="bi bi-upc-scan input-icon"></i>
-                    <input class="form-input" type="text" placeholder="Código del producto"
-                           @bind="formCode" @bind:event="oninput" />
+            <div class="form-row-2">
+                <div class="form-group">
+                    <label class="form-label">Categoría <span class="required">*</span></label>
+                    <div class="input-box">
+                        <i class="bi bi-tag input-icon"></i>
+                        <select class="form-input form-select-native" @bind="formIdCategory">
+                            <option value="0">Seleccione una categoría</option>
+                            @foreach (var c in categories)
+                            {
+                                <option value="@c.IdCategory">@c.Name</option>
+                            }
+                        </select>
+                    </div>
+                    @if (showValidation && formIdCategory == 0)
+                    {
+                        <span class="field-error">La categoría es requerida.</span>
+                    }
                 </div>
-                @if (showValidation && string.IsNullOrWhiteSpace(formCode))
-                {
-                    <span class="field-error">El código es requerido.</span>
-                }
-            </div>
 
-            <div class="form-group">
-                <label class="form-label">Precio sugerido</label>
-                <div class="input-box">
-                    <i class="bi bi-cash-stack input-icon"></i>
-                    <input class="form-input" type="number" step="0.01" min="0" placeholder="0.00"
-                           @bind="formSuggestedPrice" />
+                <div class="form-group">
+                    <label class="form-label">Precio sugerido <span class="required">*</span></label>
+                    <div class="input-box">
+                        <i class="bi bi-cash-stack input-icon"></i>
+                        <input class="form-input" type="number" step="0.01" min="0" placeholder="0.00"
+                               @bind="formSuggestedPrice" />
+                    </div>
+                    @if (showValidation && formSuggestedPrice < 0)
+                    {
+                        <span class="field-error">El precio debe ser mayor o igual a 0.</span>
+                    }
                 </div>
-                @if (showValidation && formSuggestedPrice < 0)
-                {
-                    <span class="field-error">El precio debe ser mayor o igual a 0.</span>
-                }
             </div>
 
             <div class="form-group">
                 <label class="form-label">Descripción</label>
-                <div class="input-box">
+                <div class="input-box textarea-box">
                     <i class="bi bi-card-text input-icon"></i>
-                    <input class="form-input" type="text" placeholder="Descripción del producto"
-                           @bind="formDescription" @bind:event="oninput" />
+                    <textarea class="form-input form-textarea" rows="2" placeholder="Detalles o especificaciones del producto..."
+                              @bind="formDescription" @bind:event="oninput"></textarea>
                 </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label">Categoría <span class="required">*</span></label>
-                <div class="input-box">
-                    <i class="bi bi-tag input-icon"></i>
-                    <select class="form-input" @bind="formIdCategory">
-                        <option value="0">Seleccione una categoría</option>
-                        @foreach (var c in categories)
-                        {
-                            <option value="@c.IdCategory">@c.Name</option>
-                        }
-                    </select>
+            <div class="form-row-2">
+                <div class="form-group toggle-card">
+                    <div class="toggle-info">
+                        <span class="toggle-title">Aplica IVA</span>
+                        <span class="toggle-desc">Indica si grava impuesto al valor agregado</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" @bind="formIva" />
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label">@(formIva ? "Sí" : "No")</span>
+                    </label>
                 </div>
-                @if (showValidation && formIdCategory == 0)
-                {
-                    <span class="field-error">La categoría es requerida.</span>
-                }
-            </div>
 
-            <div class="form-group toggle-group">
-                <label class="form-label">Aplica IVA</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" @bind="formIva" />
-                    <span class="toggle-slider"></span>
-                    <span class="toggle-label">@(formIva ? "Sí" : "No")</span>
-                </label>
-            </div>
-
-            <div class="form-group toggle-group">
-                <label class="form-label">Estado</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" @bind="formIsActive" />
-                    <span class="toggle-slider"></span>
-                    <span class="toggle-label">@(formIsActive ? "Activo" : "Inactivo")</span>
-                </label>
+                <div class="form-group toggle-card">
+                    <div class="toggle-info">
+                        <span class="toggle-title">Estado del producto</span>
+                        <span class="toggle-desc">Disponible para movimientos y ventas</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" @bind="formIsActive" />
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label">@(formIsActive ? "Activo" : "Inactivo")</span>
+                    </label>
+                </div>
             </div>
 
             @if (!string.IsNullOrEmpty(errorMessage))
@@ -201,8 +415,8 @@
             }
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-save" @onclick="Save" disabled="@isSaving">
                 @if (isSaving)
                 {
                     <span>Guardando...</span>
@@ -222,14 +436,14 @@
     <div class="modal-box modal-sm">
         <div class="modal-header">
             <span class="modal-title">Confirmar eliminación</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body">
-            <p class="delete-msg">¿Deseas eliminar el producto <strong>@selectedProduct?.Name</strong>? Esta acción no se puede deshacer.</p>
+            <p class="delete-msg">¿Deseas eliminar el producto <strong>@selectedProduct?.Name</strong> (Código: @selectedProduct?.Code)? Esta acción no se puede deshacer.</p>
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-danger" @onclick="ConfirmDelete" disabled="@isSaving">
                 @if (isSaving) { <span>Eliminando...</span> } else { <span>Eliminar</span> }
             </button>
         </div>
@@ -243,6 +457,19 @@
     private int pageSize = 10;
     private int totalProductsCount;
 
+    private string searchTerm = string.Empty;
+    private int filterCategoryId;
+    private string statusFilter = "all";
+    private bool isCategoryFilterOpen;
+    private bool isStatusFilterOpen;
+
+    private string selectedDatePreset = "all";
+    private DateTime? startDate;
+    private DateTime? endDate;
+    private DateTime? customStartDate;
+    private DateTime? customEndDate;
+    private bool isDateMenuOpen;
+
     private bool showModal;
     private bool showDeleteModal;
     private bool isEditing;
@@ -254,7 +481,7 @@
     private string formDescription = string.Empty;
     private decimal formSuggestedPrice;
     private bool formIva;
-    private bool formIsActive;
+    private bool formIsActive = true;
     private int formIdCategory;
     private string errorMessage = string.Empty;
 
@@ -273,10 +500,157 @@
 
     private async Task LoadProductsPageAsync()
     {
-        var paged = await ProductRepo.GetProductsPagedAsync(currentPage, pageSize);
+        var paged = await ProductRepo.GetProductsPagedAsync(
+            currentPage,
+            pageSize,
+            searchTerm,
+            filterCategoryId > 0 ? filterCategoryId : null,
+            statusFilter,
+            startDate,
+            endDate);
+
         products = paged.Items.ToList();
         totalProductsCount = paged.TotalCount;
         currentPage = paged.PageNumber;
+    }
+
+    private async Task OnFilterChangedAsync()
+    {
+        currentPage = 1;
+        await LoadProductsPageAsync();
+    }
+
+    private void CloseAllDropdowns()
+    {
+        isCategoryFilterOpen = false;
+        isStatusFilterOpen = false;
+        isDateMenuOpen = false;
+    }
+
+    private void ToggleCategoryFilterDropdown()
+    {
+        var current = isCategoryFilterOpen;
+        CloseAllDropdowns();
+        isCategoryFilterOpen = !current;
+    }
+
+    private async Task SelectCategoryFilterAsync(int idCategory)
+    {
+        filterCategoryId = idCategory;
+        isCategoryFilterOpen = false;
+        currentPage = 1;
+        await LoadProductsPageAsync();
+    }
+
+    private string GetCategoryFilterName()
+    {
+        if (filterCategoryId == 0) return "Todas las categorías";
+        return categories.FirstOrDefault(c => c.IdCategory == filterCategoryId)?.Name ?? "Categoría";
+    }
+
+    private void ToggleStatusFilterDropdown()
+    {
+        var current = isStatusFilterOpen;
+        CloseAllDropdowns();
+        isStatusFilterOpen = !current;
+    }
+
+    private async Task SelectStatusFilterAsync(string status)
+    {
+        statusFilter = status;
+        isStatusFilterOpen = false;
+        currentPage = 1;
+        await LoadProductsPageAsync();
+    }
+
+    private string GetStatusFilterName() => statusFilter switch
+    {
+        "active"   => "Activos",
+        "inactive" => "Inactivos",
+        _          => "Todos los estados"
+    };
+
+    private void ToggleDateMenu()
+    {
+        var current = isDateMenuOpen;
+        CloseAllDropdowns();
+        isDateMenuOpen = !current;
+    }
+
+    private async Task SelectDatePresetAsync(string preset)
+    {
+        selectedDatePreset = preset;
+        var now = DateTime.Today;
+
+        switch (preset)
+        {
+            case "today":
+                startDate = now;
+                endDate = now;
+                break;
+            case "week":
+                startDate = now.AddDays(-6);
+                endDate = now;
+                break;
+            case "month":
+                startDate = new DateTime(now.Year, now.Month, 1);
+                endDate = now;
+                break;
+            case "all":
+            default:
+                selectedDatePreset = "all";
+                startDate = null;
+                endDate = null;
+                break;
+        }
+
+        customStartDate = startDate;
+        customEndDate = endDate;
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadProductsPageAsync();
+    }
+
+    private async Task ApplyCustomDateRangeAsync()
+    {
+        if (!customStartDate.HasValue && !customEndDate.HasValue)
+        {
+            await SelectDatePresetAsync("all");
+            return;
+        }
+
+        startDate = customStartDate;
+        endDate = customEndDate;
+        selectedDatePreset = "custom";
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadProductsPageAsync();
+    }
+
+    private async Task ClearDateFilterAsync()
+    {
+        selectedDatePreset = "all";
+        startDate = null;
+        endDate = null;
+        customStartDate = null;
+        customEndDate = null;
+        isDateMenuOpen = false;
+        currentPage = 1;
+        await LoadProductsPageAsync();
+    }
+
+    private string GetDateFilterLabel()
+    {
+        return selectedDatePreset switch
+        {
+            "today" => "Hoy",
+            "week" => "Últimos 7 días",
+            "month" => "Este mes",
+            "custom" when startDate.HasValue && endDate.HasValue => $"{startDate.Value:dd/MM} - {endDate.Value:dd/MM}",
+            "custom" when startDate.HasValue => $"Desde {startDate.Value:dd/MM}",
+            "custom" when endDate.HasValue => $"Hasta {endDate.Value:dd/MM}",
+            _ => "Todas las fechas"
+        };
     }
 
     private string GetCategoryName(int idCategory)
@@ -355,6 +729,7 @@
                     IdCategory = formIdCategory
                 };
                 await ProductRepo.UpdateProduct(selectedProduct.IdProduct, dto);
+                ToastService.ShowSuccess("Producto actualizado correctamente.");
             }
             else
             {
@@ -369,6 +744,7 @@
                     IdCategory = formIdCategory
                 };
                 await ProductRepo.CreateProduct(dto);
+                ToastService.ShowSuccess("Producto creado correctamente.");
             }
 
             await LoadProductsPageAsync();
@@ -389,6 +765,7 @@
         try
         {
             ProductRepo.DeleteProduct(selectedProduct.IdProduct);
+            ToastService.ShowSuccess("Producto eliminado correctamente.");
             await LoadProductsPageAsync();
             CloseModal();
         }
