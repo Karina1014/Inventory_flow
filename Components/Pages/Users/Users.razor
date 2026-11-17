@@ -8,30 +8,83 @@
 @inject IUserRepository UserRepo
 @inject IRoleRepository RoleRepo
 @inject IWarehouseRepository WarehouseRepo
+@inject IMenuRepository MenuRepo
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
 
-<div class="page-container">
+<div class="page-container" @onclick="CloseAllDropdowns">
+    <!-- ENCABEZADO PRINCIPAL CON BOTÓN + USUARIO A LA DERECHA -->
     <div class="page-header">
         <div>
             <h1 class="title">Usuarios</h1>
-            <p class="subtitle">Gestión de las cuentas de acceso al sistema</p>
+            <p class="subtitle">Gestión de las cuentas de acceso, roles y permisos de menú del sistema</p>
         </div>
         <button class="btn-primary" @onclick="OpenCreate">
-            <i class="bi bi-person-plus-fill"></i>
-            Nuevo usuario
+            <i class="bi bi-plus-lg"></i>
+            <span>Usuario</span>
         </button>
     </div>
 
+    <!-- TABLA PRINCIPAL A ANCHO COMPLETO -->
     <div class="panel">
-        <div class="panel-header">
-            <span class="panel-title">Listado de usuarios</span>
-            <span class="record-count">@users.Count registros</span>
+        <div class="panel-header list-header-bar">
+            <div class="d-flex align-items-center gap-2">
+                <span class="panel-title">Listado de usuarios</span>
+                <span class="record-count">@FilteredUsers.Count() registros</span>
+            </div>
+
+            <div class="list-filters" @onclick:stopPropagation="true">
+                <div class="filter-search-box">
+                    <i class="bi bi-search"></i>
+                    <input type="text" placeholder="Buscar nombre o usuario..." @bind="searchTerm" @bind:event="oninput" />
+                </div>
+
+                <!-- FILTRO DE ROL ESTILIZADO CON PUNTAS REDONDAS -->
+                <div class="custom-select-container filter-select-width">
+                    <button type="button"
+                            class="custom-select-trigger @(isFilterRoleOpen ? "open" : "")"
+                            @onclick="ToggleFilterRoleDropdown">
+                        <div class="trigger-content">
+                            <i class="bi bi-funnel trigger-icon"></i>
+                            <span class="trigger-text">@GetFilterRoleName()</span>
+                        </div>
+                        <i class="bi bi-chevron-down trigger-chevron"></i>
+                    </button>
+
+                    @if (isFilterRoleOpen)
+                    {
+                        <div class="custom-select-menu">
+                            <button type="button"
+                                    class="custom-select-option @(filterRoleId == 0 ? "active" : "")"
+                                    @onclick="() => SelectFilterRole(0)">
+                                <span>Todos los roles</span>
+                                @if (filterRoleId == 0)
+                                {
+                                    <i class="bi bi-check2 option-check"></i>
+                                }
+                            </button>
+                            @foreach (var role in roles)
+                            {
+                                <button type="button"
+                                        class="custom-select-option @(filterRoleId == role.IdRole ? "active" : "")"
+                                        @onclick="() => SelectFilterRole(role.IdRole)">
+                                    <span>@role.Name</span>
+                                    @if (filterRoleId == role.IdRole)
+                                    {
+                                        <i class="bi bi-check2 option-check"></i>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
         </div>
 
-        @if (users.Count == 0)
+        @if (!FilteredUsers.Any())
         {
             <div class="empty-state">
                 <i class="bi bi-people"></i>
-                <span>No hay usuarios registrados</span>
+                <span>No se encontraron usuarios registrados</span>
             </div>
         }
         else
@@ -41,28 +94,54 @@
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>Nombre</th>
                             <th>Usuario</th>
                             <th>Rol</th>
                             <th>Sucursal</th>
+                            <th>Accesos / Menús</th>
                             <th>Estado</th>
-                            <th>Creado</th>
                             <th>Actualizado</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var user in users)
+                        @foreach (var user in FilteredUsers)
                         {
+                            var roleCount = GetRoleMenuCount(user.IdRole);
+                            var extras = GetUserExtraMenuNames(user.IdUser);
+
                             <tr>
                                 <td class="col-id">@user.IdUser</td>
-                                <td class="col-name">@user.Name</td>
-                                <td>@user.Username</td>
                                 <td>
-                                    <span class="badge-role">@(user.Role?.Name ?? "Sin rol")</span>
+                                    <div class="user-cell">
+                                        <div class="user-avatar-sm">@GetInitials(user.Name ?? user.Username)</div>
+                                        <div class="user-cell-info">
+                                            <span class="col-name">@user.Name</span>
+                                            <span class="user-handle">@@@user.Username</span>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td>
-                                    <span class="badge-branch">@(user.Warehouse?.Name ?? (user.Role?.IsAdmin == true ? "Acceso Global" : "Sin asignar"))</span>
+                                    <span class="badge-role @(user.Role?.IsAdmin == true ? "badge-role-admin" : "")">
+                                        @(user.Role?.Name ?? "Sin rol")
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge-branch">
+                                        @(user.Warehouse?.Name ?? (user.Role?.IsAdmin == true ? "Acceso Global" : "Sin asignar"))
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="menus-summary-cell">
+                                        <span class="badge-menu-count" title="Menús base incluidos en su rol">
+                                            <i class="bi bi-grid-1x2-fill me-1"></i>@roleCount del rol
+                                        </span>
+                                        @foreach (var extraName in extras)
+                                        {
+                                            <span class="badge-extra-menu" title="Menú adicional asignado a este usuario">
+                                                +@extraName
+                                            </span>
+                                        }
+                                    </div>
                                 </td>
                                 <td>
                                     @if (user.IsActive)
@@ -74,10 +153,9 @@
                                         <span class="badge-inactive">Inactivo</span>
                                     }
                                 </td>
-                                <td class="col-date">@user.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
                                 <td class="col-date">@user.UpdatedAt.ToString("dd/MM/yyyy HH:mm")</td>
                                 <td class="col-actions">
-                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(user)" title="Editar">
+                                    <button class="action-btn btn-edit" @onclick="() => OpenEdit(user)" title="Editar usuario y permisos">
                                         <i class="bi bi-pencil-fill"></i>
                                     </button>
                                 </td>
@@ -90,40 +168,48 @@
     </div>
 </div>
 
+<!-- MODAL DE CREACIÓN / EDICIÓN DE USUARIO Y PERMISOS DE MENÚ -->
 @if (showModal)
 {
     <div class="modal-backdrop" @onclick="CloseModal"></div>
-    <div class="modal-box">
+    <div class="modal-box" @onclick="CloseModalDropdowns">
         <div class="modal-header">
-            <span class="modal-title">@(isEditing ? "Editar usuario" : "Nuevo usuario")</span>
-            <button class="modal-close" @onclick="CloseModal"><i class="bi bi-x-lg"></i></button>
+            <div class="modal-header-title">
+                <i class="bi @(isEditing ? "bi-pencil-square" : "bi-person-plus-fill") text-primary"></i>
+                <span class="modal-title">@(isEditing ? "Editar usuario" : "Nuevo usuario")</span>
+            </div>
+            <button class="modal-close" @onclick="CloseModal">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
 
         <div class="modal-body">
-            <div class="form-group">
-                <label class="form-label">Nombre completo <span class="required">*</span></label>
-                <div class="input-box">
-                    <i class="bi bi-person-fill input-icon"></i>
-                    <input class="form-input" type="text" placeholder="Ej: Janneth Simbaña"
-                           @bind="formName" @bind:event="oninput" />
+            <div class="form-row-2">
+                <div class="form-group">
+                    <label class="form-label">Nombre completo <span class="required">*</span></label>
+                    <div class="input-box">
+                        <i class="bi bi-person-fill input-icon"></i>
+                        <input class="form-input" type="text" placeholder="Ej: Janneth Simbaña"
+                               @bind="formName" @bind:event="oninput" />
+                    </div>
+                    @if (showValidation && string.IsNullOrWhiteSpace(formName))
+                    {
+                        <span class="field-error">El nombre es requerido.</span>
+                    }
                 </div>
-                @if (showValidation && string.IsNullOrWhiteSpace(formName))
-                {
-                    <span class="field-error">El nombre es requerido.</span>
-                }
-            </div>
 
-            <div class="form-group">
-                <label class="form-label">Usuario <span class="required">*</span></label>
-                <div class="input-box">
-                    <i class="bi bi-person-badge input-icon"></i>
-                    <input class="form-input" type="text" placeholder="Ej: janneth.simbana"
-                           @bind="formUserName" @bind:event="oninput" />
+                <div class="form-group">
+                    <label class="form-label">Usuario <span class="required">*</span></label>
+                    <div class="input-box">
+                        <i class="bi bi-person-badge input-icon"></i>
+                        <input class="form-input" type="text" placeholder="Ej: janneth.simbana"
+                               @bind="formUserName" @bind:event="oninput" />
+                    </div>
+                    @if (showValidation && string.IsNullOrWhiteSpace(formUserName))
+                    {
+                        <span class="field-error">El usuario es requerido.</span>
+                    }
                 </div>
-                @if (showValidation && string.IsNullOrWhiteSpace(formUserName))
-                {
-                    <span class="field-error">El usuario es requerido.</span>
-                }
             </div>
 
             <div class="form-group">
@@ -147,46 +233,154 @@
                 {
                     <span class="field-error">La contraseña es requerida.</span>
                 }
-                else if (showValidation && formPassword.Trim().Length < 6)
+                else if (showValidation && !string.IsNullOrWhiteSpace(formPassword) && formPassword.Trim().Length < 6)
                 {
                     <span class="field-error">La contraseña debe tener al menos 6 caracteres.</span>
                 }
             </div>
 
-            <div class="form-group">
-                <label class="form-label">Rol <span class="required">*</span></label>
-                <div class="input-box">
-                    <i class="bi bi-shield-check input-icon"></i>
-                    <select class="form-input" @bind="formIdRole">
-                        <option value="0">Seleccione un rol</option>
-                        @foreach (var role in roles)
+            <div class="form-row-2">
+                <!-- SELECTOR DE ROL PERSONALIZADO CON PUNTAS REDONDAS -->
+                <div class="form-group" @onclick:stopPropagation="true">
+                    <label class="form-label">Rol <span class="required">*</span></label>
+                    <div class="custom-select-container">
+                        <button type="button"
+                                class="custom-select-trigger modal-select-trigger @(isModalRoleOpen ? "open" : "")"
+                                @onclick="ToggleModalRoleDropdown">
+                            <div class="trigger-content">
+                                <i class="bi bi-shield-check trigger-icon"></i>
+                                <span class="trigger-text @(formIdRole == 0 ? "placeholder-text" : "")">@GetSelectedRoleName()</span>
+                            </div>
+                            <i class="bi bi-chevron-down trigger-chevron"></i>
+                        </button>
+
+                        @if (isModalRoleOpen)
                         {
-                            <option value="@role.IdRole">@role.Name</option>
+                            <div class="custom-select-menu">
+                                @foreach (var role in roles)
+                                {
+                                    <button type="button"
+                                            class="custom-select-option @(formIdRole == role.IdRole ? "active" : "")"
+                                            @onclick="() => SelectModalRoleAsync(role.IdRole)">
+                                        <span>@role.Name</span>
+                                        @if (formIdRole == role.IdRole)
+                                        {
+                                            <i class="bi bi-check2 option-check"></i>
+                                        }
+                                    </button>
+                                }
+                            </div>
                         }
-                    </select>
+                    </div>
+                    @if (showValidation && formIdRole == 0)
+                    {
+                        <span class="field-error">El rol es requerido.</span>
+                    }
                 </div>
-                @if (showValidation && formIdRole == 0)
-                {
-                    <span class="field-error">El rol es requerido.</span>
-                }
+
+                <!-- SELECTOR DE SUCURSAL PERSONALIZADO CON PUNTAS REDONDAS -->
+                <div class="form-group" @onclick:stopPropagation="true">
+                    <label class="form-label">Sucursal</label>
+                    @if (selectedRoleIsAdmin)
+                    {
+                        <div class="input-box global-access-box">
+                            <i class="bi bi-globe2 input-icon"></i>
+                            <span class="global-access-text">Acceso Global</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="custom-select-container">
+                            <button type="button"
+                                    class="custom-select-trigger modal-select-trigger @(isModalWarehouseOpen ? "open" : "")"
+                                    @onclick="ToggleModalWarehouseDropdown">
+                                <div class="trigger-content">
+                                    <i class="bi bi-building trigger-icon"></i>
+                                    <span class="trigger-text @(formIdWarehouse == 0 ? "placeholder-text" : "")">@GetSelectedWarehouseName()</span>
+                                </div>
+                                <i class="bi bi-chevron-down trigger-chevron"></i>
+                            </button>
+
+                            @if (isModalWarehouseOpen)
+                            {
+                                <div class="custom-select-menu">
+                                    <button type="button"
+                                            class="custom-select-option @(formIdWarehouse == 0 ? "active" : "")"
+                                            @onclick="() => SelectModalWarehouse(0)">
+                                        <span>Sin asignar</span>
+                                        @if (formIdWarehouse == 0)
+                                        {
+                                            <i class="bi bi-check2 option-check"></i>
+                                        }
+                                    </button>
+                                    @foreach (var warehouse in warehouses)
+                                    {
+                                        <button type="button"
+                                                class="custom-select-option @(formIdWarehouse == warehouse.IdWarehouse ? "active" : "")"
+                                                @onclick="() => SelectModalWarehouse(warehouse.IdWarehouse)">
+                                            <span>@warehouse.Name</span>
+                                            @if (formIdWarehouse == warehouse.IdWarehouse)
+                                            {
+                                                <i class="bi bi-check2 option-check"></i>
+                                            }
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label">Sucursal</label>
-                <div class="input-box">
-                    <i class="bi bi-building input-icon"></i>
-                    <select class="form-input" @bind="formIdWarehouse">
-                        <option value="0">Sin sucursal asignada (o Acceso Global)</option>
-                        @foreach (var warehouse in warehouses)
-                        {
-                            <option value="@warehouse.IdWarehouse">@warehouse.Name</option>
-                        }
-                    </select>
+            <!-- SECCIÓN DE ACCESOS DEL ROL + MENÚS ADICIONALES -->
+            @if (formIdRole > 0)
+            {
+                <div class="menus-assignment-card">
+                    <div class="menus-section-block">
+                        <div class="menus-section-header">
+                            <i class="bi bi-shield-fill-check text-primary"></i>
+                            <span>Menús incluidos por su rol (@roleMenus.Count módulos)</span>
+                        </div>
+                        <div class="role-access-chips">
+                            @foreach (var menu in roleMenus)
+                            {
+                                <span class="access-chip">
+                                    <i class="@menu.Icon"></i>
+                                    <span>@menu.Name</span>
+                                </span>
+                            }
+                        </div>
+                    </div>
+
+                    @if (availableExtraMenus.Count > 0)
+                    {
+                        <div class="menus-divider"></div>
+                        <div class="menus-section-block">
+                            <div class="menus-section-header extra-header">
+                                <i class="bi bi-plus-circle-dotted"></i>
+                                <span>Menús adicionales (aparte de su rol)</span>
+                            </div>
+                            <p class="menus-helper-text">Marca si deseas habilitarle algún módulo extra a este usuario:</p>
+                            <div class="extra-menus-grid">
+                                @foreach (var extra in availableExtraMenus)
+                                {
+                                    var isChecked = IsExtraMenuSelected(extra.Url);
+                                    <label class="extra-menu-option @(isChecked ? "selected" : "")">
+                                        <input type="checkbox"
+                                               checked="@isChecked"
+                                               @onchange="(e) => ToggleExtraMenu(extra.Url, e.Value is bool b && b)" />
+                                        <i class="@extra.Icon extra-menu-icon"></i>
+                                        <span class="extra-menu-name">@extra.Name</span>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    }
                 </div>
-            </div>
+            }
 
             <div class="form-group toggle-group">
-                <label class="form-label">Estado</label>
+                <label class="form-label">Estado de la cuenta</label>
                 <label class="toggle-switch">
                     <input type="checkbox" @bind="formIsActive" />
                     <span class="toggle-label">@(formIsActive ? "Activo" : "Inactivo")</span>
@@ -200,15 +394,16 @@
         </div>
 
         <div class="modal-footer">
-            <button class="btn-cancel" @onclick="CloseModal">Cancelar</button>
-            <button class="btn-save" @onclick="Save" disabled="@isSaving">
+            <button type="button" class="btn-cancel" @onclick="CloseModal">Cancelar</button>
+            <button type="button" class="btn-save" @onclick="Save" disabled="@isSaving">
                 @if (isSaving)
                 {
                     <span>Guardando...</span>
                 }
                 else
                 {
-                    <span>Guardar</span>
+                    <i class="bi bi-check2-circle me-1"></i>
+                    <span>@(isEditing ? "Actualizar" : "Guardar")</span>
                 }
             </button>
         </div>
@@ -219,12 +414,27 @@
     private List<User> users = new();
     private List<RoleModel> roles = new();
     private List<Warehouse> warehouses = new();
+    private List<MenuDto> allCatalogMenus = new();
+    private List<MenuDto> roleMenus = new();
+    private List<MenuDto> availableExtraMenus = new();
+    private HashSet<string> selectedExtraUrls = new(StringComparer.OrdinalIgnoreCase);
+
+    private Dictionary<int, int> roleMenuCounts = new();
+    private Dictionary<int, List<string>> userExtraMenuNames = new();
 
     private bool showModal;
     private bool isSaving;
     private bool showValidation;
     private bool showPassword;
     private bool isEditing;
+    private bool selectedRoleIsAdmin;
+
+    private bool isFilterRoleOpen;
+    private bool isModalRoleOpen;
+    private bool isModalWarehouseOpen;
+
+    private string searchTerm = string.Empty;
+    private int filterRoleId;
 
     private string formName = string.Empty;
     private string formUserName = string.Empty;
@@ -236,23 +446,118 @@
     private User? selectedUser;
     private string errorMessage = string.Empty;
 
-    protected override void OnInitialized()
+    private IEnumerable<User> FilteredUsers => users.Where(u =>
+        (filterRoleId == 0 || u.IdRole == filterRoleId) &&
+        (string.IsNullOrWhiteSpace(searchTerm) ||
+         (u.Name != null && u.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+         u.Username.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
+
+    protected override async Task OnInitializedAsync()
     {
-        LoadData();
+        await LoadDataAsync();
     }
 
-    private void LoadData()
+    private async Task LoadDataAsync()
     {
         try
         {
             users = UserRepo.GetUsers().ToList();
-            roles = RoleRepo.GetRoles().OrderBy(r => r.Name).ToList();
+            roles = RoleRepo.GetRoles().OrderBy(r => r.IdRole).ToList();
             warehouses = WarehouseRepo.GetWarehouses().OrderBy(w => w.Name).ToList();
+            allCatalogMenus = (await MenuRepo.GetAllDistinctMenus()).ToList();
+
+            roleMenuCounts.Clear();
+            foreach (var r in roles)
+            {
+                var rMenus = await MenuRepo.GetMenusByRoleId(r.IdRole);
+                roleMenuCounts[r.IdRole] = rMenus.Count;
+            }
+
+            userExtraMenuNames.Clear();
+            foreach (var u in users)
+            {
+                var urls = await MenuRepo.GetExtraMenuUrlsByUser(u.IdUser);
+                if (urls.Count > 0)
+                {
+                    var names = allCatalogMenus
+                        .Where(m => urls.Any(url => string.Equals(url.Trim(), m.Url.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        .Select(m => m.Name)
+                        .ToList();
+                    userExtraMenuNames[u.IdUser] = names;
+                }
+            }
         }
         catch
         {
-            errorMessage = "No se pudieron cargar los usuarios.";
+            errorMessage = "No se pudieron cargar los datos de usuarios.";
         }
+    }
+
+    private void CloseAllDropdowns()
+    {
+        isFilterRoleOpen = false;
+        isModalRoleOpen = false;
+        isModalWarehouseOpen = false;
+    }
+
+    private void CloseModalDropdowns()
+    {
+        isModalRoleOpen = false;
+        isModalWarehouseOpen = false;
+    }
+
+    private void ToggleFilterRoleDropdown()
+    {
+        isFilterRoleOpen = !isFilterRoleOpen;
+    }
+
+    private void SelectFilterRole(int idRole)
+    {
+        filterRoleId = idRole;
+        isFilterRoleOpen = false;
+    }
+
+    private string GetFilterRoleName()
+    {
+        if (filterRoleId == 0) return "Todos los roles";
+        return roles.FirstOrDefault(r => r.IdRole == filterRoleId)?.Name ?? "Todos los roles";
+    }
+
+    private void ToggleModalRoleDropdown()
+    {
+        isModalRoleOpen = !isModalRoleOpen;
+        isModalWarehouseOpen = false;
+    }
+
+    private async Task SelectModalRoleAsync(int idRole)
+    {
+        formIdRole = idRole;
+        isModalRoleOpen = false;
+        await OnRoleChangedAsync();
+    }
+
+    private string GetSelectedRoleName()
+    {
+        if (formIdRole == 0) return "Seleccione un rol";
+        return roles.FirstOrDefault(r => r.IdRole == formIdRole)?.Name ?? "Seleccione un rol";
+    }
+
+    private void ToggleModalWarehouseDropdown()
+    {
+        isModalWarehouseOpen = !isModalWarehouseOpen;
+        isModalRoleOpen = false;
+    }
+
+    private void SelectModalWarehouse(int idWarehouse)
+    {
+        formIdWarehouse = idWarehouse;
+        isModalWarehouseOpen = false;
+    }
+
+    private string GetSelectedWarehouseName()
+    {
+        if (formIdWarehouse == 0) return "Sin asignar";
+        return warehouses.FirstOrDefault(w => w.IdWarehouse == formIdWarehouse)?.Name ?? "Sin asignar";
     }
 
     private void OpenCreate()
@@ -265,18 +570,23 @@
         formIdRole = 0;
         formIdWarehouse = 0;
         formIsActive = true;
+        selectedRoleIsAdmin = false;
+        roleMenus.Clear();
+        availableExtraMenus.Clear();
+        selectedExtraUrls.Clear();
         errorMessage = string.Empty;
         showValidation = false;
         showPassword = false;
+        CloseAllDropdowns();
         showModal = true;
     }
 
-    private void OpenEdit(User user)
+    private async Task OpenEdit(User user)
     {
         isEditing = true;
         selectedUser = user;
         formName = user.Name ?? string.Empty;
-        formUserName = user.Username ?? string.Empty;
+        formUserName = user.Username;
         formPassword = string.Empty;
         formIdRole = user.IdRole ?? 0;
         formIdWarehouse = user.IdWarehouse ?? 0;
@@ -284,6 +594,12 @@
         errorMessage = string.Empty;
         showValidation = false;
         showPassword = false;
+        CloseAllDropdowns();
+
+        var savedExtras = await MenuRepo.GetExtraMenuUrlsByUser(user.IdUser);
+        selectedExtraUrls = new HashSet<string>(savedExtras, StringComparer.OrdinalIgnoreCase);
+
+        await OnRoleChangedAsync(keepWarehouseAndExtras: true);
         showModal = true;
     }
 
@@ -292,7 +608,95 @@
         showModal = false;
         isSaving = false;
         showValidation = false;
+        CloseAllDropdowns();
         errorMessage = string.Empty;
+    }
+
+    private async Task OnRoleChangedAsync(bool keepWarehouseAndExtras = false)
+    {
+        var role = roles.FirstOrDefault(r => r.IdRole == formIdRole);
+        selectedRoleIsAdmin = role?.IsAdmin ?? false;
+
+        if (selectedRoleIsAdmin)
+        {
+            formIdWarehouse = 0;
+        }
+        else if (!keepWarehouseAndExtras)
+        {
+            formIdWarehouse = 0;
+        }
+
+        if (!keepWarehouseAndExtras)
+        {
+            selectedExtraUrls.Clear();
+        }
+
+        if (formIdRole > 0)
+        {
+            try
+            {
+                var menus = await MenuRepo.GetMenusByRoleId(formIdRole);
+                roleMenus = menus.ToList();
+
+                var roleUrls = roleMenus.Select(m => m.Url.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                availableExtraMenus = allCatalogMenus
+                    .Where(m => !roleUrls.Contains(m.Url.Trim()))
+                    .OrderBy(m => m.Order)
+                    .ToList();
+
+                selectedExtraUrls.RemoveWhere(u => roleUrls.Contains(u.Trim()));
+            }
+            catch
+            {
+                roleMenus = new();
+                availableExtraMenus = new();
+            }
+        }
+        else
+        {
+            roleMenus.Clear();
+            availableExtraMenus.Clear();
+        }
+    }
+
+    private bool IsExtraMenuSelected(string url) => selectedExtraUrls.Contains(url.Trim());
+
+    private void ToggleExtraMenu(string url, bool isSelected)
+    {
+        var cleanUrl = url.Trim();
+        if (isSelected)
+        {
+            selectedExtraUrls.Add(cleanUrl);
+        }
+        else
+        {
+            selectedExtraUrls.Remove(cleanUrl);
+        }
+    }
+
+    private int GetRoleMenuCount(int? idRole)
+    {
+        if (idRole.HasValue && roleMenuCounts.TryGetValue(idRole.Value, out var count))
+        {
+            return count;
+        }
+        return 0;
+    }
+
+    private List<string> GetUserExtraMenuNames(int idUser)
+    {
+        return userExtraMenuNames.TryGetValue(idUser, out var names) ? names : new List<string>();
+    }
+
+    private string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "U";
+        var parts = name.Trim().Split(new[] { ' ', '.' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+        {
+            return $"{char.ToUpper(parts[0][0])}{char.ToUpper(parts[1][0])}";
+        }
+        return name.Substring(0, Math.Min(2, name.Length)).ToUpper();
     }
 
     private async Task Save()
@@ -309,7 +713,6 @@
             return;
         }
 
-        // Al crear la contraseña es obligatoria; al editar, vacía significa "mantener la actual"
         if (!isEditing && string.IsNullOrWhiteSpace(password))
         {
             return;
@@ -334,9 +737,10 @@
 
         try
         {
+            User savedUser;
             if (isEditing && selectedUser != null)
             {
-                await UserRepo.UpdateUser(selectedUser.IdUser, new UpdateUserDto
+                savedUser = await UserRepo.UpdateUser(selectedUser.IdUser, new UpdateUserDto
                 {
                     UserName = userName,
                     Name = formName.Trim(),
@@ -348,7 +752,7 @@
             }
             else
             {
-                await UserRepo.Register(new CreateUserDto
+                savedUser = await UserRepo.Register(new CreateUserDto
                 {
                     UserName = userName,
                     Name = formName.Trim(),
@@ -358,7 +762,13 @@
                 });
             }
 
-            LoadData();
+            await MenuRepo.SaveExtraMenuUrlsForUser(savedUser.IdUser, selectedExtraUrls);
+
+            ToastService.Success(
+                isEditing ? "Usuario y permisos actualizados correctamente." : "Usuario creado con sus accesos asignados.",
+                isEditing ? "Usuario actualizado" : "Usuario registrado");
+
+            await LoadDataAsync();
             CloseModal();
         }
         catch
