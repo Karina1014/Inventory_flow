@@ -32,6 +32,7 @@ builder.Services.AddScoped<IInventoryMovementRepository, InventoryMovementReposi
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<IThresholdInvetoryRepository, ThresholdInvetoryRepository>();
 builder.Services.AddScoped<IMenuRepository, MenuRepository>();
+builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 
 // 3. AutoMapper
 builder.Services.AddAutoMapper(cfg => {
@@ -44,6 +45,7 @@ builder.Services.AddAutoMapper(cfg => {
     cfg.AddProfile<MovementTypeProfile>();
     cfg.AddProfile<InventoryMovementProfile>();
     cfg.AddProfile<ThresholdInvetoryProfile>();
+    cfg.AddProfile<SupplierProfile>();
 });
 
 var secretKey = builder.Configuration.GetValue<string>("ApiSettings:SecretKey");

@@ -21,6 +21,7 @@ public class AplicationDbContext: DbContext
     public DbSet<InventoryMovementDetail> InventoryMovementDetails {get;set;}
     public DbSet<ThresholdInvetory> ThresholdInvetories { get; set; }
     public DbSet<Menu>Menus {get;set;}
+    public DbSet<Supplier> Suppliers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
