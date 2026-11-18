@@ -10,6 +10,8 @@
 @inject IProductRepository ProductRepo
 @inject Inventory_Flow.Services.CurrentUserService CurrentUserService
 @inject Inventory_Flow.Services.IToastNotificationService ToastService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
 
 <div class="page-container">
     <!-- Migas de Pan (Breadcrumb) -->
@@ -196,6 +198,12 @@
                                     </td>
                                     <td class="text-end pe-3">
                                         <div class="d-inline-flex gap-1">
+                                            <button type="button"
+                                                    class="btn-action-icon text-danger"
+                                                    title="Imprimir / Ver PDF (Report Builder)"
+                                                    @onclick="() => OpenPdf(order.IdPurchaseOrder)">
+                                                <i class="bi bi-file-earmark-pdf"></i>
+                                            </button>
                                             <button type="button"
                                                     class="btn-action-icon"
                                                     title="Ver Detalle"
@@ -678,6 +686,9 @@
             </div>
 
             <div class="modal-footer-custom">
+                <button type="button" class="btn btn-outline-danger" @onclick="() => OpenPdf(selectedOrder.IdPurchaseOrder)">
+                    <i class="bi bi-file-earmark-pdf me-1"></i>Imprimir / Ver PDF
+                </button>
                 <button type="button" class="btn btn-flat-secondary" @onclick="CloseModals">Cerrar</button>
             </div>
         </div>
@@ -1191,6 +1202,13 @@
         {
             isSubmitting = false;
         }
+    }
+
+    private async Task OpenPdf(int idPurchaseOrder)
+    {
+        if (idPurchaseOrder <= 0) return;
+        var url = $"/api/purchaseorders/{idPurchaseOrder}/pdf";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
     }
 
     private void CloseModals()

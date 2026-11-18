@@ -4,6 +4,7 @@ using Inventory_Flow.Data;
 using Inventory_Flow.Mapping;
 using Inventory_Flow.Repository;
 using Inventory_Flow.Repository.IRepository;
+using Inventory_Flow.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -37,6 +38,7 @@ builder.Services.AddScoped<IRequisitionCatalogRepository, RequisitionCatalogRepo
 builder.Services.AddScoped<IInternalRequisitionRepository, InternalRequisitionRepository>();
 builder.Services.AddScoped<IPurchaseOrderCatalogRepository, PurchaseOrderCatalogRepository>();
 builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
+builder.Services.AddScoped<IPurchaseOrderReportService, PurchaseOrderReportService>();
 
 // 3. AutoMapper
 builder.Services.AddAutoMapper(cfg => {

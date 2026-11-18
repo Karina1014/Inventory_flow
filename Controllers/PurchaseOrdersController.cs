@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using AutoMapper;
 using Inventory_Flow.Models.Dtos;
 using Inventory_Flow.Repository.IRepository;
+using Inventory_Flow.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,15 +17,18 @@ namespace Inventory_Flow.Controllers
     {
         private readonly IPurchaseOrderRepository _orderRepo;
         private readonly IPurchaseOrderCatalogRepository _catalogRepo;
+        private readonly IPurchaseOrderReportService _reportService;
         private readonly IMapper _mapper;
 
         public PurchaseOrdersController(
             IPurchaseOrderRepository orderRepo,
             IPurchaseOrderCatalogRepository catalogRepo,
+            IPurchaseOrderReportService reportService,
             IMapper mapper)
         {
             _orderRepo = orderRepo;
             _catalogRepo = catalogRepo;
+            _reportService = reportService;
             _mapper = mapper;
         }
 
@@ -148,6 +152,37 @@ namespace Inventory_Flow.Controllers
             catch (InvalidOperationException ex)
             {
                 return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("{id:int}/pdf")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetPdf(int id)
+        {
+            try
+            {
+                var order = await _orderRepo.GetOrderByIdAsync(id);
+                if (order == null)
+                {
+                    return NotFound($"La orden de compra con id {id} no existe.");
+                }
+
+                var pdfBytes = await _reportService.GeneratePurchaseOrderPdfAsync(id);
+                var fileName = $"OrdenCompra_{order.OrderNumber}.pdf";
+
+                Response.Headers.Append("Content-Disposition", $"inline; filename=\"{fileName}\"");
+                return File(pdfBytes, "application/pdf");
+            }
+            catch (Exception ex)
+            {
+                var fullError = ex.InnerException != null ? $"{ex.Message} -> {ex.InnerException.Message}" : ex.Message;
+                if (ex.InnerException?.InnerException != null)
+                {
+                    fullError += $" -> {ex.InnerException.InnerException.Message}";
+                }
+                return BadRequest($"Error generando el documento PDF: {fullError}");
             }
         }
     }
