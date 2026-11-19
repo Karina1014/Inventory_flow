@@ -33,20 +33,26 @@ public class DashboardRepository : IDashboardRepository
         // 2. Conteo de productos totales
         metrics.TotalProductsCount = await _db.Products.CountAsync(p => p.IsActive);
 
-        // 3. Conteo de lotes y cálculo del Valor Total de Inventario
+        // 3. Conteo de lotes activos y cálculo del Valor Total de Inventario
         var activeLots = await _db.Lots
             .Include(l => l.Product)
-            .Where(l => l.Quantity > 0)
+            .Where(l => l.IsActive && l.Quantity > 0)
             .ToListAsync();
 
         metrics.TotalLotsCount = activeLots.Count;
         metrics.TotalInventoryValue = activeLots.Sum(l => l.Quantity * (l.Product?.SuggestedPrice ?? 0));
 
-        // 4. Conteo de movimientos registrados el día de hoy
+        // 4. Conteo de movimientos registrados el día de hoy y pendientes operativos
         var today = DateTime.Today;
         var tomorrow = today.AddDays(1);
         metrics.TodayMovementsCount = await _db.InventoryMovements
             .CountAsync(m => m.MovementDate >= today && m.MovementDate < tomorrow);
+
+        metrics.PendingRequisitionsCount = await _db.InternalRequisitions
+            .CountAsync(r => r.IdRequisitionStatus == 1 || r.IdRequisitionStatus == 2 || r.IdRequisitionStatus == 3);
+
+        metrics.PendingPurchaseOrdersCount = await _db.PurchaseOrders
+            .CountAsync(p => p.IdPurchaseOrderStatus == 2);
 
         // 5. Umbral de bajo stock dinámico: se toma el umbral activo (vigente) del listado
         //    de ThresholdInvetory a través de su repositorio (por defecto 5 si no hay activo)
@@ -79,7 +85,7 @@ public class DashboardRepository : IDashboardRepository
         var expiringLots = await _db.Lots
             .Include(l => l.Product)
             .Include(l => l.Warehouse)
-            .Where(l => l.Quantity > 0 && l.ExpirationDate < DateTime.Today.AddDays(alertDays + 1))
+            .Where(l => l.IsActive && l.Quantity > 0 && l.ExpirationDate < DateTime.Today.AddDays(alertDays + 1))
             .OrderBy(l => l.ExpirationDate)
             .ToListAsync();
 
@@ -95,6 +101,131 @@ public class DashboardRepository : IDashboardRepository
             DaysToExpire = LotExpiration.DaysToExpire(l.ExpirationDate),
             Quantity = l.Quantity
         }).ToList();
+
+        // 7. Tendencia Mensual (Últimos 6 meses) y Top Productos Más Vendidos / Despachados
+        var sixMonthsAgo = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(-5);
+        var periodMovements = await _db.InventoryMovements
+            .Include(m => m.MovementType)
+            .Include(m => m.Details)
+                .ThenInclude(d => d.Product)
+                    .ThenInclude(p => p!.Category)
+            .AsNoTracking()
+            .Where(m => m.MovementDate >= sixMonthsAgo)
+            .ToListAsync();
+
+        string[] shortMonthNames = { "", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic" };
+        string[] fullMonthNames = { "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre" };
+
+        var monthlyList = new List<MonthlyMovementTrendDto>();
+        for (int i = 5; i >= 0; i--)
+        {
+            var targetMonthDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(-i);
+            int y = targetMonthDate.Year;
+            int m = targetMonthDate.Month;
+
+            var monthMovs = periodMovements
+                .Where(mov => mov.MovementDate.Year == y && mov.MovementDate.Month == m)
+                .ToList();
+
+            int entriesUnits = 0;
+            int exitsUnits = 0;
+            decimal entriesVal = 0;
+            decimal exitsVal = 0;
+
+            foreach (var mov in monthMovs)
+            {
+                string mode = mov.MovementType?.Mode ?? "E";
+                bool isExitOrDispatch = mode == "S" || (mode == "T" && mov.ReferenceSource != "REQUISICION_INTERNA_RECEPCION");
+                bool isEntry = mode == "E" || (mode == "T" && mov.ReferenceSource == "REQUISICION_INTERNA_RECEPCION");
+
+                foreach (var det in mov.Details)
+                {
+                    decimal unitVal = det.UnitCost > 0 ? det.UnitCost : (det.Product?.SuggestedPrice ?? 0);
+                    if (isExitOrDispatch)
+                    {
+                        exitsUnits += det.Quantity;
+                        exitsVal += det.Quantity * unitVal;
+                    }
+                    else if (isEntry)
+                    {
+                        entriesUnits += det.Quantity;
+                        entriesVal += det.Quantity * unitVal;
+                    }
+                }
+            }
+
+            monthlyList.Add(new MonthlyMovementTrendDto
+            {
+                Year = y,
+                Month = m,
+                MonthLabel = shortMonthNames[m],
+                FullMonthName = $"{fullMonthNames[m]} {y}",
+                EntriesUnits = entriesUnits,
+                ExitsUnits = exitsUnits,
+                EntriesValue = Math.Round(entriesVal, 2),
+                ExitsValue = Math.Round(exitsVal, 2)
+            });
+        }
+
+        int maxMonthlyUnits = monthlyList.SelectMany(x => new[] { x.EntriesUnits, x.ExitsUnits }).DefaultIfEmpty(1).Max();
+        if (maxMonthlyUnits <= 0) maxMonthlyUnits = 1;
+
+        foreach (var item in monthlyList)
+        {
+            item.EntriesHeightPercent = item.EntriesUnits > 0
+                ? Math.Max(10, Math.Round((double)item.EntriesUnits / maxMonthlyUnits * 100, 1))
+                : 4;
+            item.ExitsHeightPercent = item.ExitsUnits > 0
+                ? Math.Max(10, Math.Round((double)item.ExitsUnits / maxMonthlyUnits * 100, 1))
+                : 4;
+        }
+
+        metrics.MonthlyTrends = monthlyList;
+        metrics.TotalUnitsSoldPeriod = monthlyList.Sum(x => x.ExitsUnits);
+        metrics.TotalSalesValuePeriod = monthlyList.Sum(x => x.ExitsValue);
+
+        // Ranking Top 6 Productos Más Vendidos / Mayor Rotación
+        var exitDetails = periodMovements
+            .Where(mov => mov.MovementType != null && (mov.MovementType.Mode == "S" || (mov.MovementType.Mode == "T" && mov.ReferenceSource != "REQUISICION_INTERNA_RECEPCION")))
+            .SelectMany(mov => mov.Details)
+            .Where(d => d.Product != null)
+            .ToList();
+
+        var topGrouping = exitDetails
+            .GroupBy(d => d.IdProduct)
+            .Select(g =>
+            {
+                var firstProd = g.First().Product!;
+                int unitsSold = g.Sum(d => d.Quantity);
+                decimal salesVal = g.Sum(d => d.Quantity * (d.UnitCost > 0 ? d.UnitCost : firstProd.SuggestedPrice));
+                int currentStk = productStocks.TryGetValue(firstProd.IdProduct, out int stk) ? stk : 0;
+
+                return new TopSellingProductDto
+                {
+                    IdProduct = firstProd.IdProduct,
+                    ProductCode = firstProd.Code,
+                    ProductName = firstProd.Name,
+                    CategoryName = firstProd.Category?.Name ?? "General",
+                    TotalUnitsSold = unitsSold,
+                    TotalSalesValue = Math.Round(salesVal, 2),
+                    CurrentStock = currentStk
+                };
+            })
+            .OrderByDescending(x => x.TotalUnitsSold)
+            .ThenByDescending(x => x.TotalSalesValue)
+            .Take(6)
+            .ToList();
+
+        int maxProductSold = topGrouping.Select(x => x.TotalUnitsSold).DefaultIfEmpty(1).Max();
+        if (maxProductSold <= 0) maxProductSold = 1;
+
+        for (int idx = 0; idx < topGrouping.Count; idx++)
+        {
+            topGrouping[idx].Rank = idx + 1;
+            topGrouping[idx].SharePercentage = Math.Max(12, Math.Round((double)topGrouping[idx].TotalUnitsSold / maxProductSold * 100, 1));
+        }
+
+        metrics.TopSellingProducts = topGrouping;
 
         // 7. Stock por Categoría (con porcentaje respecto al total)
         var categories = await _db.Categories.ToListAsync();

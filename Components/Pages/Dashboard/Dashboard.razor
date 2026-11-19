@@ -13,24 +13,39 @@
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Cargando...</span>
             </div>
-            <span>Calculando métricas del inventario...</span>
+            <span>Calculando métricas e indicadores del inventario...</span>
         </div>
     }
     else
     {
-        <!-- 1. Encabezado de bienvenida (compacto) -->
+        <!-- 1. Encabezado de bienvenida con accesos rápidos al flujo Hub & Spoke -->
         <div class="welcome-banner">
             <div class="banner-content">
+                <div class="banner-top-tag">
+                    <i class="bi bi-calendar3"></i>
+                    <span>@DateTime.Now.ToString("dddd, dd 'de' MMMM yyyy") · Matriz Carapungo &amp; Sucursales</span>
+                </div>
                 <h1 class="banner-greeting">@GreetingText, @(CurrentUserService.Name) 👋</h1>
-                <p class="banner-subtitle">Resumen de inventario, movimientos y stock de hoy.</p>
+                <p class="banner-subtitle">Panel ejecutivo de existencias, evolución mensual de ventas y trazabilidad sanitaria FEFO.</p>
             </div>
 
             <div class="banner-actions">
-                <button class="btn-banner btn-banner-white" @onclick='() => NavigationManager.NavigateTo("products")'>
-                    <i class="bi bi-box-seam"></i> Ver productos
+                <button class="btn-banner btn-banner-white" @onclick='() => NavigationManager.NavigateTo("requisitions")'>
+                    <i class="bi bi-send-check"></i> Requisiciones
+                    @if (metrics.PendingRequisitionsCount > 0)
+                    {
+                        <span class="banner-counter">@metrics.PendingRequisitionsCount</span>
+                    }
+                </button>
+                <button class="btn-banner btn-banner-ghost" @onclick='() => NavigationManager.NavigateTo("purchase-orders")'>
+                    <i class="bi bi-cart-check"></i> Órdenes de Compra
+                    @if (metrics.PendingPurchaseOrdersCount > 0)
+                    {
+                        <span class="banner-counter banner-counter-amber">@metrics.PendingPurchaseOrdersCount</span>
+                    }
                 </button>
                 <button class="btn-banner btn-banner-ghost" @onclick='() => NavigationManager.NavigateTo("movements")'>
-                    <i class="bi bi-arrow-left-right"></i> Registrar movimiento
+                    <i class="bi bi-arrow-left-right"></i> Movimientos
                 </button>
             </div>
         </div>
@@ -43,39 +58,42 @@
                     <div class="kpi-icon icon-blue">
                         <i class="bi bi-wallet2"></i>
                     </div>
+                    <span class="kpi-badge badge-blue">Activo</span>
                 </div>
                 <div class="kpi-body">
                     <span class="kpi-title">Valor total del inventario</span>
                     <span class="kpi-value">$ @metrics.TotalInventoryValue.ToString("N2")</span>
-                    <span class="kpi-hint">Valorizado a precio sugerido</span>
+                    <span class="kpi-hint">Valorizado a precio sugerido en @metrics.TotalLotsCount lotes</span>
                 </div>
             </div>
 
-            <!-- Movimientos de Hoy -->
+            <!-- Ventas y Salidas Acumuladas -->
             <div class="kpi-card">
                 <div class="kpi-header">
                     <div class="kpi-icon icon-green">
-                        <i class="bi bi-arrow-left-right"></i>
+                        <i class="bi bi-graph-up-arrow"></i>
                     </div>
+                    <span class="kpi-badge badge-green">Semestre</span>
                 </div>
                 <div class="kpi-body">
-                    <span class="kpi-title">Movimientos hoy</span>
-                    <span class="kpi-value">@metrics.TodayMovementsCount</span>
-                    <span class="kpi-hint">Registrados en la fecha</span>
+                    <span class="kpi-title">Salidas y ventas acumuladas</span>
+                    <span class="kpi-value">@metrics.TotalUnitsSoldPeriod.ToString("N0") <small class="kpi-unit-label">un.</small></span>
+                    <span class="kpi-hint">Equivalente a <strong>$ @metrics.TotalSalesValuePeriod.ToString("N2")</strong> en rotación</span>
                 </div>
             </div>
 
-            <!-- Sucursales y Lotes -->
+            <!-- Sucursales y Movimientos Hoy -->
             <div class="kpi-card">
                 <div class="kpi-header">
                     <div class="kpi-icon icon-cyan">
-                        <i class="bi bi-building"></i>
+                        <i class="bi bi-building-check"></i>
                     </div>
+                    <span class="kpi-badge badge-cyan">@metrics.TodayMovementsCount hoy</span>
                 </div>
                 <div class="kpi-body">
-                    <span class="kpi-title">Sucursales y Lotes</span>
+                    <span class="kpi-title">Red de Sucursales Activas</span>
                     <span class="kpi-value">@metrics.ActiveWarehousesCount sucursales</span>
-                    <span class="kpi-hint">@metrics.TotalLotsCount lotes activos</span>
+                    <span class="kpi-hint">@metrics.TotalProductsCount productos en catálogo oficial</span>
                 </div>
             </div>
 
@@ -99,8 +117,8 @@
                         <i class="bi bi-sliders"></i> Umbral activo: @metrics.ActiveThreshold unidades
                     </span>
                     <div class="kpi-footer-links">
-                        <a href="lots" class="kpi-link-alert">Revisar reposición &rarr;</a>
-                        <a href="thresholds" class="kpi-link-config">Ajustar umbral</a>
+                        <a href="requisitions" class="kpi-link-alert">Solicitar reposición &rarr;</a>
+                        <a href="thresholds" class="kpi-link-config">Umbral</a>
                     </div>
                 </div>
             </div>
@@ -111,29 +129,232 @@
                     <div class="kpi-icon icon-amber">
                         <i class="bi bi-calendar-x"></i>
                     </div>
+                    @if (metrics.ExpiredLotsCount > 0)
+                    {
+                        <span class="kpi-badge badge-red">@metrics.ExpiredLotsCount vencido(s)</span>
+                    }
                 </div>
                 <div class="kpi-body">
-                    <span class="kpi-title">Lotes por caducar</span>
+                    <span class="kpi-title">Lotes próximos a caducar</span>
                     <span class="kpi-value @(metrics.ExpiringLotsCount > 0 ? "text-warning-emphasis" : "")">@metrics.ExpiringLotsCount</span>
-                    <span class="kpi-hint">Próximos @metrics.ExpirationAlertDays días</span>
-                    <div class="kpi-footer-links">
-                        <a href="lots" class="kpi-link-warning">Ver lotes &rarr;</a>
-                        <span class="kpi-hint">@metrics.ExpiredLotsCount vencidos</span>
+                    <span class="kpi-hint">Ventana sanitaria: @metrics.ExpirationAlertDays días (FEFO)</span>
+                    <div class="kpi-footer-links mt-1">
+                        <a href="lots" class="kpi-link-warning">Inspeccionar lotes &rarr;</a>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Lotes próximos a caducar -->
+        <!-- 3. SECCIÓN PRINCIPAL DE ANALÍTICA: GRÁFICA POR MENSUALIDAD + TOP PRODUCTOS MÁS VENDIDOS -->
+        <div class="main-charts-grid">
+            <!-- COLUMNA IZQUIERDA: GRÁFICA DE EVOLUCIÓN MENSUAL (ENTRADAS VS SALIDAS/VENTAS) -->
+            <div class="panel-card chart-panel">
+                <div class="panel-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <div class="panel-header-title">
+                            <i class="bi bi-bar-chart-line-fill text-primary"></i>
+                            <span>Evolución por Mensualidad (Últimos 6 Meses)</span>
+                        </div>
+                        <p class="panel-subtitle mb-0">Comparativa mensual entre abastecimiento (entradas) y rotación clínica (salidas/ventas).</p>
+                    </div>
+
+                    <!-- Selector interactivo Unidades vs Valor USD -->
+                    <div class="chart-mode-toggle">
+                        <button type="button"
+                                class="toggle-pill @(!showValueInUsd ? "active" : "")"
+                                @onclick="() => showValueInUsd = false">
+                            <i class="bi bi-box-seam"></i> Unidades
+                        </button>
+                        <button type="button"
+                                class="toggle-pill @(showValueInUsd ? "active" : "")"
+                                @onclick="() => showValueInUsd = true">
+                            <i class="bi bi-currency-dollar"></i> Valor USD
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel-card-body">
+                    <!-- Leyenda superior y resumen rápido -->
+                    <div class="chart-legend-bar">
+                        <div class="legend-items">
+                            <span class="legend-item">
+                                <span class="legend-dot dot-entries"></span>
+                                Entradas / Compras CEDI
+                            </span>
+                            <span class="legend-item">
+                                <span class="legend-dot dot-exits"></span>
+                                Salidas / Ventas y Despachos
+                            </span>
+                        </div>
+                        <div class="chart-period-tag">
+                            @if (metrics.MonthlyTrends.Any())
+                            {
+                                <span>@metrics.MonthlyTrends.First().FullMonthName &ndash; @metrics.MonthlyTrends.Last().FullMonthName</span>
+                            }
+                        </div>
+                    </div>
+
+                    @if (metrics.MonthlyTrends.Count == 0)
+                    {
+                        <div class="empty-analytics">
+                            <i class="bi bi-bar-chart"></i>
+                            <span>No existen movimientos suficientes para graficar la tendencia mensual.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Área de la Gráfica de Barras por Mes -->
+                        <div class="monthly-chart-stage">
+                            <!-- Líneas guía de fondo -->
+                            <div class="chart-grid-lines">
+                                <div class="grid-line"><span>100%</span></div>
+                                <div class="grid-line"><span>75%</span></div>
+                                <div class="grid-line"><span>50%</span></div>
+                                <div class="grid-line"><span>25%</span></div>
+                                <div class="grid-line grid-line-base"><span>0</span></div>
+                            </div>
+
+                            <!-- Columnas mensuales -->
+                            <div class="monthly-columns-wrapper">
+                                @foreach (var m in metrics.MonthlyTrends)
+                                {
+                                    double entryPct = GetBarHeightPercent(m, isEntry: true);
+                                    double exitPct = GetBarHeightPercent(m, isEntry: false);
+
+                                    <div class="month-column-group" title="@($"{m.FullMonthName}: Entradas {m.EntriesUnits} u. ($ {m.EntriesValue:N2}) | Salidas {m.ExitsUnits} u. ($ {m.ExitsValue:N2})")">
+                                        <div class="bars-pair">
+                                            <!-- Barra de Entradas -->
+                                            <div class="bar-track">
+                                                <div class="bar-fill bar-entries" style="height: @(entryPct.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%;">
+                                                    <span class="bar-value-label">
+                                                        @(showValueInUsd ? $"${m.EntriesValue:N0}" : $"{m.EntriesUnits}")
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Barra de Salidas / Ventas -->
+                                            <div class="bar-track">
+                                                <div class="bar-fill bar-exits" style="height: @(exitPct.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%;">
+                                                    <span class="bar-value-label bar-value-exits">
+                                                        @(showValueInUsd ? $"${m.ExitsValue:N0}" : $"{m.ExitsUnits}")
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <span class="month-label">@m.MonthLabel</span>
+                                        <span class="month-sub-year">@m.Year</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Tarjetas de Resumen Mensual al pie de la gráfica -->
+                        <div class="chart-summary-footer">
+                            <div class="summary-mini-card">
+                                <span class="mini-label">Total Abastecido (6m)</span>
+                                <span class="mini-val text-primary">
+                                    @(showValueInUsd
+                                        ? $"$ {metrics.MonthlyTrends.Sum(x => x.EntriesValue):N2}"
+                                        : $"{metrics.MonthlyTrends.Sum(x => x.EntriesUnits):N0} unidades")
+                                </span>
+                            </div>
+                            <div class="summary-mini-card">
+                                <span class="mini-label">Total Vendido / Despachado (6m)</span>
+                                <span class="mini-val text-success">
+                                    @(showValueInUsd
+                                        ? $"$ {metrics.MonthlyTrends.Sum(x => x.ExitsValue):N2}"
+                                        : $"{metrics.MonthlyTrends.Sum(x => x.ExitsUnits):N0} unidades")
+                                </span>
+                            </div>
+                            <div class="summary-mini-card">
+                                <span class="mini-label">Mes de Mayor Demanda</span>
+                                @{
+                                    var peakMonth = metrics.MonthlyTrends.OrderByDescending(x => x.ExitsUnits).FirstOrDefault();
+                                }
+                                <span class="mini-val text-dark">
+                                    @(peakMonth != null ? $"{peakMonth.FullMonthName} ({peakMonth.ExitsUnits} u.)" : "-")
+                                </span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- COLUMNA DERECHA: RANKING DE PRODUCTOS MÁS VENDIDOS / MAYOR ROTACIÓN -->
+            <div class="panel-card top-products-panel">
+                <div class="panel-card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="panel-header-title">
+                            <i class="bi bi-trophy-fill text-warning"></i>
+                            <span>Productos Más Vendidos</span>
+                        </div>
+                        <p class="panel-subtitle mb-0">Ranking de fármacos e insumos con mayor salida clínica.</p>
+                    </div>
+                    <a href="kardex" class="btn-link-flat">Ver Kardex &rarr;</a>
+                </div>
+
+                <div class="panel-card-body">
+                    @if (metrics.TopSellingProducts.Count == 0)
+                    {
+                        <div class="empty-analytics">
+                            <i class="bi bi-award"></i>
+                            <span>Aún no se registran salidas o ventas de productos.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="top-products-list">
+                            @foreach (var prod in metrics.TopSellingProducts)
+                            {
+                                <div class="top-product-item">
+                                    <div class="top-rank-badge @GetRankClass(prod.Rank)">
+                                        #@prod.Rank
+                                    </div>
+
+                                    <div class="top-product-main">
+                                        <div class="top-product-header">
+                                            <div class="top-product-title-group">
+                                                <span class="top-product-name">@prod.ProductName</span>
+                                                <div class="top-product-tags">
+                                                    <span class="sku-tag">@prod.ProductCode</span>
+                                                    <span class="cat-tag">@prod.CategoryName</span>
+                                                </div>
+                                            </div>
+                                            <div class="top-product-numbers">
+                                                <span class="sold-units-badge">@prod.TotalUnitsSold.ToString("N0") vendidos</span>
+                                                <span class="sold-revenue">$ @prod.TotalSalesValue.ToString("N2")</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="top-progress-row">
+                                            <div class="top-progress-track">
+                                                <div class="top-progress-fill @GetRankBarClass(prod.Rank)"
+                                                     style="width: @(prod.SharePercentage.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%;"></div>
+                                            </div>
+                                            <span class="stock-status-chip @(prod.CurrentStock <= metrics.ActiveThreshold ? "chip-low" : "chip-ok")">
+                                                Stock: @prod.CurrentStock u.
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Lotes próximos a caducar (Control FEFO) -->
         <div class="panel-card">
-            <div class="panel-card-header">
+            <div class="panel-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div class="panel-header-title">
-                    <i class="bi bi-calendar-x text-danger"></i>
-                    <span>Próximos a caducar</span>
+                    <i class="bi bi-shield-exclamation text-danger"></i>
+                    <span>Control Sanitario FEFO: Lotes Próximos a Caducar o en Cuarentena</span>
                     <span class="category-threshold-note">
-                        Ventana: <strong>@metrics.ExpirationAlertDays</strong> días
+                        Ventana de alerta: <strong>@metrics.ExpirationAlertDays</strong> días
                     </span>
                 </div>
+                <a href="lots" class="btn-link-flat">Gestionar Lotes &rarr;</a>
             </div>
             <div class="panel-card-body">
                 @if (metrics.ExpiringSoonLots.Count == 0)
@@ -158,7 +379,7 @@
                                         <span class="expiry-lot">Lote @lot.LotNumber</span>
                                     </div>
                                     <span class="expiry-meta">
-                                        @lot.WarehouseName · @lot.Quantity u. · vence @lot.ExpirationDate.ToString("dd/MM/yyyy")
+                                        <i class="bi bi-geo-alt"></i> @lot.WarehouseName · <strong>@lot.Quantity u.</strong> · Vence: @lot.ExpirationDate.ToString("dd/MM/yyyy")
                                     </span>
                                 </div>
                                 <span class="expiry-days @(lot.DaysToExpire < 0 ? "expiry-days-expired" : "")">
@@ -171,14 +392,14 @@
             </div>
         </div>
 
-        <!-- 3. Sección Inferior: Gráfico de Categorías y Actividad Reciente -->
+        <!-- 5. Sección Inferior: Distribución por Categorías y Actividad Reciente -->
         <div class="analytics-grid">
             <!-- Stock por Categoría -->
             <div class="panel-card">
                 <div class="panel-card-header">
                     <div class="panel-header-title">
-                        <i class="bi bi-bar-chart-fill text-primary"></i>
-                        <span>Stock por categoría</span>
+                        <i class="bi bi-layers-fill text-primary"></i>
+                        <span>Distribución de Stock por Categoría Clínica</span>
                         <span class="category-threshold-note">
                             Umbral activo: <strong>@metrics.ActiveThreshold</strong> u.
                         </span>
@@ -211,7 +432,7 @@
                                         </span>
                                     </div>
                                     <div class="progress-bar-bg @(cat.IsLowStock ? "progress-bar-bg-low" : string.Empty)">
-                                        <div class="progress-bar-fill @(cat.IsLowStock ? "progress-bar-fill-low" : string.Empty)" style="width: @cat.Percentage%"></div>
+                                        <div class="progress-bar-fill @(cat.IsLowStock ? "progress-bar-fill-low" : string.Empty)" style="width: @(cat.Percentage.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></div>
                                     </div>
                                 </div>
                             }
@@ -222,11 +443,12 @@
 
             <!-- Actividad Reciente -->
             <div class="panel-card">
-                <div class="panel-card-header">
+                <div class="panel-card-header d-flex justify-content-between align-items-center">
                     <div class="panel-header-title">
                         <i class="bi bi-clock-history text-primary"></i>
-                        <span>Actividad reciente</span>
+                        <span>Bitácora de Movimientos Recientes</span>
                     </div>
+                    <a href="movements" class="btn-link-flat">Ver todos &rarr;</a>
                 </div>
                 <div class="panel-card-body">
                     @if (metrics.RecentActivities.Count == 0)
@@ -264,7 +486,7 @@
                                                 <span class="activity-badge">@act.TotalItems u.</span>
                                             }
                                         </div>
-                                        <span class="activity-time">(@act.TimeAgo) · por @act.UserName</span>
+                                        <span class="activity-time">@act.Date.ToString("dd/MM/yyyy HH:mm") (@act.TimeAgo) · por @act.UserName</span>
                                     </div>
                                 </div>
                             }
@@ -279,6 +501,43 @@
 @code {
     private DashboardMetricsDto metrics = new();
     private bool isLoading = true;
+    private bool showValueInUsd = false;
+
+    private double GetBarHeightPercent(MonthlyMovementTrendDto item, bool isEntry)
+    {
+        if (!showValueInUsd)
+        {
+            return isEntry ? item.EntriesHeightPercent : item.ExitsHeightPercent;
+        }
+
+        decimal maxVal = metrics.MonthlyTrends
+            .SelectMany(x => new[] { x.EntriesValue, x.ExitsValue })
+            .DefaultIfEmpty(1m)
+            .Max();
+
+        if (maxVal <= 0) maxVal = 1m;
+        decimal currentVal = isEntry ? item.EntriesValue : item.ExitsValue;
+
+        return currentVal > 0
+            ? Math.Max(10, Math.Round((double)(currentVal / maxVal) * 100, 1))
+            : 4;
+    }
+
+    private static string GetRankClass(int rank) => rank switch
+    {
+        1 => "rank-gold",
+        2 => "rank-silver",
+        3 => "rank-bronze",
+        _ => "rank-default"
+    };
+
+    private static string GetRankBarClass(int rank) => rank switch
+    {
+        1 => "bar-rank-gold",
+        2 => "bar-rank-silver",
+        3 => "bar-rank-bronze",
+        _ => "bar-rank-default"
+    };
 
     private static string GetExpiryLabel(int days) => days switch
     {

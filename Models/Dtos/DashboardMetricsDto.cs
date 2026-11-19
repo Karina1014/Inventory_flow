@@ -36,6 +36,33 @@ public class ExpiringLotDto
     public int Quantity { get; set; }
 }
 
+public class MonthlyMovementTrendDto
+{
+    public int Year { get; set; }
+    public int Month { get; set; }
+    public string MonthLabel { get; set; } = string.Empty;
+    public string FullMonthName { get; set; } = string.Empty;
+    public int EntriesUnits { get; set; }
+    public int ExitsUnits { get; set; }
+    public decimal EntriesValue { get; set; }
+    public decimal ExitsValue { get; set; }
+    public double EntriesHeightPercent { get; set; }
+    public double ExitsHeightPercent { get; set; }
+}
+
+public class TopSellingProductDto
+{
+    public int Rank { get; set; }
+    public int IdProduct { get; set; }
+    public string ProductCode { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
+    public string CategoryName { get; set; } = string.Empty;
+    public int TotalUnitsSold { get; set; }
+    public decimal TotalSalesValue { get; set; }
+    public int CurrentStock { get; set; }
+    public double SharePercentage { get; set; }
+}
+
 public class DashboardMetricsDto
 {
     public decimal TotalInventoryValue { get; set; }
@@ -53,6 +80,13 @@ public class DashboardMetricsDto
     public int ExpiringLotsCount { get; set; }
     public int ExpiredLotsCount { get; set; }
 
+    public int TotalUnitsSoldPeriod { get; set; }
+    public decimal TotalSalesValuePeriod { get; set; }
+    public int PendingRequisitionsCount { get; set; }
+    public int PendingPurchaseOrdersCount { get; set; }
+
+    public List<MonthlyMovementTrendDto> MonthlyTrends { get; set; } = new();
+    public List<TopSellingProductDto> TopSellingProducts { get; set; } = new();
     public List<ExpiringLotDto> ExpiringSoonLots { get; set; } = new();
 
     public List<CategoryStockDto> StockByCategory { get; set; } = new();

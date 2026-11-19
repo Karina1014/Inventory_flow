@@ -167,7 +167,7 @@ public static class DbSeeder
             await db.SaveChangesAsync();
         }
 
-implementar despacho fefo en transito, confirmacion en sucursal y seeder completo        // 5. Identificar Bodega Matriz (Carapungo) y Sucursales Periféricas
+        // 5. Identificar Bodega Matriz (Carapungo) y Sucursales Periféricas
         var allWarehouses = await db.Warehouses.Where(w => w.IsActive).OrderBy(w => w.IdWarehouse).ToListAsync();
         var matrizWarehouse = allWarehouses.FirstOrDefault(w =>
             w.Name.Contains("Carapungo", StringComparison.OrdinalIgnoreCase) ||
@@ -584,6 +584,123 @@ implementar despacho fefo en transito, confirmacion en sucursal y seeder complet
 
             db.InternalRequisitions.AddRange(req1, req2, req3, req4, req5);
             await db.SaveChangesAsync();
+        }
+
+        // 9. Semilla de Movimientos Históricos por Mensualidad (Últimos 6 meses) para Gráfica y Top Productos Más Vendidos
+        if (await db.InventoryMovements.CountAsync() < 10 && matrizWarehouse != null && activeProducts.Count >= 8)
+        {
+            var entryType = await db.MovementTypes.FirstOrDefaultAsync(m => m.Code == "01" || m.Mode == "E");
+            var saleType = await db.MovementTypes.FirstOrDefaultAsync(m => m.Code == "02" || m.Mode == "S");
+            var sampleLot = await db.Lots.FirstOrDefaultAsync(l => l.IsActive) ?? await db.Lots.FirstOrDefaultAsync();
+
+            if (entryType != null && saleType != null && sampleLot != null)
+            {
+                int[] monthlyEntryBase = { 95, 120, 110, 145, 160, 185 };
+                int[] monthlySaleBase = { 72, 98, 105, 128, 142, 168 };
+
+                for (int mOffset = 5; mOffset >= 0; mOffset--)
+                {
+                    var monthDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 10).AddMonths(-mOffset);
+                    if (monthDate > DateTime.Now) monthDate = DateTime.Now.AddHours(-2);
+
+                    int idx = 5 - mOffset;
+
+                    // Movimiento de Entrada Mensual (Abastecimiento CEDI)
+                    var entryMov = new InventoryMovement
+                    {
+                        MovementDate = monthDate.AddDays(-3),
+                        IdMovementType = entryType.IdMovementType,
+                        IdDestinationWarehouse = matrizWarehouse.IdWarehouse,
+                        IdUser = adminUser.IdUser,
+                        Observation = $"Ingreso mensual de lote farmacéutico en CEDI Carapungo ({monthDate:MMMM yyyy})",
+                        ReferenceSource = "ORDEN_COMPRA"
+                    };
+
+                    var pA = activeProducts[idx % 6 + 1];
+                    var pB = activeProducts[(idx + 2) % 6 + 1];
+
+                    entryMov.Details.Add(new InventoryMovementDetail
+                    {
+                        IdProduct = pA.IdProduct,
+                        IdLot = sampleLot.IdLot,
+                        Quantity = monthlyEntryBase[idx] / 2,
+                        UnitCost = pA.SuggestedPrice
+                    });
+                    entryMov.Details.Add(new InventoryMovementDetail
+                    {
+                        IdProduct = pB.IdProduct,
+                        IdLot = sampleLot.IdLot,
+                        Quantity = monthlyEntryBase[idx] - (monthlyEntryBase[idx] / 2),
+                        UnitCost = pB.SuggestedPrice
+                    });
+
+                    // Movimiento de Salida / Venta Mensual (Top Productos Más Vendidos)
+                    var saleMov = new InventoryMovement
+                    {
+                        MovementDate = monthDate,
+                        IdMovementType = saleType.IdMovementType,
+                        IdOriginWarehouse = matrizWarehouse.IdWarehouse,
+                        IdUser = adminUser.IdUser,
+                        Observation = $"Consolidado de salidas y ventas clínicas veterinarias ({monthDate:MMMM yyyy})",
+                        ReferenceSource = "VENTA_CLINICA"
+                    };
+
+                    var top1 = activeProducts[1]; // Amoxicilina 500 mg
+                    var top2 = activeProducts[2]; // Amoxicilina + ác. clavulánico
+                    var top3 = activeProducts[6]; // Meloxicam inyectable
+                    var top4 = activeProducts[3]; // Enrofloxacina 50 mg
+                    var top5 = activeProducts[4]; // Doxiciclina 100 mg
+                    var top6 = activeProducts[7]; // Meloxicam oral
+
+                    int totalSaleMonth = monthlySaleBase[idx];
+                    saleMov.Details.Add(new InventoryMovementDetail
+                    {
+                        IdProduct = top1.IdProduct,
+                        IdLot = sampleLot.IdLot,
+                        Quantity = (int)(totalSaleMonth * 0.28),
+                        UnitCost = top1.SuggestedPrice
+                    });
+                    saleMov.Details.Add(new InventoryMovementDetail
+                    {
+                        IdProduct = top2.IdProduct,
+                        IdLot = sampleLot.IdLot,
+                        Quantity = (int)(totalSaleMonth * 0.22),
+                        UnitCost = top2.SuggestedPrice
+                    });
+                    saleMov.Details.Add(new InventoryMovementDetail
+                    {
+                        IdProduct = top3.IdProduct,
+                        IdLot = sampleLot.IdLot,
+                        Quantity = (int)(totalSaleMonth * 0.18),
+                        UnitCost = top3.SuggestedPrice
+                    });
+                    saleMov.Details.Add(new InventoryMovementDetail
+                    {
+                        IdProduct = top4.IdProduct,
+                        IdLot = sampleLot.IdLot,
+                        Quantity = (int)(totalSaleMonth * 0.14),
+                        UnitCost = top4.SuggestedPrice
+                    });
+                    saleMov.Details.Add(new InventoryMovementDetail
+                    {
+                        IdProduct = top5.IdProduct,
+                        IdLot = sampleLot.IdLot,
+                        Quantity = (int)(totalSaleMonth * 0.10),
+                        UnitCost = top5.SuggestedPrice
+                    });
+                    saleMov.Details.Add(new InventoryMovementDetail
+                    {
+                        IdProduct = top6.IdProduct,
+                        IdLot = sampleLot.IdLot,
+                        Quantity = Math.Max(4, totalSaleMonth - (int)(totalSaleMonth * 0.92)),
+                        UnitCost = top6.SuggestedPrice
+                    });
+
+                    db.InventoryMovements.AddRange(entryMov, saleMov);
+                }
+
+                await db.SaveChangesAsync();
+            }
         }
     }
 }
