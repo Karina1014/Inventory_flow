@@ -167,52 +167,201 @@ public static class DbSeeder
             await db.SaveChangesAsync();
         }
 
-        // 5. Semilla de Órdenes de Compra Demostrativas si la tabla está vacía
+implementar despacho fefo en transito, confirmacion en sucursal y seeder completo        // 5. Identificar Bodega Matriz (Carapungo) y Sucursales Periféricas
+        var allWarehouses = await db.Warehouses.Where(w => w.IsActive).OrderBy(w => w.IdWarehouse).ToListAsync();
+        var matrizWarehouse = allWarehouses.FirstOrDefault(w =>
+            w.Name.Contains("Carapungo", StringComparison.OrdinalIgnoreCase) ||
+            w.Name.Contains("Matriz", StringComparison.OrdinalIgnoreCase) ||
+            w.Name.Contains("Principal", StringComparison.OrdinalIgnoreCase) ||
+            (w.Address != null && w.Address.Contains("Carapungo", StringComparison.OrdinalIgnoreCase)))
+            ?? allWarehouses.FirstOrDefault();
+
+        var branchWarehouses = allWarehouses
+            .Where(w => matrizWarehouse == null || w.IdWarehouse != matrizWarehouse.IdWarehouse)
+            .ToList();
+
+        var branch1 = branchWarehouses.FirstOrDefault() ?? matrizWarehouse;
+        var branch2 = branchWarehouses.Skip(1).FirstOrDefault() ?? branch1;
+        var adminUser = await db.Users.FirstOrDefaultAsync() ?? new User { IdUser = 1 };
+        var activeProducts = await db.Products.Where(p => p.IsActive).OrderBy(p => p.IdProduct).ToListAsync();
+
+        // 6. Semilla de Lotes FEFO realistas en Matriz Carapungo y Sucursales
+        if (matrizWarehouse != null && activeProducts.Count >= 5)
+        {
+            var activeLotsInMatriz = await db.Lots.CountAsync(l => l.IdWarehouse == matrizWarehouse.IdWarehouse && l.IsActive && l.Quantity > 0);
+            if (activeLotsInMatriz < 8)
+            {
+                var seedLots = new List<Lot>();
+                int prodCount = Math.Min(20, activeProducts.Count);
+
+                for (int i = 0; i < prodCount; i++)
+                {
+                    var prod = activeProducts[i];
+
+                    // Lote principal en Matriz Carapungo con buen stock para despachar requisiciones
+                    DateTime expDate;
+                    int qty;
+                    string prefix = i % 3 == 0 ? "LOT-BAY" : (i % 3 == 1 ? "LOT-ZOE" : "LOT-BOE");
+
+                    if (i == 0)
+                    {
+                        // Lote próximo a vencer (12 días) para alerta sanitaria
+                        expDate = DateTime.Today.AddDays(12);
+                        qty = 18;
+                    }
+                    else if (i == 1)
+                    {
+                        // Lote próximo a vencer (22 días)
+                        expDate = DateTime.Today.AddDays(22);
+                        qty = 25;
+                    }
+                    else if (i == 2)
+                    {
+                        // Lote vencido en cuarentena (-8 días)
+                        expDate = DateTime.Today.AddDays(-8);
+                        qty = 6;
+                    }
+                    else if (i == 3 || i == 4)
+                    {
+                        // Bajo stock en Matriz (3 unidades)
+                        expDate = DateTime.Today.AddMonths(14);
+                        qty = 3;
+                    }
+                    else
+                    {
+                        // Lote vigente con stock abundante (45 a 120 unidades)
+                        expDate = DateTime.Today.AddMonths(8 + (i % 16));
+                        qty = 45 + (i * 4);
+                    }
+
+                    seedLots.Add(new Lot
+                    {
+                        IdProduct = prod.IdProduct,
+                        IdWarehouse = matrizWarehouse.IdWarehouse,
+                        LotNumber = $"{prefix}-2026-{(i + 1):D3}",
+                        Quantity = qty,
+                        ExpirationDate = expDate,
+                        CreationDate = DateTime.Now.AddDays(-15),
+                        IsActive = true
+                    });
+
+                    // Si el lote 2 estaba vencido, agregar un segundo lote vigente del mismo producto para poder despachar
+                    if (i <= 4)
+                    {
+                        seedLots.Add(new Lot
+                        {
+                            IdProduct = prod.IdProduct,
+                            IdWarehouse = matrizWarehouse.IdWarehouse,
+                            LotNumber = $"{prefix}-FEFO-{(i + 10):D3}",
+                            Quantity = 60,
+                            ExpirationDate = DateTime.Today.AddMonths(18),
+                            CreationDate = DateTime.Now.AddDays(-5),
+                            IsActive = true
+                        });
+                    }
+                }
+
+                // Sembrar lotes en Sucursal 1 (Llano Grande) con mezcla de stock normal y bajo stock
+                if (branch1 != null && branch1.IdWarehouse != matrizWarehouse.IdWarehouse)
+                {
+                    for (int i = 0; i < Math.Min(12, activeProducts.Count); i++)
+                    {
+                        var prod = activeProducts[i];
+                        int branchQty = (i % 3 == 0) ? 2 : ((i % 3 == 1) ? 4 : 18); // 2 y 4 están bajo umbral (5)
+                        seedLots.Add(new Lot
+                        {
+                            IdProduct = prod.IdProduct,
+                            IdWarehouse = branch1.IdWarehouse,
+                            LotNumber = $"LOT-SUC1-{(i + 1):D3}",
+                            Quantity = branchQty,
+                            ExpirationDate = DateTime.Today.AddMonths(10 + i),
+                            CreationDate = DateTime.Now.AddDays(-10),
+                            IsActive = true
+                        });
+                    }
+                }
+
+                // Sembrar lotes en Sucursal 2 (Pusuquí) con mezcla de stock normal y bajo stock
+                if (branch2 != null && branch2.IdWarehouse != matrizWarehouse.IdWarehouse && branch2.IdWarehouse != branch1?.IdWarehouse)
+                {
+                    for (int i = 0; i < Math.Min(10, activeProducts.Count); i++)
+                    {
+                        var prod = activeProducts[i];
+                        int branchQty = (i % 2 == 0) ? 3 : 22; // 3 está bajo umbral (5)
+                        seedLots.Add(new Lot
+                        {
+                            IdProduct = prod.IdProduct,
+                            IdWarehouse = branch2.IdWarehouse,
+                            LotNumber = $"LOT-SUC2-{(i + 1):D3}",
+                            Quantity = branchQty,
+                            ExpirationDate = DateTime.Today.AddMonths(12 + i),
+                            CreationDate = DateTime.Now.AddDays(-8),
+                            IsActive = true
+                        });
+                    }
+                }
+
+                db.Lots.AddRange(seedLots);
+                await db.SaveChangesAsync();
+            }
+        }
+
+        // 7. Semilla de Órdenes de Compra Demostrativas
         if (!await db.PurchaseOrders.AnyAsync())
         {
             var firstSupplier = await db.Suppliers.FirstOrDefaultAsync();
             var secondSupplier = await db.Suppliers.Skip(1).FirstOrDefaultAsync() ?? firstSupplier;
-            var matrizWarehouse = await db.Warehouses.FirstOrDefaultAsync(w => w.Name.Contains("Carapungo") || w.Name.Contains("Matriz"))
-                ?? await db.Warehouses.FirstOrDefaultAsync();
-            var adminUser = await db.Users.FirstOrDefaultAsync() ?? new User { IdUser = 1 };
-            var sampleProduct = await db.Products.FirstOrDefaultAsync();
+            var thirdSupplier = await db.Suppliers.Skip(2).FirstOrDefaultAsync() ?? firstSupplier;
 
-            if (firstSupplier != null && matrizWarehouse != null)
+            if (firstSupplier != null && matrizWarehouse != null && activeProducts.Count >= 4)
             {
-                // Orden 1: Pendiente de Aprobación Financiera (Se verá de inmediato en la pestaña de Finanzas con badge)
+                var p1 = activeProducts[0];
+                var p2 = activeProducts[1];
+                var p3 = activeProducts[2];
+                var p4 = activeProducts[3];
+
+                // Orden 1: Pendiente de Aprobación Financiera
                 var order1 = new PurchaseOrder
                 {
                     OrderNumber = "OC-2026-0001",
-                    OrderDate = DateTime.Now.AddHours(-3),
+                    OrderDate = DateTime.Now.AddHours(-4),
                     IdSupplier = firstSupplier.IdSupplier,
                     IdDestinationWarehouse = matrizWarehouse.IdWarehouse,
                     IdUser = adminUser.IdUser,
                     IdPurchaseOrderType = 1, // Desabastecimiento Crítico
                     IdPurchaseOrderStatus = 2, // PENDIENTE_FINANCIERO
                     ExpectedDeliveryDate = DateTime.Now.AddDays(2),
-                    Observation = "Reabastecimiento urgente de fármacos antibióticos y sedantes para quirófano central Carapungo.",
-                    Subtotal = 450.00m,
-                    TaxAmount = 67.50m,
-                    TotalAmount = 517.50m
+                    Observation = "Reabastecimiento urgente de antibióticos y antiinflamatorios para quirófano central Carapungo.",
+                    Subtotal = 690.00m,
+                    TaxAmount = 103.50m,
+                    TotalAmount = 793.50m
                 };
-
-                if (sampleProduct != null)
+                order1.Details.Add(new PurchaseOrderDetail
                 {
-                    order1.Details.Add(new PurchaseOrderDetail
-                    {
-                        IdProduct = sampleProduct.IdProduct,
-                        Quantity = 30,
-                        ReceivedQuantity = 0,
-                        UnitPrice = 15.00m,
-                        Subtotal = 450.00m,
-                        TaxPercentage = 15.00m,
-                        TaxAmount = 67.50m,
-                        Total = 517.50m,
-                        Notes = "Lote con vencimiento no menor a 18 meses"
-                    });
-                }
+                    IdProduct = p1.IdProduct,
+                    Quantity = 30,
+                    ReceivedQuantity = 0,
+                    UnitPrice = 15.00m,
+                    Subtotal = 450.00m,
+                    TaxPercentage = 15.00m,
+                    TaxAmount = 67.50m,
+                    Total = 517.50m,
+                    Notes = "Lote con vencimiento mínimo 18 meses"
+                });
+                order1.Details.Add(new PurchaseOrderDetail
+                {
+                    IdProduct = p2.IdProduct,
+                    Quantity = 40,
+                    ReceivedQuantity = 0,
+                    UnitPrice = 6.00m,
+                    Subtotal = 240.00m,
+                    TaxPercentage = 15.00m,
+                    TaxAmount = 36.00m,
+                    Total = 276.00m,
+                    Notes = "Presentación hospitalaria"
+                });
 
-                // Orden 2: Aprobada por Finanzas
+                // Orden 2: Aprobada por Finanzas (Lista para Recepcionar Mercadería con Lotes FEFO)
                 var order2 = new PurchaseOrder
                 {
                     OrderNumber = "OC-2026-0002",
@@ -222,8 +371,8 @@ public static class DbSeeder
                     IdUser = adminUser.IdUser,
                     IdPurchaseOrderType = 2, // Reposición Periódica CEDI
                     IdPurchaseOrderStatus = 3, // APROBADO_FINANCIERO
-                    ExpectedDeliveryDate = DateTime.Now.AddDays(3),
-                    Observation = "Reposición mensual planificada de vacunas y desparasitantes.",
+                    ExpectedDeliveryDate = DateTime.Now.AddDays(1),
+                    Observation = "Reposición mensual planificada de fármacos veterinarios y antiparasitarios.",
                     Subtotal = 1200.00m,
                     TaxAmount = 180.00m,
                     TotalAmount = 1380.00m,
@@ -231,29 +380,37 @@ public static class DbSeeder
                     IdFinancialApprovalUser = adminUser.IdUser,
                     FinancialApprovalNote = "Aprobado por Dirección Financiera conforme al presupuesto operativo del mes."
                 };
-
-                if (sampleProduct != null)
+                order2.Details.Add(new PurchaseOrderDetail
                 {
-                    order2.Details.Add(new PurchaseOrderDetail
-                    {
-                        IdProduct = sampleProduct.IdProduct,
-                        Quantity = 80,
-                        ReceivedQuantity = 0,
-                        UnitPrice = 15.00m,
-                        Subtotal = 1200.00m,
-                        TaxPercentage = 15.00m,
-                        TaxAmount = 180.00m,
-                        Total = 1380.00m,
-                        Notes = "Mantener cadena de frío 2-8°C durante transporte"
-                    });
-                }
+                    IdProduct = p3.IdProduct,
+                    Quantity = 80,
+                    ReceivedQuantity = 0,
+                    UnitPrice = 10.00m,
+                    Subtotal = 800.00m,
+                    TaxPercentage = 15.00m,
+                    TaxAmount = 120.00m,
+                    Total = 920.00m,
+                    Notes = "Mantener cadena de frío 2-8°C durante transporte"
+                });
+                order2.Details.Add(new PurchaseOrderDetail
+                {
+                    IdProduct = p4.IdProduct,
+                    Quantity = 50,
+                    ReceivedQuantity = 0,
+                    UnitPrice = 8.00m,
+                    Subtotal = 400.00m,
+                    TaxPercentage = 15.00m,
+                    TaxAmount = 60.00m,
+                    Total = 460.00m,
+                    Notes = "Entrega en CEDI Carapungo"
+                });
 
                 // Orden 3: Borrador
                 var order3 = new PurchaseOrder
                 {
                     OrderNumber = "OC-2026-0003",
-                    OrderDate = DateTime.Now.AddMinutes(-30),
-                    IdSupplier = firstSupplier.IdSupplier,
+                    OrderDate = DateTime.Now.AddMinutes(-45),
+                    IdSupplier = thirdSupplier?.IdSupplier ?? firstSupplier.IdSupplier,
                     IdDestinationWarehouse = matrizWarehouse.IdWarehouse,
                     IdUser = adminUser.IdUser,
                     IdPurchaseOrderType = 4, // Bajo Pedido Especial
@@ -264,49 +421,169 @@ public static class DbSeeder
                     TaxAmount = 42.00m,
                     TotalAmount = 322.00m
                 };
+                order3.Details.Add(new PurchaseOrderDetail
+                {
+                    IdProduct = p1.IdProduct,
+                    Quantity = 20,
+                    ReceivedQuantity = 0,
+                    UnitPrice = 14.00m,
+                    Subtotal = 280.00m,
+                    TaxPercentage = 15.00m,
+                    TaxAmount = 42.00m,
+                    Total = 322.00m,
+                    Notes = "Cotización referencial"
+                });
 
                 db.PurchaseOrders.AddRange(order1, order2, order3);
                 await db.SaveChangesAsync();
             }
         }
 
-        // 6. Semilla de Requisiciones Internas si la tabla está vacía
-        if (!await db.InternalRequisitions.AnyAsync())
+        // 8. Semilla Completa de Requisiciones Internas (Sucursales -> Matriz Carapungo)
+        if (!await db.InternalRequisitions.AnyAsync() && matrizWarehouse != null && branch1 != null && activeProducts.Count >= 6)
         {
-            var matrizWarehouse = await db.Warehouses.FirstOrDefaultAsync(w => w.Name.Contains("Carapungo") || w.Name.Contains("Matriz"));
-            var branchWarehouse = await db.Warehouses.FirstOrDefaultAsync(w => w.IdWarehouse != (matrizWarehouse != null ? matrizWarehouse.IdWarehouse : 0))
-                ?? matrizWarehouse;
-            var adminUser = await db.Users.FirstOrDefaultAsync() ?? new User { IdUser = 1 };
-            var sampleProduct = await db.Products.FirstOrDefaultAsync();
+            var p1 = activeProducts[1]; // Amoxicilina 500 mg
+            var p2 = activeProducts[2]; // Amoxicilina + ác. clavulánico
+            var p3 = activeProducts[3]; // Enrofloxacina 50 mg
+            var p4 = activeProducts[4]; // Doxiciclina 100 mg
+            var p5 = activeProducts[5]; // Metronidazol 250 mg
+            var p6 = activeProducts[6]; // Meloxicam inyectable
 
-            if (branchWarehouse != null && matrizWarehouse != null)
+            // Requisición 1: SOLICITADO (Urgencia Quirúrgica desde Llano Grande -> Lista para Despachar en Carapungo)
+            var req1 = new InternalRequisition
             {
-                var req1 = new InternalRequisition
-                {
-                    RequisitionCode = "REQ-2026-0001",
-                    RequisitionDate = DateTime.Now.AddHours(-5),
-                    IdRequestingWarehouse = branchWarehouse.IdWarehouse,
-                    IdFulfillingWarehouse = matrizWarehouse.IdWarehouse,
-                    IdUser = adminUser.IdUser,
-                    IdRequisitionType = 1, // Urgencia Quirúrgica
-                    IdRequisitionStatus = 1, // SOLICITADO
-                    Observation = "Insumos urgentes para cirugía programada en sucursal."
-                };
+                RequisitionCode = "REQ-2026-0001",
+                RequisitionDate = DateTime.Now.AddHours(-3),
+                IdRequestingWarehouse = branch1.IdWarehouse,
+                IdFulfillingWarehouse = matrizWarehouse.IdWarehouse,
+                IdUser = adminUser.IdUser,
+                IdRequisitionType = 1, // Urgencia quirúrgica / emergencia (SLA: 4 h)
+                IdRequisitionStatus = 1, // SOLICITADO
+                Observation = "Urgencia quirúrgica en clínica Llano Grande: requerimos antibióticos y analgésicos inyectables para cirugías programadas."
+            };
+            req1.Details.Add(new InternalRequisitionDetail
+            {
+                IdProduct = p2.IdProduct,
+                RequestedQuantity = 12,
+                DispatchedQuantity = 0,
+                Note = "Prioridad quirófano"
+            });
+            req1.Details.Add(new InternalRequisitionDetail
+            {
+                IdProduct = p6.IdProduct,
+                RequestedQuantity = 10,
+                DispatchedQuantity = 0,
+                Note = "Uso post-operatorio"
+            });
 
-                if (sampleProduct != null)
-                {
-                    req1.Details.Add(new InternalRequisitionDetail
-                    {
-                        IdProduct = sampleProduct.IdProduct,
-                        RequestedQuantity = 10,
-                        DispatchedQuantity = 0,
-                        Note = "Urgente"
-                    });
-                }
+            // Requisición 2: EN_REVISION (Reposición Ordinaria desde Pusuquí -> En preparación en CEDI Carapungo)
+            var req2 = new InternalRequisition
+            {
+                RequisitionCode = "REQ-2026-0002",
+                RequisitionDate = DateTime.Now.AddHours(-14),
+                IdRequestingWarehouse = (branch2 ?? branch1).IdWarehouse,
+                IdFulfillingWarehouse = matrizWarehouse.IdWarehouse,
+                IdUser = adminUser.IdUser,
+                IdRequisitionType = 3, // Reposición ordinaria de stock (SLA: 48 h)
+                IdRequisitionStatus = 2, // EN_REVISION
+                Observation = "Reposición semanal de antibióticos de amplio espectro para farmacia de Pusuquí.",
+                ReviewedDate = DateTime.Now.AddHours(-2),
+                IdReviewedByUser = adminUser.IdUser,
+                ReviewNote = "Verificando lotes FEFO en bodega principal Carapungo."
+            };
+            req2.Details.Add(new InternalRequisitionDetail
+            {
+                IdProduct = p3.IdProduct,
+                RequestedQuantity = 20,
+                DispatchedQuantity = 0,
+                Note = "Reposición mostrador"
+            });
+            req2.Details.Add(new InternalRequisitionDetail
+            {
+                IdProduct = p4.IdProduct,
+                RequestedQuantity = 15,
+                DispatchedQuantity = 0,
+                Note = "Stock de seguridad"
+            });
 
-                db.InternalRequisitions.Add(req1);
-                await db.SaveChangesAsync();
-            }
+            // Requisición 3: DESPACHADO / EN TRÁNSITO (Desde Carapungo hacia Llano Grande -> Lista para Confirmar Recepción en Sucursal)
+            var req3 = new InternalRequisition
+            {
+                RequisitionCode = "REQ-2026-0003",
+                RequisitionDate = DateTime.Now.AddDays(-1),
+                IdRequestingWarehouse = branch1.IdWarehouse,
+                IdFulfillingWarehouse = matrizWarehouse.IdWarehouse,
+                IdUser = adminUser.IdUser,
+                IdRequisitionType = 2, // Quiebre de stock crítico (SLA: 12 h)
+                IdRequisitionStatus = 4, // DESPACHADO (En Tránsito)
+                Observation = "Reposición por quiebre de stock en Llano Grande. Mercadería enviada en transporte interno.",
+                ReviewedDate = DateTime.Now.AddHours(-5),
+                IdReviewedByUser = adminUser.IdUser,
+                ReviewNote = "Despachado con lotes FEFO desde Carapungo en guía interna #GI-0042."
+            };
+            req3.Details.Add(new InternalRequisitionDetail
+            {
+                IdProduct = p1.IdProduct,
+                RequestedQuantity = 15,
+                DispatchedQuantity = 15,
+                Note = "Lote verificado FEFO"
+            });
+            req3.Details.Add(new InternalRequisitionDetail
+            {
+                IdProduct = p5.IdProduct,
+                RequestedQuantity = 10,
+                DispatchedQuantity = 10,
+                Note = "Caja sellada"
+            });
+
+            // Requisición 4: APROBADO_PARCIAL (Campaña de vacunación/desparasitación en Pusuquí)
+            var req4 = new InternalRequisition
+            {
+                RequisitionCode = "REQ-2026-0004",
+                RequisitionDate = DateTime.Now.AddDays(-2),
+                IdRequestingWarehouse = (branch2 ?? branch1).IdWarehouse,
+                IdFulfillingWarehouse = matrizWarehouse.IdWarehouse,
+                IdUser = adminUser.IdUser,
+                IdRequisitionType = 4, // Pedido para campaña / jornada (SLA: 72 h)
+                IdRequisitionStatus = 3, // APROBADO_PARCIAL
+                Observation = "Insumos para jornada de atención veterinaria de fin de semana en Pusuquí.",
+                ReviewedDate = DateTime.Now.AddDays(-1),
+                IdReviewedByUser = adminUser.IdUser,
+                ReviewNote = "Se aprueba entrega parcial de 15 unidades; el saldo se completará tras recepción de OC-2026-0002."
+            };
+            req4.Details.Add(new InternalRequisitionDetail
+            {
+                IdProduct = p4.IdProduct,
+                RequestedQuantity = 30,
+                DispatchedQuantity = 15,
+                Note = "Entrega parcial autorizada"
+            });
+
+            // Requisición 5: COMPLETADO (Histórico ya recibido en sucursal Llano Grande)
+            var req5 = new InternalRequisition
+            {
+                RequisitionCode = "REQ-2026-0005",
+                RequisitionDate = DateTime.Now.AddDays(-4),
+                IdRequestingWarehouse = branch1.IdWarehouse,
+                IdFulfillingWarehouse = matrizWarehouse.IdWarehouse,
+                IdUser = adminUser.IdUser,
+                IdRequisitionType = 3, // Reposición ordinaria de stock (SLA: 48 h)
+                IdRequisitionStatus = 5, // COMPLETADO
+                Observation = "Pedido ordinario mensual recibido satisfactoriamente en sucursal.",
+                ReviewedDate = DateTime.Now.AddDays(-3),
+                IdReviewedByUser = adminUser.IdUser,
+                ReviewNote = "Despachado desde Carapungo | Recepción: Recibido conforme en Llano Grande sin novedades."
+            };
+            req5.Details.Add(new InternalRequisitionDetail
+            {
+                IdProduct = p5.IdProduct,
+                RequestedQuantity = 20,
+                DispatchedQuantity = 20,
+                Note = "Completado"
+            });
+
+            db.InternalRequisitions.AddRange(req1, req2, req3, req4, req5);
+            await db.SaveChangesAsync();
         }
     }
 }

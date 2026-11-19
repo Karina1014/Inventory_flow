@@ -26,5 +26,6 @@ public interface IInternalRequisitionRepository
     Task<bool> UpdateStatusAsync(int id, string newStatusCode, int reviewedByUserId, string? reviewNote = null);
 
     Task<bool> UpdateDispatchedQuantitiesAsync(int id, Dictionary<int, int> productDispatchedQuantities, int reviewedByUserId);
+    Task<bool> ConfirmBranchReceiptAsync(int id, int userId, string? confirmationNote = null);
     Task<bool> CancelRequisitionAsync(int id, int userId, string reason);
 }

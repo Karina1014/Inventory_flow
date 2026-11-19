@@ -208,6 +208,14 @@
                                 </td>
                                 <td class="pe-3 text-end">
                                     <div class="d-inline-flex gap-1">
+                                        @if (item.RequisitionStatus?.Code == "DESPACHADO")
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-success py-1 px-2"
+                                                    title="Confirmar Recepción Física en Sucursal"
+                                                    @onclick="() => OpenConfirmReceiptModal(item)">
+                                                <i class="bi bi-box-arrow-in-down"></i>
+                                            </button>
+                                        }
                                         <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2"
                                                 title="Ver detalle / Atender pedido"
                                                 @onclick="() => OpenDetailModal(item)">
@@ -265,9 +273,9 @@
                     </label>
                     <select class="form-select" @bind="newRequestingWarehouseId">
                         <option value="0">Selecciona tu sucursal...</option>
-                        @foreach (var w in warehouses)
+                        @foreach (var w in warehouses.Where(w => !IsMatrixWarehouse(w)))
                         {
-                            <option value="@w.IdWarehouse">@w.Name</option>
+                            <option value="@w.IdWarehouse">@w.Name (@w.Address)</option>
                         }
                     </select>
                 </div>
@@ -483,7 +491,7 @@
                                     @d.RequestedQuantity un.
                                 </td>
                                 <td class="text-center">
-                                    @if (selectedRequisition.RequisitionStatus?.Code == "SOLICITADO" || selectedRequisition.RequisitionStatus?.Code == "EN_REVISION")
+                                    @if (selectedRequisition.RequisitionStatus?.Code == "SOLICITADO" || selectedRequisition.RequisitionStatus?.Code == "EN_REVISION" || selectedRequisition.RequisitionStatus?.Code == "APROBADO_PARCIAL")
                                     {
                                         <input type="number"
                                                class="form-control form-control-sm text-center mx-auto"
@@ -530,8 +538,8 @@
 
                         @if (selectedRequisition.RequisitionStatus?.Code == "DESPACHADO")
                         {
-                            <button type="button" class="btn btn-success btn-sm" @onclick='() => ChangeStatusAsync("COMPLETADO")' disabled="@isActionProcessing">
-                                <i class="bi bi-check-circle me-1"></i> Confirmar Recepción en Sucursal
+                            <button type="button" class="btn btn-success btn-sm" @onclick="() => OpenConfirmReceiptModal(selectedRequisition)" disabled="@isActionProcessing">
+                                <i class="bi bi-box-arrow-in-down me-1"></i> Confirmar Recepción en Sucursal
                             </button>
                         }
 
@@ -565,6 +573,91 @@
         <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" @onclick="CloseModals">
                 Cerrar
+            </button>
+        </div>
+    </div>
+}
+
+<!-- ========================================================================= -->
+<!-- MODAL 3: CONFIRMAR RECEPCIÓN FÍSICA EN SUCURSAL DESTINO -->
+<!-- ========================================================================= -->
+@if (showConfirmReceiptModal && selectedRequisition != null)
+{
+    <div class="modal-backdrop" @onclick="CloseModals"></div>
+    <div class="modal-card modal-md">
+        <div class="modal-header">
+            <div class="d-flex align-items-center gap-2">
+                <div class="modal-icon-badge text-success bg-success-subtle">
+                    <i class="bi bi-box-arrow-in-down"></i>
+                </div>
+                <div>
+                    <h5 class="modal-title mb-0">Confirmar Recepción de Mercadería</h5>
+                    <span class="text-muted small">Requisición @selectedRequisition.RequisitionCode en @selectedRequisition.RequestingWarehouse?.Name</span>
+                </div>
+            </div>
+            <button type="button" class="btn-close" @onclick="CloseModals"></button>
+        </div>
+
+        <div class="modal-body">
+            <div class="alert alert-info py-2 small mb-3">
+                <i class="bi bi-info-circle me-1"></i>
+                La mercadería fue despachada desde <strong>@selectedRequisition.FulfillingWarehouse?.Name</strong>. Al confirmar, los lotes y existencias ingresarán oficialmente al inventario de <strong>@selectedRequisition.RequestingWarehouse?.Name</strong>.
+            </div>
+
+            <!-- Resumen de Productos Despachados -->
+            <div class="table-responsive border rounded mb-3">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light small text-muted">
+                        <tr>
+                            <th class="ps-3">Producto</th>
+                            <th class="text-center">Cant. Despachada</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var d in selectedRequisition.Details.Where(x => x.DispatchedQuantity > 0))
+                        {
+                            <tr>
+                                <td class="ps-3">
+                                    <span class="fw-semibold text-dark small">@d.Product?.Name</span>
+                                    <div class="text-muted" style="font-size: 0.72rem;">Código: @d.Product?.Code</div>
+                                </td>
+                                <td class="text-center fw-bold text-success">
+                                    @d.DispatchedQuantity un.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small text-muted mb-1">Nota o Novedad de Recepción (Opcional)</label>
+                <input type="text" class="form-control form-control-sm" placeholder="Ej. Recibido conforme sin novedades..." @bind="receiptNote" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(receiptErrorMessage))
+            {
+                <div class="alert alert-danger py-2 small mb-0">
+                    <i class="bi bi-exclamation-triangle me-1"></i> @receiptErrorMessage
+                </div>
+            }
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CloseModals" disabled="@isActionProcessing">
+                Cancelar
+            </button>
+            <button type="button" class="btn btn-success btn-sm" @onclick="ExecuteConfirmReceiptAsync" disabled="@isActionProcessing">
+                @if (isActionProcessing)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    <span>Procesando...</span>
+                }
+                else
+                {
+                    <i class="bi bi-check2-circle me-1"></i>
+                    <span>Confirmar e Ingresar a Inventario</span>
+                }
             </button>
         </div>
     </div>
@@ -608,6 +701,11 @@
     private bool showRejectInput = false;
     private string rejectReason = "";
 
+    // Modal Confirmar Recepción
+    private bool showConfirmReceiptModal = false;
+    private string receiptNote = "";
+    private string receiptErrorMessage = "";
+
     protected override async Task OnInitializedAsync()
     {
         await LoadCatalogsAsync();
@@ -637,10 +735,15 @@
                 newRequisitionTypeId = defaultType.IdRequisitionType;
             }
 
-            // Si el usuario pertenece a una sucursal, preseleccionarla
-            if (CurrentUserService.WarehouseId.HasValue && CurrentUserService.WarehouseId.Value > 0)
+            // Si el usuario pertenece a una sucursal solicitante (no la matriz), preseleccionarla
+            var branchWarehouses = warehouses.Where(w => !IsMatrixWarehouse(w)).ToList();
+            if (CurrentUserService.WarehouseId.HasValue && branchWarehouses.Any(w => w.IdWarehouse == CurrentUserService.WarehouseId.Value))
             {
                 newRequestingWarehouseId = CurrentUserService.WarehouseId.Value;
+            }
+            else if (branchWarehouses.Any())
+            {
+                newRequestingWarehouseId = branchWarehouses.First().IdWarehouse;
             }
         }
         catch (Exception ex)
@@ -684,6 +787,15 @@
         await LoadRequisitionsAsync();
     }
 
+    private static bool IsMatrixWarehouse(Warehouse w)
+    {
+        return w.Name.Contains("Carapungo", StringComparison.OrdinalIgnoreCase)
+            || w.Name.Contains("Matriz", StringComparison.OrdinalIgnoreCase)
+            || w.Name.Contains("Principal", StringComparison.OrdinalIgnoreCase)
+            || w.Name.Contains("Central", StringComparison.OrdinalIgnoreCase)
+            || (!string.IsNullOrWhiteSpace(w.Address) && w.Address.Contains("Carapungo", StringComparison.OrdinalIgnoreCase));
+    }
+
     private void OpenCreateModal()
     {
         draftDetails.Clear();
@@ -691,10 +803,17 @@
         inputQuantity = 1;
         newObservation = "";
         createErrorMessage = "";
-        if (CurrentUserService.WarehouseId.HasValue && CurrentUserService.WarehouseId.Value > 0)
+
+        var branchWarehouses = warehouses.Where(w => !IsMatrixWarehouse(w)).ToList();
+        if (CurrentUserService.WarehouseId.HasValue && branchWarehouses.Any(w => w.IdWarehouse == CurrentUserService.WarehouseId.Value))
         {
             newRequestingWarehouseId = CurrentUserService.WarehouseId.Value;
         }
+        else if (branchWarehouses.Any())
+        {
+            newRequestingWarehouseId = branchWarehouses.First().IdWarehouse;
+        }
+
         showCreateModal = true;
     }
 
@@ -863,11 +982,46 @@
         }
     }
 
+    private void OpenConfirmReceiptModal(InternalRequisition item)
+    {
+        selectedRequisition = item;
+        receiptNote = "";
+        receiptErrorMessage = "";
+        showConfirmReceiptModal = true;
+    }
+
+    private async Task ExecuteConfirmReceiptAsync()
+    {
+        if (selectedRequisition == null) return;
+
+        isActionProcessing = true;
+        receiptErrorMessage = "";
+        try
+        {
+            var userId = CurrentUserService.UserId > 0 ? CurrentUserService.UserId : 1;
+            await RequisitionRepo.ConfirmBranchReceiptAsync(selectedRequisition.IdInternalRequisition, userId, receiptNote);
+
+            ToastService.Success($"Recepción confirmada. El stock ingresó al inventario de {selectedRequisition.RequestingWarehouse?.Name}.", "Recepción Confirmada");
+            CloseModals();
+            await LoadRequisitionsAsync();
+        }
+        catch (Exception ex)
+        {
+            receiptErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isActionProcessing = false;
+        }
+    }
+
     private void CloseModals()
     {
         showCreateModal = false;
         showDetailModal = false;
+        showConfirmReceiptModal = false;
         selectedRequisition = null;
         showRejectInput = false;
+        receiptErrorMessage = "";
     }
 }

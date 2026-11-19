@@ -99,7 +99,10 @@ public class LowStockReportService : ILowStockReportService
         // 2. Consultar almacén matriz para datos de la empresa
         var matriz = await _db.Warehouses
             .AsNoTracking()
-            .FirstOrDefaultAsync(w => w.Name.Contains("Carapungo") || w.Name.Contains("Matriz"))
+            .FirstOrDefaultAsync(w => w.Name.Contains("Carapungo")
+                                   || w.Name.Contains("Matriz")
+                                   || w.Name.Contains("Principal")
+                                   || w.Address.Contains("Carapungo"))
             ?? warehouse;
 
         // 3. Obtener el umbral activo del inventario

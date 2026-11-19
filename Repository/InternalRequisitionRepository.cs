@@ -129,7 +129,12 @@ public class InternalRequisitionRepository : IInternalRequisitionRepository
         {
             var matriz = await _db.Warehouses
                 .Where(w => w.IsActive)
-                .FirstOrDefaultAsync(w => w.Name.Contains("Carapungo") || w.Name.Contains("Matriz") || w.Name.Contains("Central"));
+                .FirstOrDefaultAsync(w => w.Name.Contains("Carapungo")
+                                       || w.Name.Contains("Matriz")
+                                       || w.Name.Contains("Principal")
+                                       || w.Name.Contains("Central")
+                                       || w.Address.Contains("Carapungo"))
+                ?? await _db.Warehouses.Where(w => w.IsActive).OrderBy(w => w.IdWarehouse).FirstOrDefaultAsync();
 
             fulfillingWarehouseId = matriz?.IdWarehouse
                 ?? throw new InvalidOperationException("No se encontró la bodega matriz (Carapungo) para atender la requisición.");
@@ -137,7 +142,7 @@ public class InternalRequisitionRepository : IInternalRequisitionRepository
 
         if (fulfillingWarehouseId.Value == dto.IdRequestingWarehouse)
         {
-            throw new InvalidOperationException("La sucursal solicitante no puede ser la misma que la bodega que atiende el pedido.");
+            throw new InvalidOperationException("La sucursal solicitante no puede ser la misma Bodega Matriz Principal (Carapungo). Por favor selecciona una sucursal (ej. Llano Grande o Pusuquí).");
         }
 
         var requisition = new InternalRequisition
@@ -206,33 +211,110 @@ public class InternalRequisitionRepository : IInternalRequisitionRepository
 
     public async Task<bool> UpdateDispatchedQuantitiesAsync(int id, Dictionary<int, int> productDispatchedQuantities, int reviewedByUserId)
     {
-        var requisition = await _db.InternalRequisitions
-            .Include(r => r.Details)
-            .Include(r => r.RequisitionStatus)
-            .FirstOrDefaultAsync(r => r.IdInternalRequisition == id);
-
-        if (requisition == null) return false;
-
-        if (requisition.RequisitionStatus != null && requisition.RequisitionStatus.IsFinal)
+        using var transaction = await _db.Database.BeginTransactionAsync();
+        try
         {
-            throw new InvalidOperationException(
-                $"No se pueden actualizar despachos porque la requisición ya está en estado final '{requisition.RequisitionStatus.Name}'.");
-        }
+            var requisition = await _db.InternalRequisitions
+                .Include(r => r.Details)
+                    .ThenInclude(d => d.Product)
+                .Include(r => r.RequisitionStatus)
+                .Include(r => r.RequestingWarehouse)
+                .Include(r => r.FulfillingWarehouse)
+                .FirstOrDefaultAsync(r => r.IdInternalRequisition == id);
 
-        foreach (var detail in requisition.Details)
-        {
-            if (productDispatchedQuantities.TryGetValue(detail.IdProduct, out var qty))
+            if (requisition == null) return false;
+
+            if (requisition.RequisitionStatus != null && requisition.RequisitionStatus.IsFinal)
             {
-                // No se despacha más de lo solicitado ni cantidades negativas
-                detail.DispatchedQuantity = Math.Clamp(qty, 0, detail.RequestedQuantity);
+                throw new InvalidOperationException(
+                    $"No se pueden actualizar despachos porque la requisición ya está en estado final '{requisition.RequisitionStatus.Name}'.");
             }
-        }
 
-        var totalReq = requisition.Details.Sum(d => d.RequestedQuantity);
-        var totalDisp = requisition.Details.Sum(d => d.DispatchedQuantity);
+            var movementType = await _db.MovementTypes
+                .FirstOrDefaultAsync(m => m.Code == "20" || m.Code == "05" || m.Mode == "T")
+                ?? await _db.MovementTypes.FirstOrDefaultAsync();
 
-        if (totalDisp > 0)
-        {
+            if (movementType == null)
+            {
+                throw new InvalidOperationException("No se encontró un tipo de movimiento de transferencia/traslado configurado.");
+            }
+
+            var outgoingMovement = new InventoryMovement
+            {
+                MovementDate = DateTime.Now,
+                IdMovementType = movementType.IdMovementType,
+                IdOriginWarehouse = requisition.IdFulfillingWarehouse,
+                IdDestinationWarehouse = requisition.IdRequestingWarehouse,
+                Observation = $"Despacho de Requisición #{requisition.RequisitionCode} hacia {requisition.RequestingWarehouse?.Name} (En Tránsito)",
+                IdUser = reviewedByUserId,
+                ReferenceSource = "REQUISICION_INTERNA_DESPACHO",
+                ReferenceId = id
+            };
+
+            _db.InventoryMovements.Add(outgoingMovement);
+            await _db.SaveChangesAsync();
+
+            bool hasAnyDispatch = false;
+
+            foreach (var detail in requisition.Details)
+            {
+                if (productDispatchedQuantities.TryGetValue(detail.IdProduct, out var qty) && qty > 0)
+                {
+                    int requestedToDispatch = Math.Min(qty, detail.RequestedQuantity);
+
+                    // Consultar lotes con existencia en Carapungo ordenados por FEFO
+                    var availableLots = await _db.Lots
+                        .Where(l => l.IdWarehouse == requisition.IdFulfillingWarehouse
+                                 && l.IdProduct == detail.IdProduct
+                                 && l.IsActive
+                                 && l.Quantity > 0)
+                        .OrderBy(l => l.ExpirationDate)
+                        .ToListAsync();
+
+                    int totalAvailableStock = availableLots.Sum(l => l.Quantity);
+                    if (totalAvailableStock < requestedToDispatch)
+                    {
+                        var prodName = detail.Product?.Name ?? $"ID {detail.IdProduct}";
+                        throw new InvalidOperationException(
+                            $"Stock insuficiente en Carapungo para '{prodName}'. Solicitado despachar: {requestedToDispatch}, Disponible en lotes: {totalAvailableStock}.");
+                    }
+
+                    int remainingToDeduct = requestedToDispatch;
+                    foreach (var lot in availableLots)
+                    {
+                        if (remainingToDeduct <= 0) break;
+
+                        int take = Math.Min(lot.Quantity, remainingToDeduct);
+                        lot.Quantity -= take;
+                        remainingToDeduct -= take;
+
+                        outgoingMovement.Details.Add(new InventoryMovementDetail
+                        {
+                            IdInventoryMovement = outgoingMovement.IdInventoryMovement,
+                            IdProduct = detail.IdProduct,
+                            IdLot = lot.IdLot,
+                            Quantity = take,
+                            UnitCost = detail.Product?.SuggestedPrice ?? 0
+                        });
+                    }
+
+                    detail.DispatchedQuantity = requestedToDispatch;
+                    hasAnyDispatch = true;
+                }
+                else
+                {
+                    detail.DispatchedQuantity = 0;
+                }
+            }
+
+            if (!hasAnyDispatch)
+            {
+                throw new InvalidOperationException("Debes ingresar al menos una cantidad mayor a 0 para realizar el despacho.");
+            }
+
+            var totalReq = requisition.Details.Sum(d => d.RequestedQuantity);
+            var totalDisp = requisition.Details.Sum(d => d.DispatchedQuantity);
+
             // Id 4 = Despachado (total), Id 3 = Aprobado Parcial
             var targetStatusId = totalDisp >= totalReq ? 4 : 3;
             var targetStatus = await _catalog.GetStatusByIdAsync(targetStatusId)
@@ -244,10 +326,182 @@ public class InternalRequisitionRepository : IInternalRequisitionRepository
                 requisition.ReviewedDate = DateTime.Now;
                 requisition.IdReviewedByUser = reviewedByUserId;
             }
-        }
 
-        await _db.SaveChangesAsync();
-        return true;
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return true;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
+    public async Task<bool> ConfirmBranchReceiptAsync(int id, int userId, string? confirmationNote = null)
+    {
+        using var transaction = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            var requisition = await _db.InternalRequisitions
+                .Include(r => r.Details)
+                    .ThenInclude(d => d.Product)
+                .Include(r => r.RequisitionStatus)
+                .Include(r => r.RequestingWarehouse)
+                .Include(r => r.FulfillingWarehouse)
+                .FirstOrDefaultAsync(r => r.IdInternalRequisition == id);
+
+            if (requisition == null) return false;
+
+            // Validar que se encuentre en estado DESPACHADO (Id 4)
+            if (requisition.RequisitionStatus?.Code != "DESPACHADO" && requisition.IdRequisitionStatus != 4)
+            {
+                throw new InvalidOperationException($"La requisición no está en tránsito/despachada. Su estado actual es '{requisition.RequisitionStatus?.Name}'.");
+            }
+
+            // Buscar el movimiento de salida generado en el despacho para obtener los lotes exactos
+            var outgoingMovement = await _db.InventoryMovements
+                .Include(m => m.Details)
+                    .ThenInclude(d => d.Lot)
+                .FirstOrDefaultAsync(m => m.ReferenceSource == "REQUISICION_INTERNA_DESPACHO" && m.ReferenceId == id);
+
+            var movementType = await _db.MovementTypes
+                .FirstOrDefaultAsync(m => m.Code == "05" || m.Code == "20" || m.Mode == "T")
+                ?? await _db.MovementTypes.FirstOrDefaultAsync();
+
+            if (movementType == null)
+            {
+                throw new InvalidOperationException("No se encontró un tipo de movimiento de transferencia configurado.");
+            }
+
+            var incomingMovement = new InventoryMovement
+            {
+                MovementDate = DateTime.Now,
+                IdMovementType = movementType.IdMovementType,
+                IdOriginWarehouse = requisition.IdFulfillingWarehouse,
+                IdDestinationWarehouse = requisition.IdRequestingWarehouse,
+                Observation = $"Recepción de Transferencia Requisición #{requisition.RequisitionCode} confirmada en {requisition.RequestingWarehouse?.Name}. {confirmationNote}".Trim(),
+                IdUser = userId,
+                ReferenceSource = "REQUISICION_INTERNA_RECEPCION",
+                ReferenceId = id
+            };
+
+            _db.InventoryMovements.Add(incomingMovement);
+            await _db.SaveChangesAsync();
+
+            if (outgoingMovement != null && outgoingMovement.Details.Any())
+            {
+                foreach (var outDetail in outgoingMovement.Details)
+                {
+                    var lotNumber = outDetail.Lot?.LotNumber ?? "S/N";
+                    var expDate = outDetail.Lot?.ExpirationDate ?? DateTime.Today.AddYears(2);
+
+                    // Buscar si existe el mismo lote en la sucursal de destino
+                    var branchLot = await _db.Lots
+                        .FirstOrDefaultAsync(l => l.IdWarehouse == requisition.IdRequestingWarehouse
+                                               && l.IdProduct == outDetail.IdProduct
+                                               && l.LotNumber == lotNumber);
+
+                    if (branchLot != null)
+                    {
+                        branchLot.Quantity += outDetail.Quantity;
+                        branchLot.IsActive = true;
+                    }
+                    else
+                    {
+                        branchLot = new Lot
+                        {
+                            IdProduct = outDetail.IdProduct,
+                            IdWarehouse = requisition.IdRequestingWarehouse,
+                            LotNumber = lotNumber,
+                            Quantity = outDetail.Quantity,
+                            ExpirationDate = expDate,
+                            CreationDate = DateTime.Now,
+                            IsActive = true
+                        };
+                        _db.Lots.Add(branchLot);
+                        await _db.SaveChangesAsync();
+                    }
+
+                    incomingMovement.Details.Add(new InventoryMovementDetail
+                    {
+                        IdInventoryMovement = incomingMovement.IdInventoryMovement,
+                        IdProduct = outDetail.IdProduct,
+                        IdLot = branchLot.IdLot,
+                        Quantity = outDetail.Quantity,
+                        UnitCost = outDetail.UnitCost
+                    });
+                }
+            }
+            else
+            {
+                // Respaldo en caso de que no hubiese detalle previo
+                foreach (var detail in requisition.Details.Where(d => d.DispatchedQuantity > 0))
+                {
+                    var branchLot = await _db.Lots
+                        .FirstOrDefaultAsync(l => l.IdWarehouse == requisition.IdRequestingWarehouse
+                                               && l.IdProduct == detail.IdProduct
+                                               && l.LotNumber == $"TRANSF-{requisition.RequisitionCode}");
+
+                    if (branchLot != null)
+                    {
+                        branchLot.Quantity += detail.DispatchedQuantity;
+                        branchLot.IsActive = true;
+                    }
+                    else
+                    {
+                        branchLot = new Lot
+                        {
+                            IdProduct = detail.IdProduct,
+                            IdWarehouse = requisition.IdRequestingWarehouse,
+                            LotNumber = $"TRANSF-{requisition.RequisitionCode}",
+                            Quantity = detail.DispatchedQuantity,
+                            ExpirationDate = DateTime.Today.AddYears(2),
+                            CreationDate = DateTime.Now,
+                            IsActive = true
+                        };
+                        _db.Lots.Add(branchLot);
+                        await _db.SaveChangesAsync();
+                    }
+
+                    incomingMovement.Details.Add(new InventoryMovementDetail
+                    {
+                        IdInventoryMovement = incomingMovement.IdInventoryMovement,
+                        IdProduct = detail.IdProduct,
+                        IdLot = branchLot.IdLot,
+                        Quantity = detail.DispatchedQuantity,
+                        UnitCost = detail.Product?.SuggestedPrice ?? 0
+                    });
+                }
+            }
+
+            // Estado 5 = COMPLETADO
+            var completedStatus = await _catalog.GetStatusByIdAsync(5)
+                ?? await _db.RequisitionStatuses.FirstOrDefaultAsync(s => s.Code == "COMPLETADO");
+
+            if (completedStatus != null)
+            {
+                requisition.IdRequisitionStatus = completedStatus.IdRequisitionStatus;
+            }
+
+            requisition.ReviewedDate = DateTime.Now;
+            requisition.IdReviewedByUser = userId;
+            if (!string.IsNullOrWhiteSpace(confirmationNote))
+            {
+                requisition.ReviewNote = string.IsNullOrWhiteSpace(requisition.ReviewNote)
+                    ? confirmationNote.Trim()
+                    : $"{requisition.ReviewNote} | Recepción: {confirmationNote.Trim()}";
+            }
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return true;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<bool> CancelRequisitionAsync(int id, int userId, string reason)

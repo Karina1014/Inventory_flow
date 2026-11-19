@@ -149,5 +149,56 @@ namespace Inventory_Flow.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [HttpPut("{id:int}/dispatch")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Dispatch(int id, [FromBody] DispatchRequisitionDto dto)
+        {
+            if (dto == null || dto.ProductDispatchedQuantities == null || dto.ProductDispatchedQuantities.Count == 0)
+            {
+                return BadRequest("Debe especificar las cantidades a despachar para cada producto.");
+            }
+
+            var userId = GetCurrentUserId();
+            if (userId <= 0)
+            {
+                userId = 1;
+            }
+
+            try
+            {
+                var success = await _requisitionRepo.UpdateDispatchedQuantitiesAsync(id, dto.ProductDispatchedQuantities, userId);
+                return success ? NoContent() : NotFound($"La requisición con id {id} no existe.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPut("{id:int}/receive")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ConfirmReceipt(int id, [FromBody] ConfirmReceiptRequisitionDto? dto)
+        {
+            var userId = GetCurrentUserId();
+            if (userId <= 0)
+            {
+                userId = 1;
+            }
+
+            try
+            {
+                var success = await _requisitionRepo.ConfirmBranchReceiptAsync(id, userId, dto?.ConfirmationNote);
+                return success ? NoContent() : NotFound($"La requisición con id {id} no existe.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

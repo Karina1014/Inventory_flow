@@ -1048,7 +1048,10 @@
             availableProducts = ProductRepo.GetProducts().Where(p => p.IsActive).OrderBy(p => p.Name).ToList();
 
             // Bodega matriz por defecto
-            var matriz = warehouses.FirstOrDefault(w => w.Name.Contains("Carapungo") || w.Name.Contains("Matriz"));
+            var matriz = warehouses.FirstOrDefault(w => w.Name.Contains("Carapungo", StringComparison.OrdinalIgnoreCase)
+                                                     || w.Name.Contains("Matriz", StringComparison.OrdinalIgnoreCase)
+                                                     || w.Name.Contains("Principal", StringComparison.OrdinalIgnoreCase)
+                                                     || (w.Address != null && w.Address.Contains("Carapungo", StringComparison.OrdinalIgnoreCase)));
             newWarehouseId = matriz?.IdWarehouse ?? (warehouses.FirstOrDefault()?.IdWarehouse ?? 0);
         }
         catch (Exception ex)

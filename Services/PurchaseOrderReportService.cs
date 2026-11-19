@@ -56,7 +56,10 @@ public class PurchaseOrderReportService : IPurchaseOrderReportService
         // Consultar la bodega central matriz directamente de la base de datos
         var matriz = await _db.Warehouses
             .AsNoTracking()
-            .FirstOrDefaultAsync(w => w.Name.Contains("Carapungo") || w.Name.Contains("Matriz"))
+            .FirstOrDefaultAsync(w => w.Name.Contains("Carapungo")
+                                   || w.Name.Contains("Matriz")
+                                   || w.Name.Contains("Principal")
+                                   || w.Address.Contains("Carapungo"))
             ?? order.DestinationWarehouse;
 
         // Mapear Cabecera 100% desde entidades de la base de datos relacional

@@ -142,7 +142,12 @@ public class PurchaseOrderRepository : IPurchaseOrderRepository
         {
             var matriz = await _db.Warehouses
                 .Where(w => w.IsActive)
-                .FirstOrDefaultAsync(w => w.Name.Contains("Carapungo") || w.Name.Contains("Matriz") || w.Name.Contains("Central"));
+                .FirstOrDefaultAsync(w => w.Name.Contains("Carapungo")
+                                       || w.Name.Contains("Matriz")
+                                       || w.Name.Contains("Principal")
+                                       || w.Name.Contains("Central")
+                                       || w.Address.Contains("Carapungo"))
+                ?? await _db.Warehouses.Where(w => w.IsActive).OrderBy(w => w.IdWarehouse).FirstOrDefaultAsync();
 
             destinationWarehouseId = matriz?.IdWarehouse
                 ?? throw new InvalidOperationException("No se encontró la bodega matriz Carapungo para recepcionar la orden.");
