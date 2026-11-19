@@ -133,7 +133,7 @@
               <Paragraph>
                 <TextRuns>
                   <TextRun>
-                    <Value>BODEGA PRINCIPAL MATRIZ</Value>
+                    <Value>=IIF(InStr(UCase(First(Fields!WarehouseName.Value, "DataSetHeader")), "MATRIZ") &gt; 0 OR InStr(UCase(First(Fields!WarehouseName.Value, "DataSetHeader")), "PRINCIPAL") &gt; 0, "BODEGA PRINCIPAL MATRIZ", "ALMACÉN SUCURSAL")</Value>
                     <Style><FontFamily>Arial</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#555555</Color></Style>
                   </TextRun>
                 </TextRuns>
@@ -197,7 +197,7 @@
         <ReportItems>
           <Textbox Name="LblBodega">
             <Top>0.15cm</Top><Left>0.3cm</Left><Height>0.45cm</Height><Width>3.0cm</Width>
-            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Almacén Matriz:</Value><Style><FontFamily>Arial</FontFamily><FontSize>8.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>=IIF(InStr(UCase(First(Fields!WarehouseName.Value, "DataSetHeader")), "MATRIZ") &gt; 0 OR InStr(UCase(First(Fields!WarehouseName.Value, "DataSetHeader")), "PRINCIPAL") &gt; 0, "Almacén Matriz:", "Sucursal:")</Value><Style><FontFamily>Arial</FontFamily><FontSize>8.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs>
           </Textbox>
           <Textbox Name="ValBodega">
             <Top>0.15cm</Top><Left>3.3cm</Left><Height>0.45cm</Height><Width>8.5cm</Width>
@@ -534,7 +534,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>* Reporte oficial de existencias y control sanitario de la Bodega Matriz Carapungo. Notificado automáticamente al Bodeguero Principal vía n8n &amp; Evolution API. Los lotes en cuarentena (vencidos) deben ser dados de baja y separados físicamente del almacén principal.</Value>
+                <Value>="* Reporte oficial de existencias y control sanitario de " &amp; First(Fields!WarehouseName.Value, "DataSetHeader") &amp; ". Notificado vía n8n &amp; Evolution API. Los lotes en cuarentena (vencidos) deben ser dados de baja y separados físicamente del almacén."</Value>
                 <Style>
                   <FontFamily>Arial</FontFamily>
                   <FontSize>7.5pt</FontSize>

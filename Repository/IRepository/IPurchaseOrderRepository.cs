@@ -22,4 +22,5 @@ public interface IPurchaseOrderRepository
     Task<bool> ProcessFinancialApprovalAsync(int id, bool approved, int financialUserId, string? note = null);
     Task<bool> UpdateStatusAsync(int id, string newStatusCode, int userId, string? note = null);
     Task<bool> CancelOrderAsync(int id, int userId, string reason);
+    Task<bool> ReceiveOrderShipmentAsync(ReceivePurchaseOrderDto dto, int userId);
 }

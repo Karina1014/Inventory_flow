@@ -198,6 +198,15 @@
                                     </td>
                                     <td class="text-end pe-3">
                                         <div class="d-inline-flex gap-1">
+                                            @if (CanReceive(order))
+                                            {
+                                                <button type="button"
+                                                        class="btn-action-icon text-success"
+                                                        title="Recepcionar Mercadería (Ingreso con Lotes)"
+                                                        @onclick="() => OpenReceiveModal(order)">
+                                                    <i class="bi bi-box-arrow-in-down"></i>
+                                                </button>
+                                            }
                                             <button type="button"
                                                     class="btn-action-icon text-danger"
                                                     title="Imprimir / Ver PDF (Report Builder)"
@@ -686,6 +695,12 @@
             </div>
 
             <div class="modal-footer-custom">
+                @if (CanReceive(selectedOrder))
+                {
+                    <button type="button" class="btn btn-success" @onclick="() => OpenReceiveModal(selectedOrder)">
+                        <i class="bi bi-box-arrow-in-down me-1"></i>Recepcionar Mercadería
+                    </button>
+                }
                 <button type="button" class="btn btn-outline-danger" @onclick="() => OpenPdf(selectedOrder.IdPurchaseOrder)">
                     <i class="bi bi-file-earmark-pdf me-1"></i>Imprimir / Ver PDF
                 </button>
@@ -810,6 +825,130 @@
     </div>
 }
 
+<!-- ==================== MODAL: RECEPCIONAR MERCADERÍA (LOTES Y FEFO) ==================== -->
+@if (showReceiveModal && selectedOrder != null)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-dialog-custom modal-dialog-lg" style="max-width: 900px;">
+            <div class="modal-header-custom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="header-icon-box text-success" style="width:36px; height:36px; font-size:1.1rem; background-color:#D1FAE5;">
+                        <i class="bi bi-box-arrow-in-down"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark">Recepción Física de Mercadería (Ingreso con Lotes)</h5>
+                        <span class="text-muted small">Orden N° @selectedOrder.OrderNumber · Destino: @(selectedOrder.DestinationWarehouse?.Name ?? "Matriz")</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" @onclick="CloseModals"></button>
+            </div>
+
+            <div class="modal-body-custom">
+                @if (!string.IsNullOrWhiteSpace(receiveErrorMessage))
+                {
+                    <div class="alert alert-danger d-flex align-items-center gap-2 mb-3">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <span>@receiveErrorMessage</span>
+                    </div>
+                }
+
+                <!-- Datos de la Entrega -->
+                <div class="row g-2 mb-3 p-2 bg-light rounded border">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold text-muted mb-1">N° Guía de Remisión o Factura Proveedor</label>
+                        <input type="text" class="form-control form-control-flat"
+                               placeholder="Ej: 001-002-0001248"
+                               @bind="receiveDto.DeliveryNoteNumber" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold text-muted mb-1">Notas de Control de Calidad / Recepción</label>
+                        <input type="text" class="form-control form-control-flat"
+                               placeholder="Ej: Embalaje en perfecto estado, cadena de frío verificada"
+                               @bind="receiveDto.ReceptionNotes" />
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold mb-0 text-dark">Ítems Pendientes por Ingresar</h6>
+                    <span class="text-muted small">Ingrese la cantidad recibida, código de lote y fecha de vencimiento del fabricante.</span>
+                </div>
+
+                @if (receiveDto.Items.Count == 0)
+                {
+                    <div class="alert alert-info py-2">
+                        Todos los productos de esta orden ya han sido recibidos completamente.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive border rounded">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr class="text-muted small">
+                                    <th>Producto</th>
+                                    <th class="text-center" style="width: 80px;">Pedido</th>
+                                    <th class="text-center" style="width: 80px;">Pendiente</th>
+                                    <th style="width: 120px;">Cant. Recibir</th>
+                                    <th style="width: 160px;">N° Lote Fabricante *</th>
+                                    <th style="width: 150px;">Fecha Caducidad *</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in receiveDto.Items)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold text-dark">@item.ProductName</div>
+                                            <span class="text-muted font-monospace small">@item.ProductCode</span>
+                                        </td>
+                                        <td class="text-center font-monospace">@item.OrderedQuantity</td>
+                                        <td class="text-center font-monospace fw-bold text-primary">@item.RemainingQuantity</td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm text-center font-monospace"
+                                                   min="0" max="@item.RemainingQuantity"
+                                                   @bind="item.QuantityToReceive" />
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm text-uppercase"
+                                                   placeholder="Ej: L2611-001"
+                                                   disabled="@(item.QuantityToReceive == 0)"
+                                                   @bind="item.LotNumber" />
+                                        </td>
+                                        <td>
+                                            <input type="date" class="form-control form-control-sm"
+                                                   disabled="@(item.QuantityToReceive == 0)"
+                                                   @bind="item.ExpirationDate" />
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-flat-secondary" @onclick="CloseModals">Cancelar</button>
+                <button type="button"
+                        class="btn btn-success"
+                        disabled="@(isReceiving || receiveDto.Items.Count == 0 || !receiveDto.Items.Any(i => i.QuantityToReceive > 0))"
+                        @onclick="ConfirmReceiveOrderAsync">
+                    @if (isReceiving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                        <span>Ingresando a Inventario...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-box-seam me-1"></i>
+                        <span>Confirmar e Ingresar a Bodega</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private const string TabOrders = "orders";
     private const string TabFinancial = "financial";
@@ -845,6 +984,11 @@
     private bool showDetailModal = false;
     private bool showApprovalModal = false;
     private bool showCancelModal = false;
+    private bool showReceiveModal = false;
+
+    private ReceivePurchaseOrderDto receiveDto = new();
+    private string receiveErrorMessage = string.Empty;
+    private bool isReceiving = false;
 
     private PurchaseOrder? selectedOrder;
 
@@ -1204,6 +1348,95 @@
         }
     }
 
+    private bool CanReceive(PurchaseOrder? order)
+    {
+        if (order?.PurchaseOrderStatus == null) return false;
+        var code = order.PurchaseOrderStatus.Code;
+        return code == "APROBADO_FINANCIERO" || code == "EMITIDO_PROVEEDOR" || code == "RECIBIDO_PARCIAL";
+    }
+
+    private void OpenReceiveModal(PurchaseOrder order)
+    {
+        selectedOrder = order;
+        receiveErrorMessage = string.Empty;
+        receiveDto = new ReceivePurchaseOrderDto
+        {
+            IdPurchaseOrder = order.IdPurchaseOrder,
+            DeliveryNoteNumber = string.Empty,
+            ReceptionNotes = string.Empty,
+            Items = order.Details.Select(d => new ReceivePurchaseOrderItemDto
+            {
+                IdPurchaseOrderDetail = d.IdPurchaseOrderDetail,
+                IdProduct = d.IdProduct,
+                ProductCode = d.Product?.Code ?? "-",
+                ProductName = d.Product?.Name ?? "Producto",
+                OrderedQuantity = d.Quantity,
+                PreviouslyReceivedQuantity = d.ReceivedQuantity,
+                QuantityToReceive = Math.Max(0, d.Quantity - d.ReceivedQuantity),
+                LotNumber = string.Empty,
+                ExpirationDate = DateTime.Today.AddMonths(18)
+            }).Where(i => i.RemainingQuantity > 0).ToList()
+        };
+        showReceiveModal = true;
+    }
+
+    private async Task ConfirmReceiveOrderAsync()
+    {
+        if (selectedOrder == null) return;
+
+        var itemsToReceive = receiveDto.Items.Where(i => i.QuantityToReceive > 0).ToList();
+        if (!itemsToReceive.Any())
+        {
+            receiveErrorMessage = "Debe ingresar una cantidad a recibir mayor a 0 en al menos un producto.";
+            return;
+        }
+
+        foreach (var item in itemsToReceive)
+        {
+            if (string.IsNullOrWhiteSpace(item.LotNumber))
+            {
+                receiveErrorMessage = $"Debe ingresar el número de lote del fabricante para el producto '{item.ProductName}'.";
+                return;
+            }
+
+            if (item.ExpirationDate <= DateTime.Today)
+            {
+                receiveErrorMessage = $"La fecha de caducidad del lote '{item.LotNumber}' ({item.ExpirationDate:dd/MM/yyyy}) debe ser posterior a la fecha actual.";
+                return;
+            }
+
+            if (item.QuantityToReceive > item.RemainingQuantity)
+            {
+                receiveErrorMessage = $"La cantidad a recibir de '{item.ProductName}' ({item.QuantityToReceive}) supera la cantidad pendiente ({item.RemainingQuantity}).";
+                return;
+            }
+        }
+
+        isReceiving = true;
+        receiveErrorMessage = string.Empty;
+
+        try
+        {
+            var userId = CurrentUserService.UserId > 0 ? CurrentUserService.UserId : 1;
+            var success = await OrderRepo.ReceiveOrderShipmentAsync(receiveDto, userId);
+            if (success)
+            {
+                ToastService.Success($"Recepción de la Orden #{selectedOrder.OrderNumber} registrada exitosamente. Lotes y stock ingresados en {selectedOrder.DestinationWarehouse?.Name}.");
+                CloseModals();
+                await LoadOrdersAsync();
+                await LoadFinancialPendingOrdersAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            receiveErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isReceiving = false;
+        }
+    }
+
     private async Task OpenPdf(int idPurchaseOrder)
     {
         if (idPurchaseOrder <= 0) return;
@@ -1217,7 +1450,9 @@
         showDetailModal = false;
         showApprovalModal = false;
         showCancelModal = false;
+        showReceiveModal = false;
         selectedOrder = null;
         createErrorMessage = string.Empty;
+        receiveErrorMessage = string.Empty;
     }
 }

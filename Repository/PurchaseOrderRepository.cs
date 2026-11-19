@@ -287,4 +287,163 @@ public class PurchaseOrderRepository : IPurchaseOrderRepository
         await _db.SaveChangesAsync();
         return true;
     }
+
+    public async Task<bool> ReceiveOrderShipmentAsync(ReceivePurchaseOrderDto dto, int userId)
+    {
+        if (dto == null || dto.Items == null || !dto.Items.Any(i => i.QuantityToReceive > 0))
+        {
+            throw new InvalidOperationException("Debe ingresar al menos un ítem con cantidad mayor a cero para recepcionar.");
+        }
+
+        using var transaction = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            var order = await _db.PurchaseOrders
+                .Include(o => o.PurchaseOrderStatus)
+                .Include(o => o.Details)
+                    .ThenInclude(d => d.Product)
+                .FirstOrDefaultAsync(o => o.IdPurchaseOrder == dto.IdPurchaseOrder);
+
+            if (order == null)
+            {
+                throw new InvalidOperationException($"La orden de compra #{dto.IdPurchaseOrder} no existe.");
+            }
+
+            // Validar que la orden esté en un estado apto para recepcionar mercadería
+            var validCodes = new[] { "APROBADO_FINANCIERO", "EMITIDO_PROVEEDOR", "RECIBIDO_PARCIAL" };
+            var currentCode = order.PurchaseOrderStatus?.Code ?? string.Empty;
+            if (!validCodes.Contains(currentCode))
+            {
+                throw new InvalidOperationException(
+                    $"No se puede registrar recepción física para una orden en estado '{order.PurchaseOrderStatus?.Name ?? currentCode}'. Debe estar aprobada o emitida al proveedor.");
+            }
+
+            // Buscar o crear tipo de movimiento de entrada
+            var movementType = await _db.MovementTypes
+                .FirstOrDefaultAsync(m => m.Code == "ENT_COMPRA" || m.Mode.ToLower() == "entrada" || m.Code == "ENT-01");
+
+            if (movementType == null)
+            {
+                movementType = new MovementType
+                {
+                    Code = "ENT_COMPRA",
+                    Mode = "Entrada",
+                    Description = "Ingreso al inventario por compra a proveedor",
+                    CreationDate = DateTime.Now
+                };
+                _db.MovementTypes.Add(movementType);
+                await _db.SaveChangesAsync();
+            }
+
+            // Crear cabecera del movimiento de inventario
+            var guideInfo = !string.IsNullOrWhiteSpace(dto.DeliveryNoteNumber) ? $" | Guía/Factura: {dto.DeliveryNoteNumber.Trim()}" : "";
+            var notesInfo = !string.IsNullOrWhiteSpace(dto.ReceptionNotes) ? $" | Obs: {dto.ReceptionNotes.Trim()}" : "";
+
+            var movement = new InventoryMovement
+            {
+                MovementDate = DateTime.Now,
+                IdMovementType = movementType.IdMovementType,
+                IdOriginWarehouse = null, // Entrada pura
+                IdDestinationWarehouse = order.IdDestinationWarehouse,
+                IdUser = userId,
+                Observation = $"Recepción de Orden de Compra {order.OrderNumber}{guideInfo}{notesInfo}",
+                ReferenceId = order.IdPurchaseOrder,
+                ReferenceSource = "ORDEN_COMPRA"
+            };
+
+            _db.InventoryMovements.Add(movement);
+            await _db.SaveChangesAsync();
+
+            // Procesar cada ítem recibido
+            foreach (var item in dto.Items.Where(i => i.QuantityToReceive > 0))
+            {
+                var detail = order.Details.FirstOrDefault(d => d.IdPurchaseOrderDetail == item.IdPurchaseOrderDetail);
+                if (detail == null)
+                {
+                    throw new InvalidOperationException($"El detalle con ID {item.IdPurchaseOrderDetail} no pertenece a esta orden de compra.");
+                }
+
+                int remaining = Math.Max(0, detail.Quantity - detail.ReceivedQuantity);
+                if (item.QuantityToReceive > remaining)
+                {
+                    throw new InvalidOperationException(
+                        $"La cantidad a recibir ({item.QuantityToReceive}) para '{detail.Product?.Name}' excede la cantidad pendiente ({remaining}).");
+                }
+
+                if (string.IsNullOrWhiteSpace(item.LotNumber))
+                {
+                    throw new InvalidOperationException($"Debe ingresar el número de lote para el producto '{detail.Product?.Name}'.");
+                }
+
+                if (item.ExpirationDate <= DateTime.Today)
+                {
+                    throw new InvalidOperationException(
+                        $"La fecha de caducidad ({item.ExpirationDate:dd/MM/yyyy}) para el lote '{item.LotNumber}' debe ser posterior a la fecha de hoy.");
+                }
+
+                var cleanLotNumber = item.LotNumber.Trim().ToUpperInvariant();
+
+                // Buscar si ya existe el lote en ese almacén con esa caducidad
+                var lot = await _db.Lots.FirstOrDefaultAsync(l =>
+                    l.IdProduct == detail.IdProduct &&
+                    l.IdWarehouse == order.IdDestinationWarehouse &&
+                    l.LotNumber == cleanLotNumber &&
+                    l.ExpirationDate.Date == item.ExpirationDate.Date);
+
+                if (lot != null)
+                {
+                    lot.Quantity += item.QuantityToReceive;
+                    lot.IsActive = true;
+                }
+                else
+                {
+                    lot = new Lot
+                    {
+                        IdProduct = detail.IdProduct,
+                        IdWarehouse = order.IdDestinationWarehouse,
+                        LotNumber = cleanLotNumber,
+                        Quantity = item.QuantityToReceive,
+                        ExpirationDate = item.ExpirationDate.Date,
+                        IsActive = true,
+                        CreationDate = DateTime.Now
+                    };
+                    _db.Lots.Add(lot);
+                    await _db.SaveChangesAsync();
+                }
+
+                // Actualizar detalle de la orden
+                detail.ReceivedQuantity += item.QuantityToReceive;
+
+                // Crear detalle del movimiento de inventario
+                var movementDetail = new InventoryMovementDetail
+                {
+                    IdInventoryMovement = movement.IdInventoryMovement,
+                    IdProduct = detail.IdProduct,
+                    IdLot = lot.IdLot,
+                    Quantity = item.QuantityToReceive,
+                    UnitCost = detail.UnitPrice
+                };
+                _db.InventoryMovementDetails.Add(movementDetail);
+            }
+
+            // Determinar si la orden se completó en su totalidad o parcialmente
+            bool allReceived = order.Details.All(d => d.ReceivedQuantity >= d.Quantity);
+            var targetStatusCode = allReceived ? "RECIBIDO_TOTAL" : "RECIBIDO_PARCIAL";
+
+            var targetStatus = await _catalog.GetStatusByCodeAsync(targetStatusCode)
+                ?? await _db.PurchaseOrderStatuses.FirstOrDefaultAsync(s => s.Code == targetStatusCode)
+                ?? throw new InvalidOperationException($"No se encontró el estado '{targetStatusCode}' en el catálogo.");
+
+            order.IdPurchaseOrderStatus = targetStatus.IdPurchaseOrderStatus;
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return true;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
 }

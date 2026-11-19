@@ -126,6 +126,40 @@ namespace Inventory_Flow.Controllers
             }
         }
 
+        [HttpPost("{id:int}/receive")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ReceiveOrder(int id, [FromBody] ReceivePurchaseOrderDto dto)
+        {
+            if (dto == null)
+            {
+                return BadRequest("Datos de recepción inválidos.");
+            }
+
+            dto.IdPurchaseOrder = id;
+            var userId = GetCurrentUserId();
+            if (userId <= 0)
+            {
+                userId = 1;
+            }
+
+            try
+            {
+                var success = await _orderRepo.ReceiveOrderShipmentAsync(dto, userId);
+                return success ? Ok(new { message = "Mercadería recibida e ingresada al inventario exitosamente." }) : NotFound($"La orden con id {id} no existe.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                var fullError = ex.InnerException != null ? $"{ex.Message} -> {ex.InnerException.Message}" : ex.Message;
+                return BadRequest($"Error procesando la recepción: {fullError}");
+            }
+        }
+
         [HttpPut("{id:int}/financial-approval")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]

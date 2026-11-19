@@ -123,6 +123,12 @@ public class MatrixStockReportService : IMatrixStockReportService
             throw new InvalidOperationException("No se encontró ninguna sucursal o almacén registrado en la base de datos.");
         }
 
+        // Consultar almacén matriz para datos generales de la empresa
+        var matriz = await _db.Warehouses
+            .AsNoTracking()
+            .FirstOrDefaultAsync(w => w.Name.Contains("Carapungo") || w.Name.Contains("Matriz") || w.Name.Contains("Principal"))
+            ?? warehouse;
+
         // 2. Obtener ventana de días de alerta de caducidad (30 por defecto) y umbral activo de bajo stock
         int alertDays = 30;
         if (int.TryParse(_configuration["InventorySettings:ExpirationAlertDays"], out int days) && days > 0)
@@ -234,9 +240,9 @@ public class MatrixStockReportService : IMatrixStockReportService
         // 5. Construir Cabecera
         var header = new MatrixStockReportHeaderDto
         {
-            CompanyName = "MedVet Enterprise - Matriz Carapungo",
+            CompanyName = "MedVet Enterprise",
             CompanyRuc = "1792345678001",
-            CompanyAddress = !string.IsNullOrWhiteSpace(warehouse.Address) ? warehouse.Address : "Av. Panamericana Norte y Galo Plaza, Carapungo, Quito",
+            CompanyAddress = !string.IsNullOrWhiteSpace(matriz.Address) ? matriz.Address : "Carapungo, Quito",
             CompanyPhone = "(02) 289-4560",
 
             WarehouseName = warehouse.Name,
