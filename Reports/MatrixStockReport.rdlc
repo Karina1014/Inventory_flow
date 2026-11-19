@@ -1,0 +1,561 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <AutoRefresh>0</AutoRefresh>
+  <DataSources>
+    <DataSource Name="MatrixStockDataSource">
+      <ConnectionProperties>
+        <DataProvider>System.Data.DataSet</DataProvider>
+        <ConnectString>/* Local Connection */</ConnectString>
+      </ConnectionProperties>
+      <rd:DataSourceID>e2c3d4e5-f6a7-8901-bcde-fa2345678901</rd:DataSourceID>
+    </DataSource>
+  </DataSources>
+  <DataSets>
+    <DataSet Name="DataSetHeader">
+      <Query>
+        <DataSourceName>MatrixStockDataSource</DataSourceName>
+        <CommandText>/* Local Query */</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="CompanyName"><DataField>CompanyName</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CompanyRuc"><DataField>CompanyRuc</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CompanyAddress"><DataField>CompanyAddress</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CompanyPhone"><DataField>CompanyPhone</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="WarehouseName"><DataField>WarehouseName</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="WarehouseAddress"><DataField>WarehouseAddress</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="GeneratedAt"><DataField>GeneratedAt</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="ExpirationAlertDays"><DataField>ExpirationAlertDays</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="TotalProductsCount"><DataField>TotalProductsCount</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="TotalLotsCount"><DataField>TotalLotsCount</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="TotalUnitsCount"><DataField>TotalUnitsCount</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="TotalValuedAmount"><DataField>TotalValuedAmount</DataField><rd:TypeName>System.Decimal</rd:TypeName></Field>
+        <Field Name="ExpiringSoonLotsCount"><DataField>ExpiringSoonLotsCount</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="ExpiredLotsCount"><DataField>ExpiredLotsCount</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="ValidLotsCount"><DataField>ValidLotsCount</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="LowStockProductsCount"><DataField>LowStockProductsCount</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="ActiveThreshold"><DataField>ActiveThreshold</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="GeneratedBy"><DataField>GeneratedBy</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DataSetItems">
+      <Query>
+        <DataSourceName>MatrixStockDataSource</DataSourceName>
+        <CommandText>/* Local Query */</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="ItemIndex"><DataField>ItemIndex</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="ProductCode"><DataField>ProductCode</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="ProductName"><DataField>ProductName</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CategoryName"><DataField>CategoryName</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="LotNumber"><DataField>LotNumber</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="ExpirationDate"><DataField>ExpirationDate</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="DaysRemaining"><DataField>DaysRemaining</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="Quantity"><DataField>Quantity</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="UnitPrice"><DataField>UnitPrice</DataField><rd:TypeName>System.Decimal</rd:TypeName></Field>
+        <Field Name="TotalValue"><DataField>TotalValue</DataField><rd:TypeName>System.Decimal</rd:TypeName></Field>
+        <Field Name="Status"><DataField>Status</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+      </Fields>
+    </DataSet>
+  </DataSets>
+  <Body>
+    <ReportItems>
+      <!-- ==================== ENCABEZADO SUPERIOR IZQUIERDO ==================== -->
+      <Textbox Name="TxtEmpresaTitulo">
+        <Top>0.4cm</Top>
+        <Left>0.5cm</Left>
+        <Height>0.7cm</Height>
+        <Width>12.0cm</Width>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
+              <TextRun>
+                <Value>=First(Fields!CompanyName.Value, "DataSetHeader")</Value>
+                <Style>
+                  <FontFamily>Arial</FontFamily>
+                  <FontSize>15pt</FontSize>
+                  <FontWeight>Bold</FontWeight>
+                  <Color>#000000</Color>
+                </Style>
+              </TextRun>
+            </TextRuns>
+          </Paragraph>
+        </Paragraphs>
+      </Textbox>
+      <Textbox Name="TxtEmpresaDireccion">
+        <Top>1.15cm</Top>
+        <Left>0.5cm</Left>
+        <Height>0.4cm</Height>
+        <Width>12.0cm</Width>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
+              <TextRun>
+                <Value>=First(Fields!CompanyAddress.Value, "DataSetHeader")</Value>
+                <Style><FontFamily>Arial</FontFamily><FontSize>8.5pt</FontSize><Color>#333333</Color></Style>
+              </TextRun>
+            </TextRuns>
+          </Paragraph>
+        </Paragraphs>
+      </Textbox>
+      <Textbox Name="TxtEmpresaTelf">
+        <Top>1.6cm</Top>
+        <Left>0.5cm</Left>
+        <Height>0.4cm</Height>
+        <Width>12.0cm</Width>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
+              <TextRun>
+                <Value>="Telf: " &amp; First(Fields!CompanyPhone.Value, "DataSetHeader") &amp; "  |  R.U.C.: " &amp; First(Fields!CompanyRuc.Value, "DataSetHeader")</Value>
+                <Style><FontFamily>Arial</FontFamily><FontSize>8.5pt</FontSize><Color>#333333</Color></Style>
+              </TextRun>
+            </TextRuns>
+          </Paragraph>
+        </Paragraphs>
+      </Textbox>
+
+      <!-- ==================== RECUADRO SUPERIOR DERECHO ==================== -->
+      <Rectangle Name="RectTituloReporte">
+        <Top>0.4cm</Top>
+        <Left>13.2cm</Left>
+        <Height>1.8cm</Height>
+        <Width>6.8cm</Width>
+        <Style>
+          <Border><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></Border>
+        </Style>
+        <ReportItems>
+          <Textbox Name="TxtTopEtiqueta">
+            <Top>0.15cm</Top>
+            <Left>0.2cm</Left>
+            <Height>0.45cm</Height>
+            <Width>6.4cm</Width>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>BODEGA PRINCIPAL MATRIZ</Value>
+                    <Style><FontFamily>Arial</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#555555</Color></Style>
+                  </TextRun>
+                </TextRuns>
+                <Style><TextAlign>Center</TextAlign></Style>
+              </Paragraph>
+            </Paragraphs>
+          </Textbox>
+          <Rectangle Name="RectBarraGris">
+            <Top>0.65cm</Top>
+            <Left>0.2cm</Left>
+            <Height>0.55cm</Height>
+            <Width>6.4cm</Width>
+            <Style><BackgroundColor>#F0F2F5</BackgroundColor></Style>
+            <ReportItems>
+              <Textbox Name="TxtSubTitulo">
+                <Top>0.05cm</Top>
+                <Left>0.1cm</Left>
+                <Height>0.45cm</Height>
+                <Width>6.2cm</Width>
+                <Paragraphs>
+                  <Paragraph>
+                    <TextRuns>
+                      <TextRun>
+                        <Value>EXISTENCIAS Y CADUCIDADES</Value>
+                        <Style><FontFamily>Arial</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#0066A1</Color></Style>
+                      </TextRun>
+                    </TextRuns>
+                    <Style><TextAlign>Center</TextAlign></Style>
+                  </Paragraph>
+                </Paragraphs>
+              </Textbox>
+            </ReportItems>
+          </Rectangle>
+          <Textbox Name="TxtFechaHoraTop">
+            <Top>1.25cm</Top>
+            <Left>0.2cm</Left>
+            <Height>0.45cm</Height>
+            <Width>6.4cm</Width>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>=First(Fields!GeneratedAt.Value, "DataSetHeader")</Value>
+                    <Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize><FontWeight>Bold</FontWeight></Style>
+                  </TextRun>
+                </TextRuns>
+                <Style><TextAlign>Center</TextAlign></Style>
+              </Paragraph>
+            </Paragraphs>
+          </Textbox>
+        </ReportItems>
+      </Rectangle>
+
+      <!-- ==================== RECUADRO DE DATOS DE LA BODEGA ==================== -->
+      <Rectangle Name="RectDatosBodega">
+        <Top>2.4cm</Top>
+        <Left>0.5cm</Left>
+        <Height>1.3cm</Height>
+        <Width>19.5cm</Width>
+        <Style><Border><Style>Solid</Style><Color>#E0E0E0</Color><Width>1pt</Width></Border></Style>
+        <ReportItems>
+          <Textbox Name="LblBodega">
+            <Top>0.15cm</Top><Left>0.3cm</Left><Height>0.45cm</Height><Width>3.0cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Almacén Matriz:</Value><Style><FontFamily>Arial</FontFamily><FontSize>8.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+          <Textbox Name="ValBodega">
+            <Top>0.15cm</Top><Left>3.3cm</Left><Height>0.45cm</Height><Width>8.5cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>=First(Fields!WarehouseName.Value, "DataSetHeader")</Value><Style><FontFamily>Arial</FontFamily><FontSize>8.5pt</FontSize><FontWeight>Bold</FontWeight><Color>#0066A1</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+
+          <Textbox Name="LblValorizacion">
+            <Top>0.15cm</Top><Left>12.0cm</Left><Height>0.45cm</Height><Width>3.2cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Valor Total Inventario:</Value><Style><FontFamily>Arial</FontFamily><FontSize>8.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+          <Textbox Name="ValValorizacion">
+            <Top>0.15cm</Top><Left>15.2cm</Left><Height>0.45cm</Height><Width>4.0cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>="$ " &amp; CStr(First(Fields!TotalValuedAmount.Value, "DataSetHeader"))</Value><Style><FontFamily>Arial</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#27AE60</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+
+          <Textbox Name="LblUbicacion">
+            <Top>0.65cm</Top><Left>0.3cm</Left><Height>0.45cm</Height><Width>3.0cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Ubicación:</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+          <Textbox Name="ValUbicacion">
+            <Top>0.65cm</Top><Left>3.3cm</Left><Height>0.45cm</Height><Width>8.5cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>=First(Fields!WarehouseAddress.Value, "DataSetHeader")</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+
+          <Textbox Name="LblVentana">
+            <Top>0.65cm</Top><Left>12.0cm</Left><Height>0.45cm</Height><Width>3.2cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Ventana Caducidad:</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+          <Textbox Name="ValVentana">
+            <Top>0.65cm</Top><Left>15.2cm</Left><Height>0.45cm</Height><Width>4.0cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>=CStr(First(Fields!ExpirationAlertDays.Value, "DataSetHeader")) &amp; " días"</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+        </ReportItems>
+      </Rectangle>
+
+      <!-- ==================== TARJETAS DE RESUMEN (KPIs) ==================== -->
+      <!-- Card 1: Total Unidades -->
+      <Rectangle Name="CardTotalUnidades">
+        <Top>3.9cm</Top>
+        <Left>0.5cm</Left>
+        <Height>1.0cm</Height>
+        <Width>6.2cm</Width>
+        <Style><BackgroundColor>#F4F8FA</BackgroundColor><Border><Style>Solid</Style><Color>#BCE8F1</Color><Width>1pt</Width></Border></Style>
+        <ReportItems>
+          <Textbox Name="TxtKpiUnidadesLbl">
+            <Top>0.1cm</Top><Left>0.2cm</Left><Height>0.35cm</Height><Width>5.8cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>UNIDADES TOTALES EN STOCK</Value><Style><FontFamily>Arial</FontFamily><FontSize>7pt</FontSize><FontWeight>Bold</FontWeight><Color>#31708F</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+          <Textbox Name="TxtKpiUnidadesVal">
+            <Top>0.45cm</Top><Left>0.2cm</Left><Height>0.45cm</Height><Width>5.8cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>=CStr(First(Fields!TotalUnitsCount.Value, "DataSetHeader")) &amp; " Unidades (" &amp; CStr(First(Fields!TotalLotsCount.Value, "DataSetHeader")) &amp; " lotes)"</Value><Style><FontFamily>Arial</FontFamily><FontSize>9.5pt</FontSize><FontWeight>Bold</FontWeight><Color>#0066A1</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+        </ReportItems>
+      </Rectangle>
+
+      <!-- Card 2: Lotes Próximos a Vencer -->
+      <Rectangle Name="CardPorVencer">
+        <Top>3.9cm</Top>
+        <Left>7.15cm</Left>
+        <Height>1.0cm</Height>
+        <Width>6.2cm</Width>
+        <Style><BackgroundColor>#FEF5E7</BackgroundColor><Border><Style>Solid</Style><Color>#FAD7A0</Color><Width>1pt</Width></Border></Style>
+        <ReportItems>
+          <Textbox Name="TxtKpiPorVencerLbl">
+            <Top>0.1cm</Top><Left>0.2cm</Left><Height>0.35cm</Height><Width>5.8cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>PRODUCTOS EN ALERTA / BAJO STOCK</Value><Style><FontFamily>Arial</FontFamily><FontSize>7pt</FontSize><FontWeight>Bold</FontWeight><Color>#D35400</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+          <Textbox Name="TxtKpiPorVencerVal">
+            <Top>0.45cm</Top><Left>0.2cm</Left><Height>0.45cm</Height><Width>5.8cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>=CStr(First(Fields!LowStockProductsCount.Value, "DataSetHeader")) &amp; " Ítems"</Value><Style><FontFamily>Arial</FontFamily><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight><Color>#D35400</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+        </ReportItems>
+      </Rectangle>
+
+      <!-- Card 3: Lotes Vencidos -->
+      <Rectangle Name="CardVencidos">
+        <Top>3.9cm</Top>
+        <Left>13.8cm</Left>
+        <Height>1.0cm</Height>
+        <Width>6.2cm</Width>
+        <Style><BackgroundColor>#FDEDEC</BackgroundColor><Border><Style>Solid</Style><Color>#F5B7B1</Color><Width>1pt</Width></Border></Style>
+        <ReportItems>
+          <Textbox Name="TxtKpiVencidosLbl">
+            <Top>0.1cm</Top><Left>0.2cm</Left><Height>0.35cm</Height><Width>5.8cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>LOTES VENCIDOS (CUARENTENA)</Value><Style><FontFamily>Arial</FontFamily><FontSize>7pt</FontSize><FontWeight>Bold</FontWeight><Color>#C0392B</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+          <Textbox Name="TxtKpiVencidosVal">
+            <Top>0.45cm</Top><Left>0.2cm</Left><Height>0.45cm</Height><Width>5.8cm</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>=CStr(First(Fields!ExpiredLotsCount.Value, "DataSetHeader")) &amp; " Lotes"</Value><Style><FontFamily>Arial</FontFamily><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight><Color>#C0392B</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+          </Textbox>
+        </ReportItems>
+      </Rectangle>
+
+      <!-- ==================== TABLA DETALLADA DE EXISTENCIAS Y LOTES ==================== -->
+      <Tablix Name="TablixMatrixStock">
+        <Top>5.2cm</Top>
+        <Left>0.5cm</Left>
+        <Height>1.2cm</Height>
+        <Width>19.5cm</Width>
+        <DataSetName>DataSetItems</DataSetName>
+        <TablixBody>
+          <TablixColumns>
+            <TablixColumn><Width>0.8cm</Width></TablixColumn>
+            <TablixColumn><Width>5.1cm</Width></TablixColumn>
+            <TablixColumn><Width>2.6cm</Width></TablixColumn>
+            <TablixColumn><Width>2.4cm</Width></TablixColumn>
+            <TablixColumn><Width>2.0cm</Width></TablixColumn>
+            <TablixColumn><Width>1.6cm</Width></TablixColumn>
+            <TablixColumn><Width>1.6cm</Width></TablixColumn>
+            <TablixColumn><Width>1.8cm</Width></TablixColumn>
+            <TablixColumn><Width>1.6cm</Width></TablixColumn>
+          </TablixColumns>
+          <TablixRows>
+            <!-- FILA ENCABEZADO -->
+            <TablixRow>
+              <Height>0.6cm</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="ColNum">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>#</Value><Style><FontFamily>Arial</FontFamily><FontSize>7.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+                      <Style>
+                        <TopBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></TopBorder>
+                        <BottomBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></BottomBorder>
+                        <PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="ColProducto">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>PRODUCTO</Value><Style><FontFamily>Arial</FontFamily><FontSize>7.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+                      <Style>
+                        <TopBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></TopBorder>
+                        <BottomBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></BottomBorder>
+                        <PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="ColCat">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>CATEGORÍA</Value><Style><FontFamily>Arial</FontFamily><FontSize>7.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+                      <Style>
+                        <TopBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></TopBorder>
+                        <BottomBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></BottomBorder>
+                        <PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="ColLote">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>N° LOTE</Value><Style><FontFamily>Arial</FontFamily><FontSize>7.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+                      <Style>
+                        <TopBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></TopBorder>
+                        <BottomBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></BottomBorder>
+                        <PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="ColVence">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>CADUCIDAD</Value><Style><FontFamily>Arial</FontFamily><FontSize>7.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
+                      <Style>
+                        <TopBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></TopBorder>
+                        <BottomBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></BottomBorder>
+                        <PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="ColCant">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>CANT.</Value><Style><FontFamily>Arial</FontFamily><FontSize>7.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs>
+                      <Style>
+                        <TopBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></TopBorder>
+                        <BottomBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></BottomBorder>
+                        <PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom><PaddingRight>3pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="ColPUnit">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>P. UNIT</Value><Style><FontFamily>Arial</FontFamily><FontSize>7.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs>
+                      <Style>
+                        <TopBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></TopBorder>
+                        <BottomBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></BottomBorder>
+                        <PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom><PaddingRight>3pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="ColSubtot">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>VALOR</Value><Style><FontFamily>Arial</FontFamily><FontSize>7.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs>
+                      <Style>
+                        <TopBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></TopBorder>
+                        <BottomBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></BottomBorder>
+                        <PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom><PaddingRight>3pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="ColEstado">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>ESTADO</Value><Style><FontFamily>Arial</FontFamily><FontSize>7.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
+                      <Style>
+                        <TopBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></TopBorder>
+                        <BottomBorder><Style>Solid</Style><Color>#000000</Color><Width>1.5pt</Width></BottomBorder>
+                        <PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+              </TablixCells>
+            </TablixRow>
+            <!-- FILA DATOS -->
+            <TablixRow>
+              <Height>0.6cm</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="CellNum">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!ItemIndex.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+                      <Style><BottomBorder><Style>Solid</Style><Color>#EAEAEA</Color><Width>0.5pt</Width></BottomBorder><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom><PaddingRight>4pt</PaddingRight></Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="CellProd">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!ProductName.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+                      <Style><BottomBorder><Style>Solid</Style><Color>#EAEAEA</Color><Width>0.5pt</Width></BottomBorder><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom><PaddingLeft>4pt</PaddingLeft></Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="CellCat">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CategoryName.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+                      <Style><BottomBorder><Style>Solid</Style><Color>#EAEAEA</Color><Width>0.5pt</Width></BottomBorder><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="CellLote">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!LotNumber.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+                      <Style><BottomBorder><Style>Solid</Style><Color>#EAEAEA</Color><Width>0.5pt</Width></BottomBorder><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="CellVence">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!ExpirationDate.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
+                      <Style><BottomBorder><Style>Solid</Style><Color>#EAEAEA</Color><Width>0.5pt</Width></BottomBorder><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="CellCant">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>=CStr(Fields!Quantity.Value)</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs>
+                      <Style><BottomBorder><Style>Solid</Style><Color>#EAEAEA</Color><Width>0.5pt</Width></BottomBorder><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom><PaddingRight>3pt</PaddingRight></Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="CellPUnit">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>=CStr(Fields!UnitPrice.Value)</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs>
+                      <Style><BottomBorder><Style>Solid</Style><Color>#EAEAEA</Color><Width>0.5pt</Width></BottomBorder><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom><PaddingRight>3pt</PaddingRight></Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="CellSubtot">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>=CStr(Fields!TotalValue.Value)</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs>
+                      <Style><BottomBorder><Style>Solid</Style><Color>#EAEAEA</Color><Width>0.5pt</Width></BottomBorder><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom><PaddingRight>3pt</PaddingRight></Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="CellEstado">
+                      <Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Status.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>7.5pt</FontSize><FontWeight>Bold</FontWeight><Color>=IIf(Fields!Status.Value = "AGOTADO" Or Fields!Status.Value = "VENCIDO", "#C0392B", IIf(Fields!Status.Value = "PRÓXIMO A VENCER" Or Fields!Status.Value = "BAJO STOCK", "#D35400", "#27AE60"))</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
+                      <Style><BottomBorder><Style>Solid</Style><Color>#EAEAEA</Color><Width>0.5pt</Width></BottomBorder><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+              </TablixCells>
+            </TablixRow>
+          </TablixRows>
+        </TablixBody>
+        <TablixColumnHierarchy>
+          <TablixMembers><TablixMember/><TablixMember/><TablixMember/><TablixMember/><TablixMember/><TablixMember/><TablixMember/><TablixMember/><TablixMember/></TablixMembers>
+        </TablixColumnHierarchy>
+        <TablixRowHierarchy>
+          <TablixMembers>
+            <TablixMember><KeepWithGroup>After</KeepWithGroup></TablixMember>
+            <TablixMember><Group Name="MatrixStockDetalleGrp"/></TablixMember>
+          </TablixMembers>
+        </TablixRowHierarchy>
+      </Tablix>
+
+      <!-- ==================== BLOQUE INFERIOR / TOTALES ==================== -->
+      <Line Name="LineaFinTabla">
+        <Top>6.6cm</Top>
+        <Left>0.5cm</Left>
+        <Height>0cm</Height>
+        <Width>19.5cm</Width>
+        <Style><Border><Style>Solid</Style><Color>#000000</Color><Width>1pt</Width></Border></Style>
+      </Line>
+
+      <Textbox Name="TxtNotaAuditoria">
+        <Top>6.8cm</Top>
+        <Left>0.5cm</Left>
+        <Height>0.8cm</Height>
+        <Width>19.5cm</Width>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
+              <TextRun>
+                <Value>* Reporte oficial de existencias y control sanitario de la Bodega Matriz Carapungo. Notificado automáticamente al Bodeguero Principal vía n8n &amp; Evolution API. Los lotes en cuarentena (vencidos) deben ser dados de baja y separados físicamente del almacén principal.</Value>
+                <Style>
+                  <FontFamily>Arial</FontFamily>
+                  <FontSize>7.5pt</FontSize>
+                  <FontStyle>Italic</FontStyle>
+                  <Color>#555555</Color>
+                </Style>
+              </TextRun>
+            </TextRuns>
+          </Paragraph>
+        </Paragraphs>
+      </Textbox>
+    </ReportItems>
+    <Height>8.0cm</Height>
+  </Body>
+  <Width>20.5cm</Width>
+  <Page>
+    <PageHeight>27.94cm</PageHeight>
+    <PageWidth>21.59cm</PageWidth>
+    <LeftMargin>0.5cm</LeftMargin>
+    <RightMargin>0.5cm</RightMargin>
+    <TopMargin>0.8cm</TopMargin>
+    <BottomMargin>0.8cm</BottomMargin>
+  </Page>
+</Report>

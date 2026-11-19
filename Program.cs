@@ -39,6 +39,8 @@ builder.Services.AddScoped<IInternalRequisitionRepository, InternalRequisitionRe
 builder.Services.AddScoped<IPurchaseOrderCatalogRepository, PurchaseOrderCatalogRepository>();
 builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
 builder.Services.AddScoped<IPurchaseOrderReportService, PurchaseOrderReportService>();
+builder.Services.AddScoped<ILowStockReportService, LowStockReportService>();
+builder.Services.AddScoped<IMatrixStockReportService, MatrixStockReportService>();
 
 // 3. AutoMapper
 builder.Services.AddAutoMapper(cfg => {

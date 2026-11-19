@@ -4,12 +4,19 @@
 @using Inventory_Flow.Repository.IRepository
 @inject ILotRepository LotRepo
 @inject IWarehouseRepository WarehouseRepo
+@inject IJSRuntime JSRuntime
 
 <div class="page-container">
-    <div class="page-header">
+    <div class="page-header d-flex justify-content-between align-items-center">
         <div>
             <h1 class="title">Reporte de Stock</h1>
             <p class="subtitle">Existencias por sucursal, producto y lote</p>
+        </div>
+        <div>
+            <button type="button" class="btn btn-outline-danger d-inline-flex align-items-center gap-2" @onclick="OpenMatrixStockPdf" title="Descargar Reporte PDF Matriz Carapungo">
+                <i class="bi bi-file-earmark-pdf"></i>
+                <span>PDF Bodega Matriz</span>
+            </button>
         </div>
     </div>
 
@@ -48,6 +55,10 @@
                         <option value="@w.IdWarehouse">@w.Name</option>
                     }
                 </select>
+                <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1" @onclick="OpenSelectedWarehousePdf" title="Descargar PDF de las existencias de esta sucursal">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                    <span>Descargar PDF</span>
+                </button>
                 <label class="checkbox-label">
                     <input type="checkbox" @bind="includeEmpty" @bind:after="OnFilterChanged" />
                     <span>Incluir lotes sin stock</span>
@@ -183,6 +194,19 @@
     }
 
     private static bool IsExpired(Lot lot) => lot.ExpirationDate.Date < DateTime.Today;
+
+    private async Task OpenMatrixStockPdf()
+    {
+        await JSRuntime.InvokeVoidAsync("open", "/api/reports/matrix-inventory/pdf", "_blank");
+    }
+
+    private async Task OpenSelectedWarehousePdf()
+    {
+        var url = warehouseFilter > 0
+            ? $"/api/reports/inventory/warehouses/{warehouseFilter}/pdf"
+            : "/api/reports/matrix-inventory/pdf";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+    }
 
     private class StockGroup
     {

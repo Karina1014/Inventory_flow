@@ -5,6 +5,7 @@
 @using Inventory_Flow.Repository.IRepository
 @inject IWarehouseRepository WarehouseRepo
 @inject Inventory_Flow.Services.IToastNotificationService ToastService
+@inject IJSRuntime JSRuntime
 
 <div class="page-container">
     <!-- ENCABEZADO CON ÍCONO EN CAJA REDONDEADA -->
@@ -121,6 +122,12 @@
                                 </td>
                                 <td class="col-date">@w.CreationDate.ToString("dd/MM/yyyy")</td>
                                 <td class="col-actions">
+                                    <button type="button" class="action-btn text-danger" @onclick="() => OpenLowStockPdf(w.IdWarehouse)" title="Reporte PDF Bajo Stock">
+                                        <i class="bi bi-file-earmark-ruled" style="font-size: 1rem;"></i>
+                                    </button>
+                                    <button type="button" class="action-btn text-primary" @onclick="() => OpenInventoryPdf(w.IdWarehouse)" title="Reporte PDF Existencias y Lotes">
+                                        <i class="bi bi-file-earmark-pdf" style="font-size: 1rem;"></i>
+                                    </button>
                                     <button type="button" class="action-btn btn-edit" @onclick="() => OpenEdit(w)" title="Editar">
                                         <i class="bi bi-pencil-fill"></i>
                                     </button>
@@ -375,6 +382,18 @@
             errorMessage = "Ocurrió un error al guardar. Intenta nuevamente.";
             isSaving = false;
         }
+    }
+
+    private async Task OpenLowStockPdf(int idWarehouse)
+    {
+        var url = $"/api/reports/low-stock/warehouses/{idWarehouse}/pdf";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+    }
+
+    private async Task OpenInventoryPdf(int idWarehouse)
+    {
+        var url = $"/api/reports/inventory/warehouses/{idWarehouse}/pdf";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
     }
 
     private async Task ConfirmDelete()
