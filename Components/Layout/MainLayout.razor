@@ -3,6 +3,7 @@
 @inject Inventory_Flow.Services.CurrentUserService CurrentUserService
 @inject Inventory_Flow.Repository.IRepository.IMenuRepository MenuRepo
 @inject Inventory_Flow.Services.IToastNotificationService ToastService
+@inject IJSRuntime JSRuntime
 @using Inventory_Flow.Models.Dtos
 @implements IDisposable
 
@@ -42,8 +43,17 @@
                 <kbd class="search-kbd">Ctrl K</kbd>
             </div>
 
-            <!-- Avatar de usuario circular a la derecha -->
+            <!-- Acciones de la barra superior: Selector de Tema + Avatar de usuario -->
             <div class="topbar-actions">
+                <!-- Botón Modo Claro / Oscuro -->
+                <button type="button"
+                        class="theme-toggle-btn"
+                        @onclick="ToggleThemeAsync"
+                        title="@(isDarkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro")"
+                        aria-label="Cambiar tema">
+                    <i class="bi @(isDarkMode ? "bi-sun-fill text-warning" : "bi-moon-stars-fill")"></i>
+                </button>
+
                 <div class="user-dropdown-container position-relative">
                     <button type="button" class="topbar-avatar-btn" @onclick="ToggleDropdown" aria-label="Menú de usuario">
                         <span>@(GetInitials(CurrentUserService.Name))</span>
@@ -64,6 +74,11 @@
                             </div>
 
                             <div class="user-menu-divider"></div>
+
+                            <button type="button" class="user-menu-item" @onclick="ToggleThemeAsync">
+                                <i class="bi @(isDarkMode ? "bi-sun-fill text-warning" : "bi-moon-stars-fill")"></i>
+                                <span>@(isDarkMode ? "Modo Claro" : "Modo Oscuro")</span>
+                            </button>
 
                             <NavLink href="profile" class="user-menu-item" @onclick="CloseDropdown">
                                 <i class="bi bi-person-circle"></i>
@@ -91,10 +106,57 @@
 
 @code {
     private bool isDropdownOpen;
+    private bool isDarkMode;
     private List<MenuDto> userMenus = new();
 
     private void ToggleDropdown() => isDropdownOpen = !isDropdownOpen;
     private void CloseDropdown() => isDropdownOpen = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var theme = await JSRuntime.InvokeAsync<string>("eval", @"(function() {
+                    var t = localStorage.getItem('medvet_theme') || document.documentElement.getAttribute('data-theme') || 'light';
+                    document.documentElement.setAttribute('data-theme', t);
+                    document.documentElement.setAttribute('data-bs-theme', t);
+                    return t;
+                })()");
+                isDarkMode = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase);
+                StateHasChanged();
+            }
+            catch
+            {
+                // Ignorar en pre-rendering
+            }
+        }
+    }
+
+    private async Task ToggleThemeAsync()
+    {
+        try
+        {
+            var nextTheme = await JSRuntime.InvokeAsync<string>("eval", @"(function() {
+                var current = document.documentElement.getAttribute('data-theme') || localStorage.getItem('medvet_theme') || 'light';
+                var next = current === 'dark' ? 'light' : 'dark';
+                localStorage.setItem('medvet_theme', next);
+                document.documentElement.setAttribute('data-theme', next);
+                document.documentElement.setAttribute('data-bs-theme', next);
+                if (window.medvetTheme && typeof window.medvetTheme.setTheme === 'function') {
+                    window.medvetTheme.setTheme(next);
+                }
+                return next;
+            })()");
+            isDarkMode = string.Equals(nextTheme, "dark", StringComparison.OrdinalIgnoreCase);
+            StateHasChanged();
+        }
+        catch
+        {
+            isDarkMode = !isDarkMode;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -119,6 +181,7 @@
     {
         InvokeAsync(async () =>
         {
+            userMenus.Clear();
             await LoadMenusAsync();
             ValidateRouteAccess();
             StateHasChanged();
@@ -127,6 +190,11 @@
 
     private async Task LoadMenusAsync()
     {
+        if (userMenus != null && userMenus.Count > 0)
+        {
+            return;
+        }
+
         if (CurrentUserService.IsAuthenticated)
         {
             try

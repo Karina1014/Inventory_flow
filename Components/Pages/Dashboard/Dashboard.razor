@@ -1,10 +1,13 @@
 @page "/dashboard"
 @layout MainLayout
+@using Inventory_Flow.Data
 @using Inventory_Flow.Models.Dtos
 @using Inventory_Flow.Repository.IRepository
 @inject IDashboardRepository DashboardRepo
 @inject NavigationManager NavigationManager
 @inject Inventory_Flow.Services.CurrentUserService CurrentUserService
+@inject Inventory_Flow.Data.AplicationDbContext Db
+@inject Inventory_Flow.Services.IToastNotificationService ToastService
 
 <div class="dashboard-container">
     @if (isLoading)
@@ -47,6 +50,12 @@
                 <button class="btn-banner btn-banner-ghost" @onclick='() => NavigationManager.NavigateTo("movements")'>
                     <i class="bi bi-arrow-left-right"></i> Movimientos
                 </button>
+                @if (metrics.TotalProductsCount == 0 || metrics.TotalUnitsSoldPeriod == 0)
+                {
+                    <button class="btn-banner btn-banner-white" @onclick="SeedDemoDataAsync" title="Generar datos de ejemplo y métricas">
+                        <i class="bi bi-database-fill-gear"></i> Generar Datos Demo
+                    </button>
+                }
             </div>
         </div>
 
@@ -568,10 +577,34 @@
         try
         {
             metrics = await DashboardRepo.GetDashboardMetricsAsync();
+            if (metrics.TotalProductsCount == 0 || metrics.ActiveWarehousesCount == 0)
+            {
+                await DbSeeder.SeedAsync(Db);
+                metrics = await DashboardRepo.GetDashboardMetricsAsync();
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error al cargar métricas: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SeedDemoDataAsync()
+    {
+        isLoading = true;
+        try
+        {
+            await DbSeeder.SeedAsync(Db);
+            metrics = await DashboardRepo.GetDashboardMetricsAsync();
+            ToastService.Success("Datos de demostración y métricas generados exitosamente.", "Inventario Sincronizado");
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error al generar datos demo: {ex.Message}", "Error");
         }
         finally
         {

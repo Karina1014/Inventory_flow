@@ -167,6 +167,95 @@ public static class DbSeeder
             await db.SaveChangesAsync();
         }
 
+        // 4.1 Semilla de Bodegas (Matriz Carapungo + Sucursales) si no existen
+        if (!await db.Warehouses.AnyAsync())
+        {
+            db.Warehouses.AddRange(new[]
+            {
+                new Warehouse
+                {
+                    Name = "Bodega Matriz Carapungo",
+                    Address = "Av. Panamericana Norte y Galo Plaza, Carapungo, Quito",
+                    IsActive = true,
+                    CreationDate = DateTime.Now
+                },
+                new Warehouse
+                {
+                    Name = "Sucursal Llano Grande",
+                    Address = "Av. 23 de Abril y García Moreno, Llano Grande, Quito",
+                    IsActive = true,
+                    CreationDate = DateTime.Now
+                },
+                new Warehouse
+                {
+                    Name = "Sucursal Pusuquí",
+                    Address = "Av. Manuel Córdova Galarza Km 12, Pusuquí, Quito",
+                    IsActive = true,
+                    CreationDate = DateTime.Now
+                }
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // 4.2 Semilla de Categorías Veterinarias si no existen
+        if (!await db.Categories.AnyAsync())
+        {
+            db.Categories.AddRange(new[]
+            {
+                new Category { Name = "Fármacos y Antibióticos", Description = "Antibióticos inyectables y comprimidos para caninos y felinos" },
+                new Category { Name = "Inmunológicos y Vacunas", Description = "Biológicos y vacunas de cadena de frío veterinaria" },
+                new Category { Name = "Antiinflamatorios y Analgésicos", Description = "AINEs y analgésicos para control del dolor animal" },
+                new Category { Name = "Antiparasitarios y Pipetas", Description = "Desparasitantes internos y externos de amplio espectro" },
+                new Category { Name = "Suplementos y Nutracéuticos", Description = "Vitaminas, minerales y condroprotectores" }
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // 4.3 Semilla de Tipos de Movimiento si no existen
+        if (!await db.MovementTypes.AnyAsync())
+        {
+            db.MovementTypes.AddRange(new[]
+            {
+                new MovementType { Code = "01", Mode = "E", Description = "Entrada por compra a proveedor" },
+                new MovementType { Code = "02", Mode = "S", Description = "Salida por venta clínica o farmacia" },
+                new MovementType { Code = "03", Mode = "T", Description = "Transferencia entre sucursales" },
+                new MovementType { Code = "04", Mode = "A", Description = "Ajuste manual de inventario" },
+                new MovementType { Code = "20", Mode = "T", Description = "Traslado CEDI Carapungo a Sucursal" }
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // 4.4 Semilla de Productos Farmacéuticos Veterinarios si no existen
+        if (!await db.Products.AnyAsync())
+        {
+            var cats = await db.Categories.ToListAsync();
+            var farmacosCat = cats.FirstOrDefault(c => c.Name.Contains("Fármacos")) ?? cats.First();
+            var vacunasCat = cats.FirstOrDefault(c => c.Name.Contains("Inmunológicos")) ?? cats.First();
+            var ainesCat = cats.FirstOrDefault(c => c.Name.Contains("Antiinflamatorios")) ?? cats.First();
+            var antiparasitariosCat = cats.FirstOrDefault(c => c.Name.Contains("Antiparasitarios")) ?? cats.First();
+            var suplementosCat = cats.FirstOrDefault(c => c.Name.Contains("Suplementos")) ?? cats.First();
+
+            db.Products.AddRange(new[]
+            {
+                new Product { Code = "ATB002", Name = "Amoxicilina + ác. clavulánico 250mg", Description = "Antibiótico de amplio espectro para caninos y felinos", SuggestedPrice = 14.50m, Iva = true, IsActive = true, IdCategory = farmacosCat.IdCategory },
+                new Product { Code = "ATB003", Name = "Cefalexina 500mg Comprimidos", Description = "Tratamiento de infecciones dermatológicas bacterianas", SuggestedPrice = 12.00m, Iva = true, IsActive = true, IdCategory = farmacosCat.IdCategory },
+                new Product { Code = "ATB004", Name = "Enrofloxacina Inyectable 100ml", Description = "Fluoroquinolona veterinaria de amplio espectro", SuggestedPrice = 22.50m, Iva = true, IsActive = true, IdCategory = farmacosCat.IdCategory },
+                new Product { Code = "VAC001", Name = "Vacuna Séxtuple Canina Nobivac", Description = "Inmunización contra parvovirus, moquillo, hepatitis y leptospira", SuggestedPrice = 18.00m, Iva = false, IsActive = true, IdCategory = vacunasCat.IdCategory },
+                new Product { Code = "VAC002", Name = "Vacuna Antirrábica Nobivac Rabies", Description = "Vacuna monovalente inactivada contra el virus de la rabia", SuggestedPrice = 8.50m, Iva = false, IsActive = true, IdCategory = vacunasCat.IdCategory },
+                new Product { Code = "VAC003", Name = "Vacuna Triple Felina Felocell", Description = "Protección contra rinotraqueitis, calicivirus y panleucopenia", SuggestedPrice = 16.50m, Iva = false, IsActive = true, IdCategory = vacunasCat.IdCategory },
+                new Product { Code = "AIN001", Name = "Meloxicam Gotas 10ml (Meloxivet)", Description = "Antiinflamatorio no esteroideo para analgesia postoperatoria", SuggestedPrice = 9.80m, Iva = true, IsActive = true, IdCategory = ainesCat.IdCategory },
+                new Product { Code = "AIN002", Name = "Carprofeno 100mg Comprimidos", Description = "Alivio del dolor osteoarticular y de columna en perros", SuggestedPrice = 24.00m, Iva = true, IsActive = true, IdCategory = ainesCat.IdCategory },
+                new Product { Code = "AIN003", Name = "Tramadol Gotas 20ml", Description = "Analgésico opioide para dolor agudo y moderado", SuggestedPrice = 11.20m, Iva = true, IsActive = true, IdCategory = ainesCat.IdCategory },
+                new Product { Code = "ANT001", Name = "Bravecto Perros 10-20kg (1 Comp)", Description = "Protección contra pulgas y garrapatas por 12 semanas", SuggestedPrice = 34.00m, Iva = true, IsActive = true, IdCategory = antiparasitariosCat.IdCategory },
+                new Product { Code = "ANT002", Name = "Nexgard Spectra Antiparasitario M", Description = "Tableta masticable sabor a carne para pulgas, garrapatas y parásitos", SuggestedPrice = 28.50m, Iva = true, IsActive = true, IdCategory = antiparasitariosCat.IdCategory },
+                new Product { Code = "ANT003", Name = "Ivermectina 1% Inyectable 50ml", Description = "Endectocida antiparasitario interno y externo", SuggestedPrice = 13.00m, Iva = true, IsActive = true, IdCategory = antiparasitariosCat.IdCategory },
+                new Product { Code = "SUP001", Name = "Suplemento Vitamínico Nutri-Plus Gel", Description = "Pasta oral de alta energía para animales convalecientes", SuggestedPrice = 16.00m, Iva = true, IsActive = true, IdCategory = suplementosCat.IdCategory },
+                new Product { Code = "SUP002", Name = "Condroprotector Artroglycan 30 Comp", Description = "Regenerador articular con glucosamina y condroitina", SuggestedPrice = 26.00m, Iva = true, IsActive = true, IdCategory = suplementosCat.IdCategory },
+                new Product { Code = "SUP003", Name = "Complejo B + Calcio Inyectable 100ml", Description = "Estimulante metabólico y reconstituyente vitamínico", SuggestedPrice = 15.20m, Iva = true, IsActive = true, IdCategory = suplementosCat.IdCategory }
+            });
+            await db.SaveChangesAsync();
+        }
+
         // 5. Identificar Bodega Matriz (Carapungo) y Sucursales Periféricas
         var allWarehouses = await db.Warehouses.Where(w => w.IsActive).OrderBy(w => w.IdWarehouse).ToListAsync();
         var matrizWarehouse = allWarehouses.FirstOrDefault(w =>

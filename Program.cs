@@ -12,35 +12,35 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Configuración de la base de datos
+// 1. Configuración de la base de datos (Transient para prevenir concurrencia en Blazor Server)
 var dbConnectionString = builder.Configuration.GetConnectionString("ConexionSql");
 builder.Services.AddDbContext<AplicationDbContext>(options => 
-    options.UseSqlServer(dbConnectionString));
+    options.UseSqlServer(dbConnectionString), ServiceLifetime.Transient);
 
 // 2. Registro del Repositorio (Inyección de dependencias)
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<Inventory_Flow.Services.IToastNotificationService, Inventory_Flow.Services.ToastNotificationService>();
 builder.Services.AddScoped<Inventory_Flow.Services.IUserContextService, Inventory_Flow.Services.UserContextService>();
 builder.Services.AddScoped<Inventory_Flow.Services.CurrentUserService>();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IRoleRepository, RoleRepository>();
-builder.Services.AddScoped<IWarehouseRepository, WarehouseRepository>();
-builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
-builder.Services.AddScoped<IProductRepository, ProductRepository>();
-builder.Services.AddScoped<ILotRepository, LotRepository>();
-builder.Services.AddScoped<IMovementTypeRepository, MovementTypeRepository>();
-builder.Services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();
-builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
-builder.Services.AddScoped<IThresholdInvetoryRepository, ThresholdInvetoryRepository>();
-builder.Services.AddScoped<IMenuRepository, MenuRepository>();
-builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
-builder.Services.AddScoped<IRequisitionCatalogRepository, RequisitionCatalogRepository>();
-builder.Services.AddScoped<IInternalRequisitionRepository, InternalRequisitionRepository>();
-builder.Services.AddScoped<IPurchaseOrderCatalogRepository, PurchaseOrderCatalogRepository>();
-builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
-builder.Services.AddScoped<IPurchaseOrderReportService, PurchaseOrderReportService>();
-builder.Services.AddScoped<ILowStockReportService, LowStockReportService>();
-builder.Services.AddScoped<IMatrixStockReportService, MatrixStockReportService>();
+builder.Services.AddTransient<IUserRepository, UserRepository>();
+builder.Services.AddTransient<IRoleRepository, RoleRepository>();
+builder.Services.AddTransient<IWarehouseRepository, WarehouseRepository>();
+builder.Services.AddTransient<ICategoryRepository, CategoryRepository>();
+builder.Services.AddTransient<IProductRepository, ProductRepository>();
+builder.Services.AddTransient<ILotRepository, LotRepository>();
+builder.Services.AddTransient<IMovementTypeRepository, MovementTypeRepository>();
+builder.Services.AddTransient<IInventoryMovementRepository, InventoryMovementRepository>();
+builder.Services.AddTransient<IDashboardRepository, DashboardRepository>();
+builder.Services.AddTransient<IThresholdInvetoryRepository, ThresholdInvetoryRepository>();
+builder.Services.AddTransient<IMenuRepository, MenuRepository>();
+builder.Services.AddTransient<ISupplierRepository, SupplierRepository>();
+builder.Services.AddTransient<IRequisitionCatalogRepository, RequisitionCatalogRepository>();
+builder.Services.AddTransient<IInternalRequisitionRepository, InternalRequisitionRepository>();
+builder.Services.AddTransient<IPurchaseOrderCatalogRepository, PurchaseOrderCatalogRepository>();
+builder.Services.AddTransient<IPurchaseOrderRepository, PurchaseOrderRepository>();
+builder.Services.AddTransient<IPurchaseOrderReportService, PurchaseOrderReportService>();
+builder.Services.AddTransient<ILowStockReportService, LowStockReportService>();
+builder.Services.AddTransient<IMatrixStockReportService, MatrixStockReportService>();
 
 // 3. AutoMapper
 builder.Services.AddAutoMapper(cfg => {

@@ -17,12 +17,12 @@
 }
 
 .sidebar-nav::-webkit-scrollbar-thumb {
-    background-color: #CBD5E1;
+    background-color: var(--border-color, #CBD5E1);
     border-radius: 4px;
 }
 
 .sidebar-nav::-webkit-scrollbar-thumb:hover {
-    background-color: #94A3B8;
+    background-color: var(--text-muted, #94A3B8);
 }
 
 /* Enlaces con NavLink (Modern Flat: bordes redondeados de 6px) */
@@ -48,7 +48,7 @@
 }
 
 ::deep .nav-item-link:hover {
-    background-color: #F1F5F9;
+    background-color: var(--bg-elevated, #F1F5F9);
     color: var(--text-main, #1E293B);
 }
 
@@ -100,7 +100,7 @@
 }
 
 ::deep .submenu-link:hover {
-    background-color: #F1F5F9;
+    background-color: var(--bg-elevated, #F1F5F9);
     color: var(--text-main, #1E293B);
 }
 
