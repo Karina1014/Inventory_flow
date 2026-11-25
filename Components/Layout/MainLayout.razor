@@ -248,6 +248,14 @@
             return;
         }
 
+        // 1. Administrador siempre tiene acceso total a todos los módulos
+        if (string.Equals(CurrentUserService.Role, "Administrador", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(CurrentUserService.Role, "Admin", StringComparison.OrdinalIgnoreCase)
+            || (CurrentUserService.Role?.Contains("Admin", StringComparison.OrdinalIgnoreCase) == true))
+        {
+            return;
+        }
+
         var relativePath = "/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('?')[0].Trim('/');
         if (string.Equals(relativePath, "/dashboard", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/profile", StringComparison.OrdinalIgnoreCase)
@@ -256,6 +264,7 @@
             || string.Equals(relativePath, "/requisitions", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/purchase-orders", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/suppliers", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(relativePath, "/n8n-notifications", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/", StringComparison.OrdinalIgnoreCase))
         {
             return;

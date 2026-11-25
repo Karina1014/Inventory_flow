@@ -1,0 +1,534 @@
+@page "/n8n-notifications"
+@layout MainLayout
+@using Inventory_Flow.Models
+@using Inventory_Flow.Repository.IRepository
+@using Inventory_Flow.Services
+@inject IN8nNotificationRepository NotificationRepo
+@inject IN8nNotificationService NotificationService
+@inject IWarehouseRepository WarehouseRepo
+@inject IToastNotificationService ToastService
+@inject CurrentUserService CurrentUser
+@inject IJSRuntime JSRuntime
+
+<div class="page-container">
+    <!-- ENCABEZADO -->
+    <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="header-title-block">
+            <div class="header-icon-box">
+                <i class="bi bi-bell"></i>
+            </div>
+            <div>
+                <h1 class="title">Notificaciones n8n</h1>
+                <p class="subtitle">Historial y despacho de alertas de stock en PDF y mensajes hacia n8n</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-2" @onclick="OpenSendModal">
+                <i class="bi bi-send-plus"></i>
+                <span>Nueva Notificación</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- TARJETAS DE RESUMEN (STATS) -->
+    <div class="summary-cards">
+        <div class="summary-card">
+            <div class="summary-icon-box text-primary">
+                <i class="bi bi-send-check"></i>
+            </div>
+            <div class="summary-info">
+                <span class="summary-label">Total Notificaciones</span>
+                <span class="summary-value">@notifications.Count</span>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon-box text-danger">
+                <i class="bi bi-file-earmark-pdf"></i>
+            </div>
+            <div class="summary-info">
+                <span class="summary-label">Alertas Stock (PDF)</span>
+                <span class="summary-value">@notifications.Count(n => n.IdN8nNotificationType == 2)</span>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon-box text-info">
+                <i class="bi bi-chat-left-text"></i>
+            </div>
+            <div class="summary-info">
+                <span class="summary-label">Mensajes de Texto</span>
+                <span class="summary-value">@notifications.Count(n => n.IdN8nNotificationType == 1)</span>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon-box text-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+            </div>
+            <div class="summary-info">
+                <span class="summary-label">Fallidas / Errores</span>
+                <span class="summary-value">@notifications.Count(n => n.Status == "Failed" || n.IdN8nNotificationType == 3)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANEL PRINCIPAL CON TABLA -->
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title-group">
+                <span class="panel-title">Historial de Envíos</span>
+                <span class="panel-subtitle">Registro de auditoría de llamadas al webhook de n8n</span>
+            </div>
+            <div class="filters-toolbar">
+                <!-- Buscador -->
+                <div class="search-box">
+                    <i class="bi bi-search"></i>
+                    <input type="text" placeholder="Buscar destinatario, mensaje..." @bind="searchTerm" @bind:event="oninput" />
+                    @if (!string.IsNullOrWhiteSpace(searchTerm))
+                    {
+                        <button type="button" class="clear-btn" @onclick="() => searchTerm = string.Empty">
+                            <i class="bi bi-x-circle-fill"></i>
+                        </button>
+                    }
+                </div>
+
+                <!-- Filtro Tipo -->
+                <select class="filter-select" @bind="selectedTypeFilter">
+                    <option value="0">Todos los tipos</option>
+                    @foreach (var t in notificationTypes)
+                    {
+                        <option value="@t.IdN8nNotificationType">@t.Name</option>
+                    }
+                </select>
+
+                <!-- Filtro Estado -->
+                <select class="filter-select" @bind="selectedStatusFilter">
+                    <option value="All">Todos los estados</option>
+                    <option value="Sent">Enviados (Sent)</option>
+                    <option value="Failed">Fallidos (Failed)</option>
+                    <option value="Pending">Pendientes (Pending)</option>
+                </select>
+
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="LoadDataAsync" title="Recargar historial">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table custom-table">
+                <thead>
+                    <tr>
+                        <th style="width: 130px;">Fecha y Hora</th>
+                        <th style="width: 110px;">Tipo</th>
+                        <th style="width: 150px;">Sucursal</th>
+                        <th style="width: 160px;">Destinatario</th>
+                        <th>Mensaje</th>
+                        <th style="width: 100px;">PDF</th>
+                        <th style="width: 110px;">Estado</th>
+                        <th style="width: 100px;" class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (isLoading)
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center py-4">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                <span class="ms-2 text-muted">Cargando notificaciones...</span>
+                            </td>
+                        </tr>
+                    }
+                    else if (!FilteredNotifications.Any())
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                                No se encontraron registros de notificaciones con los filtros aplicados.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in FilteredNotifications)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="date-text">@item.SentDate.ToString("dd/MM/yyyy")</span>
+                                    <span class="time-text">@item.SentDate.ToString("HH:mm:ss")</span>
+                                </td>
+                                <td>
+                                    @if (item.IdN8nNotificationType == 2)
+                                    {
+                                        <span class="badge-type badge-pdf">
+                                            <i class="bi bi-file-earmark-pdf-fill"></i> PDF
+                                        </span>
+                                    }
+                                    else if (item.IdN8nNotificationType == 3 || item.Status == "Failed")
+                                    {
+                                        <span class="badge-type badge-error">
+                                            <i class="bi bi-exclamation-triangle-fill"></i> Error
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-type badge-text">
+                                            <i class="bi bi-chat-left-text-fill"></i> Texto
+                                        </span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="warehouse-pill">
+                                        <i class="bi bi-building"></i> @(item.Warehouse?.Name ?? "General")
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="recipient-text">
+                                        <i class="bi bi-person-check"></i> @item.Recipient
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="message-preview" title="@item.Message">
+                                        @item.Message
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(item.PdfPath))
+                                    {
+                                        <a href="@item.PdfPath" target="_blank" class="btn btn-xs btn-outline-danger d-inline-flex align-items-center gap-1" title="Ver archivo PDF">
+                                            <i class="bi bi-file-earmark-pdf"></i> PDF
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (item.Status == "Sent")
+                                    {
+                                        <span class="badge-status badge-status-sent">
+                                            <i class="bi bi-check-circle-fill"></i> Enviado
+                                        </span>
+                                    }
+                                    else if (item.Status == "Failed")
+                                    {
+                                        <span class="badge-status badge-status-failed">
+                                            <i class="bi bi-x-circle-fill"></i> Falló
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-status badge-status-pending">
+                                            <i class="bi bi-clock-history"></i> Pendiente
+                                        </span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-icon btn-light" @onclick="() => OpenDetailModal(item)" title="Ver detalle de respuesta n8n">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: ENVIAR NUEVA NOTIFICACIÓN -->
+@if (isSendModalOpen)
+{
+    <div class="modal-backdrop"></div>
+    <div class="custom-modal">
+        <div class="modal-header">
+            <h5 class="modal-title">
+                <i class="bi bi-send-check text-primary me-2"></i>Nueva Notificación hacia n8n
+            </h5>
+            <button type="button" class="btn-close" @onclick="CloseSendModal"></button>
+        </div>
+        <div class="modal-body">
+            <!-- Tipo de mensaje -->
+            <div class="form-group mb-3">
+                <label class="form-label">Tipo de Notificación</label>
+                <div class="type-selector-group">
+                    <button type="button" class="type-option-btn @(formTypeId == 2 ? "active" : "")" @onclick="() => SetFormType(2)">
+                        <i class="bi bi-file-earmark-pdf"></i>
+                        <div>
+                            <strong>Alerta de Stock (PDF)</strong>
+                            <small>Genera y adjunta el reporte oficial de existencias</small>
+                        </div>
+                    </button>
+                    <button type="button" class="type-option-btn @(formTypeId == 1 ? "active" : "")" @onclick="() => SetFormType(1)">
+                        <i class="bi bi-chat-left-text"></i>
+                        <div>
+                            <strong>Mensaje de Texto</strong>
+                            <small>Envío de texto plano o alerta breve</small>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sucursal / Bodega -->
+            <div class="form-group mb-3">
+                <label class="form-label">Sucursal / Bodega</label>
+                <select class="form-select" @bind="formWarehouseId">
+                    @foreach (var w in warehouses)
+                    {
+                        <option value="@w.IdWarehouse">@w.Name</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Destinatario -->
+            <div class="form-group mb-3">
+                <label class="form-label">Destinatario (WhatsApp o Correo)</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-telephone-outbound"></i></span>
+                    <input type="text" class="form-control" placeholder="Ej: +593991234567 o compras@medvet.com" @bind="formRecipient" />
+                </div>
+            </div>
+
+            <!-- Mensaje -->
+            <div class="form-group mb-3">
+                <label class="form-label">Mensaje / Contenido</label>
+                <textarea class="form-control" rows="3" placeholder="Escribe el mensaje que se enviará..." @bind="formMessage"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" @onclick="CloseSendModal" disabled="@isSending">Cancelar</button>
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-2" @onclick="SendNotificationAsync" disabled="@isSending">
+                @if (isSending)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span>Enviando a n8n...</span>
+                }
+                else
+                {
+                    <i class="bi bi-send-fill"></i>
+                    <span>Enviar a n8n</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+<!-- MODAL: DETALLE Y RESPUESTA N8N -->
+@if (selectedNotification != null)
+{
+    <div class="modal-backdrop"></div>
+    <div class="custom-modal modal-lg">
+        <div class="modal-header">
+            <h5 class="modal-title">
+                <i class="bi bi-info-circle text-info me-2"></i>Detalle de Notificación #@selectedNotification.IdN8nNotification
+            </h5>
+            <button type="button" class="btn-close" @onclick="() => selectedNotification = null"></button>
+        </div>
+        <div class="modal-body">
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Fecha y Hora:</span>
+                    <span class="detail-value">@selectedNotification.SentDate.ToString("dd/MM/yyyy HH:mm:ss")</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Tipo:</span>
+                    <span class="detail-value">@selectedNotification.NotificationType?.Name</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Destinatario:</span>
+                    <span class="detail-value">@selectedNotification.Recipient</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Estado:</span>
+                    <span class="detail-value">@selectedNotification.Status</span>
+                </div>
+                <div class="detail-item full-width">
+                    <span class="detail-label">Mensaje Enviado:</span>
+                    <div class="detail-box">@selectedNotification.Message</div>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(selectedNotification.PdfPath))
+                {
+                    <div class="detail-item full-width">
+                        <span class="detail-label">Archivo PDF generado:</span>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <span class="text-muted">@selectedNotification.PdfPath</span>
+                            <a href="@selectedNotification.PdfPath" target="_blank" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-download"></i> Descargar
+                            </a>
+                        </div>
+                    </div>
+                }
+                <div class="detail-item full-width">
+                    <span class="detail-label">Respuesta del Webhook n8n:</span>
+                    <pre class="response-box">@selectedNotification.Response</pre>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @onclick="() => selectedNotification = null">Cerrar</button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<N8nNotification> notifications = new();
+    private List<N8nNotificationType> notificationTypes = new();
+    private List<Warehouse> warehouses = new();
+
+    private bool isLoading = true;
+    private bool isSending = false;
+    private bool isSendModalOpen = false;
+    private N8nNotification? selectedNotification = null;
+
+    private string searchTerm = string.Empty;
+    private int selectedTypeFilter = 0;
+    private string selectedStatusFilter = "All";
+
+    // Formulario modal
+    private int formTypeId = 2; // Por defecto PDF (Alertas de stock)
+    private int formWarehouseId = 3;
+    private string formRecipient = "593963124396";
+    private string formMessage = "Alerta de Stock Bajo detectada en inventario.";
+
+    private IEnumerable<N8nNotification> FilteredNotifications
+    {
+        get
+        {
+            var query = notifications.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.Trim().ToLower();
+                query = query.Where(n =>
+                    (n.Recipient != null && n.Recipient.ToLower().Contains(term)) ||
+                    (n.Message != null && n.Message.ToLower().Contains(term)) ||
+                    (n.Warehouse != null && n.Warehouse.Name.ToLower().Contains(term)));
+            }
+
+            if (selectedTypeFilter > 0)
+            {
+                query = query.Where(n => n.IdN8nNotificationType == selectedTypeFilter);
+            }
+
+            if (selectedStatusFilter != "All")
+            {
+                query = query.Where(n => n.Status == selectedStatusFilter);
+            }
+
+            return query;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var notifs = await NotificationRepo.GetAllAsync();
+            notifications = notifs.ToList();
+
+            var types = await NotificationRepo.GetNotificationTypesAsync();
+            notificationTypes = types.ToList();
+
+            warehouses = WarehouseRepo.GetWarehouses().ToList();
+            if (warehouses.Any() && !warehouses.Any(w => w.IdWarehouse == formWarehouseId))
+            {
+                formWarehouseId = warehouses.First().IdWarehouse;
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error al cargar notificaciones: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenSendModal()
+    {
+        isSendModalOpen = true;
+    }
+
+    private void CloseSendModal()
+    {
+        isSendModalOpen = false;
+    }
+
+    private void SetFormType(int typeId)
+    {
+        formTypeId = typeId;
+        if (typeId == 2)
+        {
+            formMessage = "Alerta de Stock Bajo detectada en inventario. Se adjunta reporte oficial en PDF.";
+        }
+        else
+        {
+            formMessage = "Aviso urgente de inventario MedVet.";
+        }
+    }
+
+    private async Task SendNotificationAsync()
+    {
+        if (string.IsNullOrWhiteSpace(formRecipient))
+        {
+            ToastService.ShowWarning("El destinatario es obligatorio.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(formMessage))
+        {
+            ToastService.ShowWarning("El mensaje es obligatorio.");
+            return;
+        }
+
+        isSending = true;
+        try
+        {
+            var userId = CurrentUser.IsAuthenticated ? CurrentUser.UserId : 1;
+
+            N8nNotification result;
+            if (formTypeId == 2)
+            {
+                // Envío de Alerta PDF
+                result = await NotificationService.SendStockAlertPdfAsync(formRecipient, formMessage, formWarehouseId, userId);
+            }
+            else
+            {
+                // Envío de Texto
+                result = await NotificationService.SendTextMessageAsync(formRecipient, formMessage, formWarehouseId, userId);
+            }
+
+            if (result.Status == "Sent")
+            {
+                ToastService.ShowSuccess("Notificación enviada exitosamente a n8n.");
+            }
+            else
+            {
+                ToastService.ShowWarning($"Notificación registrada con estado: {result.Status}. Revisa la respuesta del webhook.");
+            }
+
+            CloseSendModal();
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error al enviar a n8n: {ex.Message}");
+        }
+        finally
+        {
+            isSending = false;
+        }
+    }
+
+    private void OpenDetailModal(N8nNotification item)
+    {
+        selectedNotification = item;
+    }
+}

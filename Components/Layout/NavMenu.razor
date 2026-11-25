@@ -143,7 +143,7 @@
     }
 
     <!-- 4. INTELIGENCIA Y REPORTES (Sección desplegable) -->
-    @if (HasCategoryAccess("/analytics", "/stockreport", "/kardex"))
+    @if (HasCategoryAccess("/analytics", "/stockreport", "/kardex", "/n8n-notifications"))
     {
         <div class="nav-group">
             <button type="button" class="nav-item-link nav-group-toggle" @onclick="ToggleReports">
@@ -176,6 +176,13 @@
                         <NavLink class="submenu-link" href="kardex" Match="NavLinkMatch.Prefix">
                             <i class="bi bi-journal-text"></i>
                             <span>Kardex</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/n8n-notifications"))
+                    {
+                        <NavLink class="submenu-link" href="n8n-notifications" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-bell"></i>
+                            <span>Notificaciones n8n</span>
                         </NavLink>
                     }
                 </div>
@@ -255,6 +262,7 @@
             || string.Equals(cleanTarget, "purchase-orders", StringComparison.OrdinalIgnoreCase)
             || string.Equals(cleanTarget, "inventario", StringComparison.OrdinalIgnoreCase)
             || string.Equals(cleanTarget, "dashboard", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(cleanTarget, "n8n-notifications", StringComparison.OrdinalIgnoreCase)
             || string.Equals(cleanTarget, "profile", StringComparison.OrdinalIgnoreCase))
         {
             return true;

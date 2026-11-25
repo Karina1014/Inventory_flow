@@ -38,6 +38,9 @@ builder.Services.AddTransient<IRequisitionCatalogRepository, RequisitionCatalogR
 builder.Services.AddTransient<IInternalRequisitionRepository, InternalRequisitionRepository>();
 builder.Services.AddTransient<IPurchaseOrderCatalogRepository, PurchaseOrderCatalogRepository>();
 builder.Services.AddTransient<IPurchaseOrderRepository, PurchaseOrderRepository>();
+builder.Services.AddHttpClient();
+builder.Services.AddTransient<IN8nNotificationRepository, N8nNotificationRepository>();
+builder.Services.AddTransient<IN8nNotificationService, N8nNotificationService>();
 builder.Services.AddTransient<IPurchaseOrderReportService, PurchaseOrderReportService>();
 builder.Services.AddTransient<ILowStockReportService, LowStockReportService>();
 builder.Services.AddTransient<IMatrixStockReportService, MatrixStockReportService>();
