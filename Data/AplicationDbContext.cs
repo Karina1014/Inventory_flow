@@ -30,6 +30,8 @@ public class AplicationDbContext: DbContext
     public DbSet<PurchaseOrderDetail> PurchaseOrderDetails { get; set; }
     public DbSet<PurchaseOrderStatus> PurchaseOrderStatuses { get; set; }
     public DbSet<PurchaseOrderType> PurchaseOrderTypes { get; set; }
+    public DbSet<N8nNotificationType> N8nNotificationTypes { get; set; }
+    public DbSet<N8nNotification> N8nNotifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -238,5 +240,73 @@ public class AplicationDbContext: DbContext
             new PurchaseOrderType { IdPurchaseOrderType = 3, Code = "CAMPANIA_ESTACIONAL",       Name = "Campaña / Temporada",        Description = "Volumen extraordinario para campañas masivas de vacunación.", PriorityLevel = 3, IsActive = true },
             new PurchaseOrderType { IdPurchaseOrderType = 4, Code = "PEDIDO_ESPECIAL_IMPORTADO", Name = "Bajo Pedido Especial",       Description = "Insumos o equipos específicos no habituales en inventario.", PriorityLevel = 4, IsActive = true }
         );
+
+        // ---------- Notificaciones n8n ----------
+        modelBuilder.Entity<N8nNotificationType>(entity =>
+        {
+            entity.HasOne(t => t.UserCreated)
+                .WithMany()
+                .HasForeignKey(t => t.IdUserCreated)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(t => t.UserUpdated)
+                .WithMany()
+                .HasForeignKey(t => t.IdUserUpdated)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasData(
+                new N8nNotificationType
+                {
+                    IdN8nNotificationType = 1,
+                    Name = "Text",
+                    Description = "Notificaciones de texto directo para alertas rápidas y avisos generales.",
+                    CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Unspecified),
+                    UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Unspecified),
+                    IsActive = true,
+                    IdUserCreated = 1,
+                    IdUserUpdated = 1
+                },
+                new N8nNotificationType
+                {
+                    IdN8nNotificationType = 2,
+                    Name = "PDF",
+                    Description = "Notificaciones con reporte PDF adjunto para alertas de stock bajo y umbrales de inventario.",
+                    CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Unspecified),
+                    UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Unspecified),
+                    IsActive = true,
+                    IdUserCreated = 1,
+                    IdUserUpdated = 1
+                },
+                new N8nNotificationType
+                {
+                    IdN8nNotificationType = 3,
+                    Name = "Error",
+                    Description = "Flujo de envíos de mensajes error (notificación de fallos en ejecución o entrega de n8n).",
+                    CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Unspecified),
+                    UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Unspecified),
+                    IsActive = true,
+                    IdUserCreated = 1,
+                    IdUserUpdated = 1
+                }
+            );
+        });
+
+        modelBuilder.Entity<N8nNotification>(entity =>
+        {
+            entity.HasOne(n => n.NotificationType)
+                .WithMany()
+                .HasForeignKey(n => n.IdN8nNotificationType)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(n => n.Warehouse)
+                .WithMany()
+                .HasForeignKey(n => n.IdWarehouse)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(n => n.User)
+                .WithMany()
+                .HasForeignKey(n => n.IdUser)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 }

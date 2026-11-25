@@ -338,6 +338,137 @@ namespace Inventory_Flow.Migrations
                     b.ToTable("MovementTypes");
                 });
 
+            modelBuilder.Entity("Inventory_Flow.Models.N8nNotification", b =>
+                {
+                    b.Property<int>("IdN8nNotification")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdN8nNotification"));
+
+                    b.Property<int>("IdN8nNotificationType")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdUser")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdWarehouse")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PdfPath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Response")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("SentDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("IdN8nNotification");
+
+                    b.HasIndex("IdN8nNotificationType");
+
+                    b.HasIndex("IdUser");
+
+                    b.HasIndex("IdWarehouse");
+
+                    b.ToTable("N8nNotifications");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.N8nNotificationType", b =>
+                {
+                    b.Property<int>("IdN8nNotificationType")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdN8nNotificationType"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("IdUserCreated")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdUserUpdated")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("IdN8nNotificationType");
+
+                    b.HasIndex("IdUserCreated");
+
+                    b.HasIndex("IdUserUpdated");
+
+                    b.ToTable("N8nNotificationTypes");
+
+                    b.HasData(
+                        new
+                        {
+                            IdN8nNotificationType = 1,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Description = "Notificaciones de texto directo para alertas rápidas y avisos generales.",
+                            IdUserCreated = 1,
+                            IdUserUpdated = 1,
+                            IsActive = true,
+                            Name = "Text",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
+                        },
+                        new
+                        {
+                            IdN8nNotificationType = 2,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Description = "Notificaciones con reporte PDF adjunto para alertas de stock bajo y umbrales de inventario.",
+                            IdUserCreated = 1,
+                            IdUserUpdated = 1,
+                            IsActive = true,
+                            Name = "PDF",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
+                        },
+                        new
+                        {
+                            IdN8nNotificationType = 3,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Description = "Flujo de envíos de mensajes error (notificación de fallos en ejecución o entrega de n8n).",
+                            IdUserCreated = 1,
+                            IdUserUpdated = 1,
+                            IsActive = true,
+                            Name = "Error",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
+                        });
+                });
+
             modelBuilder.Entity("Inventory_Flow.Models.Product", b =>
                 {
                     b.Property<int>("IdProduct")
@@ -1219,6 +1350,52 @@ namespace Inventory_Flow.Migrations
                         .IsRequired();
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.N8nNotification", b =>
+                {
+                    b.HasOne("Inventory_Flow.Models.N8nNotificationType", "NotificationType")
+                        .WithMany()
+                        .HasForeignKey("IdN8nNotificationType")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("IdUser")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("IdWarehouse")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("NotificationType");
+
+                    b.Navigation("User");
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("Inventory_Flow.Models.N8nNotificationType", b =>
+                {
+                    b.HasOne("Inventory_Flow.Models.User", "UserCreated")
+                        .WithMany()
+                        .HasForeignKey("IdUserCreated")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Flow.Models.User", "UserUpdated")
+                        .WithMany()
+                        .HasForeignKey("IdUserUpdated")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("UserCreated");
+
+                    b.Navigation("UserUpdated");
                 });
 
             modelBuilder.Entity("Inventory_Flow.Models.Product", b =>
