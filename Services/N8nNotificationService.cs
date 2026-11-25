@@ -213,4 +213,104 @@ public class N8nNotificationService : IN8nNotificationService
         await _repo.UpdateStatusAsync(notification.IdN8nNotification, notification.Status, notification.Response);
         return notification;
     }
+
+    public async Task<N8nNotification> SendLowStockSaleAlertAsync(
+        int warehouseId,
+        string warehouseName,
+        int productId,
+        string productCode,
+        string productName,
+        int remainingStock,
+        int threshold,
+        string recipient,
+        int idUser = 1)
+    {
+        string statusHeader = remainingStock == 0 ? "🚨 *¡ALERTA DE QUIEBRE DE STOCK (AGOTADO)!*" : "⚠️ *ALERTA DE STOCK BAJO (POR AGOTARSE)*";
+        string statusTag = remainingStock == 0 ? "AGOTADO" : "BAJO STOCK";
+
+        string message = $"{statusHeader}\n\n" +
+                         $"🏢 *Sucursal:* {warehouseName}\n" +
+                         $"📦 *Producto:* {productName} ({productCode})\n" +
+                         $"📉 *Stock Restante:* {remainingStock} unidad(es)\n" +
+                         $"🎯 *Umbral Mínimo:* {threshold} unidades\n\n" +
+                         $"🔔 *Acción requerida:* Se requiere preparar reposición/transferencia desde Matriz Carapungo hacia {warehouseName}.";
+
+        var notification = new N8nNotification
+        {
+            IdN8nNotificationType = 1, // Text
+            IdWarehouse = warehouseId,
+            IdUser = idUser,
+            Recipient = recipient,
+            Message = message,
+            PdfPath = string.Empty,
+            Status = "Pending",
+            Response = string.Empty,
+            SentDate = DateTime.Now
+        };
+
+        await _repo.CreateAsync(notification);
+
+        var webhookUrl = _config["N8nSettings:WebhookUrl"];
+        if (string.IsNullOrWhiteSpace(webhookUrl))
+        {
+            notification.Status = "Failed";
+            notification.Response = "N8nSettings:WebhookUrl no configurada en appsettings.json";
+            await _repo.UpdateStatusAsync(notification.IdN8nNotification, notification.Status, notification.Response);
+            return notification;
+        }
+
+        try
+        {
+            var payload = new
+            {
+                @event = "SaleLowStockAlert",
+                type = "Text",
+                recipient = recipient,
+                warehouseId = warehouseId,
+                warehouseName = warehouseName,
+                productId = productId,
+                productCode = productCode,
+                productName = productName,
+                remainingStock = remainingStock,
+                threshold = threshold,
+                status = statusTag,
+                message = message,
+                notificationId = notification.IdN8nNotification,
+                timestamp = DateTime.UtcNow.ToString("o")
+            };
+
+            var jsonContent = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+            var apiKey = _config["N8nSettings:ApiKey"];
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                jsonContent.Headers.TryAddWithoutValidation("X-API-KEY", apiKey);
+            }
+
+            var httpResponse = await _httpClient.PostAsync(webhookUrl, jsonContent);
+            var responseBody = await httpResponse.Content.ReadAsStringAsync();
+
+            if (httpResponse.IsSuccessStatusCode)
+            {
+                notification.Status = "Sent";
+                notification.Response = string.IsNullOrWhiteSpace(responseBody) ? $"HTTP {(int)httpResponse.StatusCode} OK" : responseBody;
+            }
+            else
+            {
+                notification.Status = "Failed";
+                notification.IdN8nNotificationType = 3; // Error
+                notification.Response = $"HTTP {(int)httpResponse.StatusCode}: {responseBody}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al enviar webhook de alerta de venta con stock bajo a n8n");
+            notification.Status = "Failed";
+            notification.IdN8nNotificationType = 3; // Error
+            notification.Response = $"Excepción: {ex.Message}";
+        }
+
+        await _repo.UpdateStatusAsync(notification.IdN8nNotification, notification.Status, notification.Response);
+        return notification;
+    }
 }

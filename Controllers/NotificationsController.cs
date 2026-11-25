@@ -17,17 +17,20 @@ namespace Inventory_Flow.Controllers;
 public class NotificationsController : ControllerBase
 {
     private readonly ILowStockReportService _reportService;
+    private readonly IN8nNotificationService _n8nNotificationService;
     private readonly AplicationDbContext _db;
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _env;
 
     public NotificationsController(
         ILowStockReportService reportService,
+        IN8nNotificationService n8nNotificationService,
         AplicationDbContext db,
         IConfiguration configuration,
         IWebHostEnvironment env)
     {
         _reportService = reportService;
+        _n8nNotificationService = n8nNotificationService;
         _db = db;
         _configuration = configuration;
         _env = env;
@@ -108,6 +111,46 @@ public class NotificationsController : ControllerBase
         {
             var fullError = ex.InnerException != null ? $"{ex.Message} -> {ex.InnerException.Message}" : ex.Message;
             return BadRequest(new { error = $"Error generando la alerta de stock: {fullError}" });
+        }
+    }
+
+    /// <summary>
+    /// Simula una alerta en tiempo real de venta con stock bajo/agotado enviada a n8n por Webhook.
+    /// </summary>
+    [HttpPost("test-sale-alert")]
+    [HttpGet("test-sale-alert")]
+    public async Task<IActionResult> TestSaleAlert(
+        [FromQuery] int warehouseId = 4,
+        [FromQuery] int remainingStock = 2,
+        [FromQuery] string recipient = "593963124396")
+    {
+        try
+        {
+            var warehouse = await _db.Warehouses.FirstOrDefaultAsync(w => w.IdWarehouse == warehouseId);
+            var warehouseName = warehouse?.Name ?? "Llano Grande";
+
+            var product = await _db.Products.FirstOrDefaultAsync(p => p.IsActive);
+            var prodName = product?.Name ?? "Balanceado Cachorro";
+            var prodCode = product?.Code ?? "MED-001";
+            var prodId = product?.IdProduct ?? 1;
+
+            var notif = await _n8nNotificationService.SendLowStockSaleAlertAsync(
+                warehouseId,
+                warehouseName,
+                prodId,
+                prodCode,
+                prodName,
+                remainingStock,
+                5,
+                recipient,
+                1
+            );
+
+            return Ok(notif);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
         }
     }
 }

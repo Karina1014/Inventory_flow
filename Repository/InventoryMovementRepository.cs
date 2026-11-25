@@ -7,7 +7,10 @@ using Inventory_Flow.Data;
 using Inventory_Flow.Models;
 using Inventory_Flow.Models.Dtos;
 using Inventory_Flow.Repository.IRepository;
+using Inventory_Flow.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Inventory_Flow.Repository;
 
@@ -15,11 +18,22 @@ public class InventoryMovementRepository : IInventoryMovementRepository
 {
     private readonly AplicationDbContext _db;
     private readonly IMapper _mapper;
+    private readonly IN8nNotificationService _n8nService;
+    private readonly IConfiguration _config;
+    private readonly ILogger<InventoryMovementRepository> _logger;
 
-    public InventoryMovementRepository(AplicationDbContext db, IMapper mapper)
+    public InventoryMovementRepository(
+        AplicationDbContext db,
+        IMapper mapper,
+        IN8nNotificationService n8nService,
+        IConfiguration config,
+        ILogger<InventoryMovementRepository> logger)
     {
         _db = db;
         _mapper = mapper;
+        _n8nService = n8nService;
+        _config = config;
+        _logger = logger;
     }
 
     public async Task<ICollection<InventoryMovementDto>> GetMovementsAsync()
@@ -148,12 +162,66 @@ public class InventoryMovementRepository : IInventoryMovementRepository
             await _db.SaveChangesAsync();
 
             await transaction.CommitAsync();
+
+            // Verificación y despacho de alerta en tiempo real tras egreso/venta
+            if (mode == "S" && dto.IdOriginWarehouse.HasValue)
+            {
+                await CheckAndNotifyLowStockAsync(dto.IdOriginWarehouse.Value, movement.Details, movement.IdUser ?? 1);
+            }
+
             return movement;
         }
         catch
         {
             await transaction.RollbackAsync();
             throw;
+        }
+    }
+
+    private async Task CheckAndNotifyLowStockAsync(int idWarehouse, ICollection<InventoryMovementDetail> details, int idUser)
+    {
+        try
+        {
+            var thresholdEntity = await _db.ThresholdInvetories.AsNoTracking().FirstOrDefaultAsync(t => t.IsActive);
+            int threshold = thresholdEntity?.Threshold ?? 5;
+
+            var productIds = details.Select(d => d.IdProduct).Distinct().ToList();
+
+            var warehouse = await _db.Warehouses.AsNoTracking().FirstOrDefaultAsync(w => w.IdWarehouse == idWarehouse);
+            var warehouseName = warehouse?.Name ?? $"Sucursal #{idWarehouse}";
+
+            var recipient = _config["N8nSettings:MatrizRecipientPhone"] ?? "593963124396";
+
+            foreach (var prodId in productIds)
+            {
+                var remainingStock = await _db.Lots
+                    .AsNoTracking()
+                    .Where(l => l.IdWarehouse == idWarehouse && l.IdProduct == prodId && l.IsActive && l.Quantity > 0)
+                    .SumAsync(l => (int?)l.Quantity) ?? 0;
+
+                if (remainingStock <= threshold)
+                {
+                    var product = await _db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.IdProduct == prodId);
+                    var prodName = product?.Name ?? "Producto";
+                    var prodCode = product?.Code ?? "-";
+
+                    await _n8nService.SendLowStockSaleAlertAsync(
+                        idWarehouse,
+                        warehouseName,
+                        prodId,
+                        prodCode,
+                        prodName,
+                        remainingStock,
+                        threshold,
+                        recipient,
+                        idUser
+                    );
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al verificar y despachar alerta de stock crítico tras venta en almacén {WarehouseId}", idWarehouse);
         }
     }
 
