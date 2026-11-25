@@ -1018,3 +1018,126 @@ body {
     color: #475569 !important;
     opacity: 0.4 !important;
 }
+
+/* ==========================================================================
+   VISTA POR CATEGORÍAS (CONTÍFICO) EN MODO OSCURO
+   ========================================================================== */
+[data-theme="dark"] .view-mode-toggle {
+    background-color: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .btn-toggle-view {
+    color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .btn-toggle-view:hover:not(.active) {
+    color: var(--text-main) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme="dark"] .btn-toggle-view.active {
+    background-color: var(--bg-elevated) !important;
+    color: #38bdf8 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .btn-expand-collapse {
+    background-color: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-main) !important;
+}
+
+[data-theme="dark"] .btn-expand-collapse:hover {
+    background-color: var(--bg-elevated) !important;
+    border-color: #38bdf8 !important;
+    color: #38bdf8 !important;
+}
+
+[data-theme="dark"] .category-card {
+    background-color: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .category-card:hover {
+    border-color: rgba(56, 189, 248, 0.35) !important;
+}
+
+[data-theme="dark"] .category-card.expanded {
+    border-color: rgba(56, 189, 248, 0.3) !important;
+}
+
+[data-theme="dark"] .category-card-header {
+    background-color: var(--bg-surface) !important;
+}
+
+[data-theme="dark"] .category-card-header:hover {
+    background-color: var(--bg-elevated) !important;
+}
+
+[data-theme="dark"] .category-card.expanded .category-card-header {
+    background-color: var(--bg-elevated) !important;
+    border-bottom-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .category-title {
+    color: var(--text-main) !important;
+}
+
+[data-theme="dark"] .category-desc {
+    color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .category-chevron-icon {
+    color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .category-chevron-icon.rotated {
+    color: #38bdf8 !important;
+}
+
+[data-theme="dark"] .category-icon-bubble {
+    background-color: rgba(56, 189, 248, 0.12) !important;
+    color: #38bdf8 !important;
+}
+
+[data-theme="dark"] .category-count-badge {
+    background-color: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .btn-category-add {
+    background-color: rgba(56, 189, 248, 0.12) !important;
+    border-color: rgba(56, 189, 248, 0.25) !important;
+    color: #38bdf8 !important;
+}
+
+[data-theme="dark"] .btn-category-add:hover {
+    background-color: #0284c7 !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .category-card-body {
+    background-color: var(--bg-surface) !important;
+}
+
+[data-theme="dark"] .subtable thead th {
+    background-color: var(--bg-subtle) !important;
+    border-bottom-color: var(--border-color) !important;
+    color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .subtable tbody td {
+    background-color: var(--bg-surface) !important;
+    border-bottom-color: var(--border-color) !important;
+    color: var(--text-main) !important;
+}
+
+[data-theme="dark"] .subtable tbody tr:hover td {
+    background-color: var(--bg-elevated) !important;
+}
+
+[data-theme="dark"] .category-empty-sub {
+    color: var(--text-muted) !important;
+}

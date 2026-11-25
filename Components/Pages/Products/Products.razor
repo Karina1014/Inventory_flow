@@ -197,6 +197,32 @@
                     </div>
                 }
             </div>
+
+            <!-- SELECTOR DE VISTA: POR CATEGORÍAS (CONTÍFICO) vs LISTA PLANA -->
+            <div class="view-mode-toggle">
+                <button type="button"
+                        class="btn-toggle-view @(viewMode == "categories" ? "active" : "")"
+                        @onclick='() => SetViewMode("categories")'
+                        title="Ver agrupado por Categorías (Estilo Contífico)">
+                    <i class="bi bi-folder2-open"></i>
+                    <span>Por Categorías</span>
+                </button>
+                <button type="button"
+                        class="btn-toggle-view @(viewMode == "flat" ? "active" : "")"
+                        @onclick='() => SetViewMode("flat")'
+                        title="Ver lista plana tradicional">
+                    <i class="bi bi-table"></i>
+                    <span>Lista Plana</span>
+                </button>
+            </div>
+
+            @if (viewMode == "categories")
+            {
+                <button type="button" class="btn-expand-collapse" @onclick="ToggleExpandAll" title="@(isAllExpanded ? "Colapsar todas las categorías" : "Expandir todas las categorías")">
+                    <i class="bi @(isAllExpanded ? "bi-arrows-collapse" : "bi-arrows-expand")"></i>
+                    <span>@(isAllExpanded ? "Colapsar todo" : "Expandir todo")</span>
+                </button>
+            }
         </div>
 
         <div class="toolbar-right">
@@ -207,101 +233,249 @@
         </div>
     </div>
 
-    <!-- TABLA PRINCIPAL ESTILO CUADRÍCULA LIMPIA (SIN COLUMNA ID) -->
-    <div class="panel">
-        @if (products.Count == 0)
-        {
-            <div class="empty-state">
-                <i class="bi bi-box-seam"></i>
-                <span>No se encontraron productos registrados</span>
-            </div>
-        }
-        else
-        {
-            <div class="table-wrapper">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Código</th>
-                            <th>Nombre</th>
-                            <th>Categoría</th>
-                            <th>Precio</th>
-                            <th>IVA</th>
-                            <th>Estado</th>
-                            <th>Creado</th>
-                            <th class="col-actions-header">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var p in products)
-                        {
-                            <tr>
-                                <td class="col-code">
-                                    <span class="code-pill">@p.Code</span>
-                                </td>
-                                <td class="col-name">
-                                    <div class="product-name-block">
-                                        <span class="name-main">@p.Name</span>
-                                        @if (!string.IsNullOrWhiteSpace(p.Description))
-                                        {
-                                            <span class="name-desc" title="@p.Description">@p.Description</span>
-                                        }
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="category-pill">@(p.Category?.Name ?? GetCategoryName(p.IdCategory))</span>
-                                </td>
-                                <td class="col-price">@p.SuggestedPrice.ToString("C2")</td>
-                                <td>
-                                    @if (p.Iva)
+    <!-- CONTENIDO PRINCIPAL: VISTA POR CATEGORÍAS (CONTÍFICO) O VISTA PLANA -->
+    @if (viewMode == "categories")
+    {
+        <div class="categories-accordion-container">
+            @if (filteredCategoryGroups.Count == 0)
+            {
+                <div class="panel empty-state">
+                    <i class="bi bi-box-seam"></i>
+                    <span>No se encontraron productos o categorías con los filtros seleccionados</span>
+                </div>
+            }
+            else
+            {
+                @foreach (var group in filteredCategoryGroups)
+                {
+                    var isExpanded = expandedCategoryIds.Contains(group.IdCategory);
+                    <div class="category-card @(isExpanded ? "expanded" : "")">
+                        <!-- ENCABEZADO DE LA CATEGORÍA (CLICKEABLE ESTILO CONTÍFICO) -->
+                        <div class="category-card-header" @onclick="() => ToggleCategory(group.IdCategory)">
+                            <div class="category-header-left">
+                                <span class="category-chevron-icon @(isExpanded ? "rotated" : "")">
+                                    <i class="bi bi-chevron-right"></i>
+                                </span>
+                                <div class="category-icon-bubble">
+                                    <i class="bi bi-tag-fill"></i>
+                                </div>
+                                <div class="category-info">
+                                    <span class="category-title">@group.CategoryName</span>
+                                    @if (!string.IsNullOrWhiteSpace(group.CategoryDescription))
                                     {
-                                        <span class="badge badge-iva">Sí</span>
+                                        <span class="category-desc">@group.CategoryDescription</span>
                                     }
-                                    else
-                                    {
-                                        <span class="badge badge-no-iva">No</span>
-                                    }
-                                </td>
-                                <td>
-                                    @if (p.IsActive)
-                                    {
-                                        <span class="badge badge-active">Activo</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge badge-inactive">Inactivo</span>
-                                    }
-                                </td>
-                                <td class="col-date">@p.CreationDate.ToString("dd/MM/yyyy")</td>
-                                <td class="col-actions">
-                                    <!-- BOTONES DE ACCIÓN DIRECTOS, CLAROS Y ATRACTIVOS (PILLS) -->
-                                    <div class="actions-pill-group">
-                                        <button type="button"
-                                                class="btn-action-pill btn-pill-edit"
-                                                @onclick="() => OpenEdit(p)"
-                                                title="Editar @p.Name">
-                                            <i class="bi bi-pencil-square"></i>
-                                        </button>
-                                        <button type="button"
-                                                class="btn-action-pill btn-pill-delete"
-                                                @onclick="() => OpenDelete(p)"
-                                                title="Eliminar @p.Name">
-                                            <i class="bi bi-trash3"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
+                                </div>
+                            </div>
 
-            <TablePagination TotalItems="@totalProductsCount"
-                             @bind-CurrentPage="currentPage"
-                             @bind-PageSize="pageSize"
-                             OnPageChanged="LoadProductsPageAsync" />
-        }
-    </div>
+                            <div class="category-header-right" @onclick:stopPropagation="true">
+                                <span class="category-count-badge">
+                                    <i class="bi bi-box-seam me-1"></i>
+                                    @group.ProductCount @(group.ProductCount == 1 ? "producto" : "productos")
+                                </span>
+                                @if (group.IdCategory > 0)
+                                {
+                                    <button type="button" class="btn-category-add" 
+                                            @onclick="() => OpenCreateForCategory(group.IdCategory)"
+                                            title="Añadir producto en @group.CategoryName">
+                                        <i class="bi bi-plus"></i>
+                                        <span>Añadir</span>
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- SUB-TABLA DE PRODUCTOS DESPLEGABLE -->
+                        @if (isExpanded)
+                        {
+                            <div class="category-card-body">
+                                @if (group.Products.Count == 0)
+                                {
+                                    <div class="category-empty-sub">
+                                        <i class="bi bi-inbox"></i>
+                                        <span>No hay productos registrados en esta categoría</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="table-wrapper subtable-wrapper">
+                                        <table class="data-table subtable">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 140px;">Código</th>
+                                                    <th>Producto</th>
+                                                    <th style="width: 120px;">Precio</th>
+                                                    <th style="width: 80px;">IVA</th>
+                                                    <th style="width: 100px;">Estado</th>
+                                                    <th style="width: 110px;">Creado</th>
+                                                    <th class="col-actions-header" style="width: 100px;">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var p in group.Products)
+                                                {
+                                                    <tr>
+                                                        <td class="col-code">
+                                                            <span class="code-pill">@p.Code</span>
+                                                        </td>
+                                                        <td class="col-name">
+                                                            <div class="product-name-block">
+                                                                <span class="name-main">@p.Name</span>
+                                                                @if (!string.IsNullOrWhiteSpace(p.Description))
+                                                                {
+                                                                    <span class="name-desc" title="@p.Description">@p.Description</span>
+                                                                }
+                                                            </div>
+                                                        </td>
+                                                        <td class="col-price">@p.SuggestedPrice.ToString("C2")</td>
+                                                        <td>
+                                                            @if (p.Iva)
+                                                            {
+                                                                <span class="badge badge-iva">Sí</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="badge badge-no-iva">No</span>
+                                                            }
+                                                        </td>
+                                                        <td>
+                                                            @if (p.IsActive)
+                                                            {
+                                                                <span class="badge badge-active">Activo</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="badge badge-inactive">Inactivo</span>
+                                                            }
+                                                        </td>
+                                                        <td class="col-date">@p.CreationDate.ToString("dd/MM/yyyy")</td>
+                                                        <td class="col-actions">
+                                                            <div class="actions-pill-group">
+                                                                <button type="button"
+                                                                        class="btn-action-pill btn-pill-edit"
+                                                                        @onclick="() => OpenEdit(p)"
+                                                                        title="Editar @p.Name">
+                                                                    <i class="bi bi-pencil-square"></i>
+                                                                </button>
+                                                                <button type="button"
+                                                                        class="btn-action-pill btn-pill-delete"
+                                                                        @onclick="() => OpenDelete(p)"
+                                                                        title="Eliminar @p.Name">
+                                                                    <i class="bi bi-trash3"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </div>
+    }
+    else
+    {
+        <!-- TABLA PRINCIPAL ESTILO CUADRÍCULA LIMPIA (SIN COLUMNA ID) -->
+        <div class="panel">
+            @if (products.Count == 0)
+            {
+                <div class="empty-state">
+                    <i class="bi bi-box-seam"></i>
+                    <span>No se encontraron productos registrados</span>
+                </div>
+            }
+            else
+            {
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Nombre</th>
+                                <th>Categoría</th>
+                                <th>Precio</th>
+                                <th>IVA</th>
+                                <th>Estado</th>
+                                <th>Creado</th>
+                                <th class="col-actions-header">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in products)
+                            {
+                                <tr>
+                                    <td class="col-code">
+                                        <span class="code-pill">@p.Code</span>
+                                    </td>
+                                    <td class="col-name">
+                                        <div class="product-name-block">
+                                            <span class="name-main">@p.Name</span>
+                                            @if (!string.IsNullOrWhiteSpace(p.Description))
+                                            {
+                                                <span class="name-desc" title="@p.Description">@p.Description</span>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="category-pill">@(p.Category?.Name ?? GetCategoryName(p.IdCategory))</span>
+                                    </td>
+                                    <td class="col-price">@p.SuggestedPrice.ToString("C2")</td>
+                                    <td>
+                                        @if (p.Iva)
+                                        {
+                                            <span class="badge badge-iva">Sí</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge badge-no-iva">No</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (p.IsActive)
+                                        {
+                                            <span class="badge badge-active">Activo</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge badge-inactive">Inactivo</span>
+                                        }
+                                    </td>
+                                    <td class="col-date">@p.CreationDate.ToString("dd/MM/yyyy")</td>
+                                    <td class="col-actions">
+                                        <!-- BOTONES DE ACCIÓN DIRECTOS, CLAROS Y ATRACTIVOS (PILLS) -->
+                                        <div class="actions-pill-group">
+                                            <button type="button"
+                                                    class="btn-action-pill btn-pill-edit"
+                                                    @onclick="() => OpenEdit(p)"
+                                                    title="Editar @p.Name">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                            <button type="button"
+                                                    class="btn-action-pill btn-pill-delete"
+                                                    @onclick="() => OpenDelete(p)"
+                                                    title="Eliminar @p.Name">
+                                                <i class="bi bi-trash3"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <TablePagination TotalItems="@totalProductsCount"
+                                 @bind-CurrentPage="currentPage"
+                                 @bind-PageSize="pageSize"
+                                 OnPageChanged="LoadProductsPageAsync" />
+            }
+        </div>
+    }
 </div>
 
 @if (showModal)
@@ -457,6 +631,22 @@
     private int pageSize = 10;
     private int totalProductsCount;
 
+    // Estado para vista jerárquica estilo Contífico / Siigo
+    private string viewMode = "categories"; // "categories" o "flat"
+    private bool isAllExpanded = false;
+    private HashSet<int> expandedCategoryIds = new();
+    private List<Product> allFilteredProducts = new();
+    private List<CategoryProductGroup> filteredCategoryGroups = new();
+
+    public class CategoryProductGroup
+    {
+        public int IdCategory { get; set; }
+        public string CategoryName { get; set; } = string.Empty;
+        public string? CategoryDescription { get; set; }
+        public List<Product> Products { get; set; } = new();
+        public int ProductCount => Products.Count;
+    }
+
     private string searchTerm = string.Empty;
     private int filterCategoryId;
     private string statusFilter = "all";
@@ -495,7 +685,13 @@
     private async Task LoadDataAsync()
     {
         categories = CategoryRepo.GetCategories().ToList();
+        await RefreshAllProductsDataAsync();
+    }
+
+    private async Task RefreshAllProductsDataAsync()
+    {
         await LoadProductsPageAsync();
+        await LoadAllFilteredProductsAsync();
     }
 
     private async Task LoadProductsPageAsync()
@@ -514,10 +710,131 @@
         currentPage = paged.PageNumber;
     }
 
+    private async Task LoadAllFilteredProductsAsync()
+    {
+        var paged = await ProductRepo.GetProductsPagedAsync(
+            1,
+            2000,
+            searchTerm,
+            filterCategoryId > 0 ? filterCategoryId : null,
+            statusFilter,
+            startDate,
+            endDate);
+
+        allFilteredProducts = paged.Items.ToList();
+        BuildCategoryGroups();
+    }
+
+    private void BuildCategoryGroups()
+    {
+        var groups = new List<CategoryProductGroup>();
+
+        var targetCategories = filterCategoryId > 0
+            ? categories.Where(c => c.IdCategory == filterCategoryId).ToList()
+            : categories.OrderBy(c => c.Name).ToList();
+
+        foreach (var cat in targetCategories)
+        {
+            var catProds = allFilteredProducts
+                .Where(p => p.IdCategory == cat.IdCategory)
+                .OrderBy(p => p.Name)
+                .ToList();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                if (catProds.Count > 0 || cat.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                {
+                    groups.Add(new CategoryProductGroup
+                    {
+                        IdCategory = cat.IdCategory,
+                        CategoryName = cat.Name,
+                        CategoryDescription = cat.Description,
+                        Products = catProds
+                    });
+                    expandedCategoryIds.Add(cat.IdCategory);
+                }
+            }
+            else
+            {
+                groups.Add(new CategoryProductGroup
+                {
+                    IdCategory = cat.IdCategory,
+                    CategoryName = cat.Name,
+                    CategoryDescription = cat.Description,
+                    Products = catProds
+                });
+            }
+        }
+
+        var uncategorized = allFilteredProducts
+            .Where(p => !categories.Any(c => c.IdCategory == p.IdCategory))
+            .OrderBy(p => p.Name)
+            .ToList();
+
+        if (uncategorized.Count > 0)
+        {
+            groups.Add(new CategoryProductGroup
+            {
+                IdCategory = -1,
+                CategoryName = "Sin Categoría Asignada",
+                CategoryDescription = "Productos que no tienen una categoría oficial",
+                Products = uncategorized
+            });
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                expandedCategoryIds.Add(-1);
+            }
+        }
+
+        filteredCategoryGroups = groups;
+        isAllExpanded = filteredCategoryGroups.Count > 0 && filteredCategoryGroups.All(g => expandedCategoryIds.Contains(g.IdCategory));
+    }
+
+    private void SetViewMode(string mode)
+    {
+        viewMode = mode;
+    }
+
+    private void ToggleCategory(int idCategory)
+    {
+        if (expandedCategoryIds.Contains(idCategory))
+        {
+            expandedCategoryIds.Remove(idCategory);
+        }
+        else
+        {
+            expandedCategoryIds.Add(idCategory);
+        }
+        isAllExpanded = filteredCategoryGroups.Count > 0 && filteredCategoryGroups.All(g => expandedCategoryIds.Contains(g.IdCategory));
+    }
+
+    private void ToggleExpandAll()
+    {
+        if (isAllExpanded)
+        {
+            expandedCategoryIds.Clear();
+            isAllExpanded = false;
+        }
+        else
+        {
+            foreach (var g in filteredCategoryGroups)
+            {
+                expandedCategoryIds.Add(g.IdCategory);
+            }
+            isAllExpanded = true;
+        }
+    }
+
+    private void OpenCreateForCategory(int idCategory)
+    {
+        OpenCreate();
+        formIdCategory = idCategory;
+    }
+
     private async Task OnFilterChangedAsync()
     {
         currentPage = 1;
-        await LoadProductsPageAsync();
+        await RefreshAllProductsDataAsync();
     }
 
     private void CloseAllDropdowns()
@@ -539,7 +856,7 @@
         filterCategoryId = idCategory;
         isCategoryFilterOpen = false;
         currentPage = 1;
-        await LoadProductsPageAsync();
+        await RefreshAllProductsDataAsync();
     }
 
     private string GetCategoryFilterName()
@@ -560,7 +877,7 @@
         statusFilter = status;
         isStatusFilterOpen = false;
         currentPage = 1;
-        await LoadProductsPageAsync();
+        await RefreshAllProductsDataAsync();
     }
 
     private string GetStatusFilterName() => statusFilter switch
@@ -624,7 +941,7 @@
         selectedDatePreset = "custom";
         isDateMenuOpen = false;
         currentPage = 1;
-        await LoadProductsPageAsync();
+        await RefreshAllProductsDataAsync();
     }
 
     private async Task ClearDateFilterAsync()
@@ -636,7 +953,7 @@
         customEndDate = null;
         isDateMenuOpen = false;
         currentPage = 1;
-        await LoadProductsPageAsync();
+        await RefreshAllProductsDataAsync();
     }
 
     private string GetDateFilterLabel()
@@ -716,6 +1033,7 @@
 
         try
         {
+            var savedCatId = formIdCategory;
             if (isEditing && selectedProduct != null)
             {
                 var dto = new UpdateProductDto
@@ -747,7 +1065,12 @@
                 ToastService.ShowSuccess("Producto creado correctamente.");
             }
 
-            await LoadProductsPageAsync();
+            if (savedCatId > 0)
+            {
+                expandedCategoryIds.Add(savedCatId);
+            }
+
+            await RefreshAllProductsDataAsync();
             CloseModal();
         }
         catch
@@ -764,9 +1087,10 @@
         isSaving = true;
         try
         {
+            var catId = selectedProduct.IdCategory;
             ProductRepo.DeleteProduct(selectedProduct.IdProduct);
             ToastService.ShowSuccess("Producto eliminado correctamente.");
-            await LoadProductsPageAsync();
+            await RefreshAllProductsDataAsync();
             CloseModal();
         }
         catch
