@@ -19,15 +19,23 @@
         </div>
     </div>
 
-    <!-- BARRA DE HERRAMIENTAS EN UNA SOLA LÍNEA CON FILTROS Y BOTÓN AÑADIR -->
-    <div class="table-toolbar">
-        <div class="toolbar-left">
-            <!-- BUSCADOR -->
-            <div class="filter-search-box">
-                <i class="bi bi-search"></i>
-                <input type="text" placeholder="Buscar código, nombre o descripción..."
-                       @bind="searchTerm" @bind:event="oninput" @bind:after="OnFilterChangedAsync" />
-            </div>
+    <!-- BARRA DE HERRAMIENTAS: DOS NIVELES INTUITIVOS Y ORGANIZADOS -->
+    <div class="products-toolbar-container">
+        <!-- NIVEL 1: FILTROS PRINCIPALES + BOTÓN NUEVO PRODUCTO -->
+        <div class="toolbar-row-primary">
+            <div class="filters-group">
+                <!-- BUSCADOR -->
+                <div class="filter-search-box">
+                    <i class="bi bi-search"></i>
+                    <input type="text" placeholder="Buscar código, nombre o descripción..."
+                           @bind="searchTerm" @bind:event="oninput" @bind:after="OnFilterChangedAsync" />
+                    @if (!string.IsNullOrWhiteSpace(searchTerm))
+                    {
+                        <span class="clear-search-btn" @onclick="ClearSearchAsync" title="Limpiar búsqueda">
+                            <i class="bi bi-x-circle-fill"></i>
+                        </span>
+                    }
+                </div>
 
             <!-- SELECTOR DESPLEGABLE DE CATEGORÍA -->
             <div class="custom-select-container filter-category-width">
@@ -197,7 +205,20 @@
                     </div>
                 }
             </div>
+        </div>
 
+        <!-- BOTÓN AÑADIR PRODUCTO A LA DERECHA (FIJO, DESTACADO Y ACCESIBLE) -->
+        <div class="actions-group">
+            <button type="button" class="btn-primary" @onclick="OpenCreate">
+                <i class="bi bi-plus-lg"></i>
+                <span>Nuevo producto</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- NIVEL 2: BARRA DE NAVEGACIÓN Y VISTA (ESTILO CONTÍFICO) -->
+    <div class="toolbar-row-secondary">
+        <div class="view-controls-left">
             <!-- SELECTOR DE VISTA: POR CATEGORÍAS (CONTÍFICO) vs LISTA PLANA -->
             <div class="view-mode-toggle">
                 <button type="button"
@@ -219,19 +240,34 @@
             @if (viewMode == "categories")
             {
                 <button type="button" class="btn-expand-collapse" @onclick="ToggleExpandAll" title="@(isAllExpanded ? "Colapsar todas las categorías" : "Expandir todas las categorías")">
-                    <i class="bi @(isAllExpanded ? "bi-arrows-collapse" : "bi-arrows-expand")"></i>
+                    <i class="bi @(isAllExpanded ? "bi-chevron-bar-contract" : "bi-chevron-bar-expand")"></i>
                     <span>@(isAllExpanded ? "Colapsar todo" : "Expandir todo")</span>
                 </button>
             }
         </div>
 
-        <div class="toolbar-right">
-            <button type="button" class="btn-primary" @onclick="OpenCreate">
-                <i class="bi bi-plus-lg"></i>
-                <span>Nuevo producto</span>
-            </button>
+        <div class="view-meta-right">
+            @if (viewMode == "categories")
+            {
+                <span class="view-meta-pill">
+                    <i class="bi bi-folder2"></i>
+                    <span>@filteredCategoryGroups.Count @(filteredCategoryGroups.Count == 1 ? "categoría" : "categorías")</span>
+                </span>
+                <span class="view-meta-pill">
+                    <i class="bi bi-box-seam"></i>
+                    <span>@allFilteredProducts.Count @(allFilteredProducts.Count == 1 ? "producto" : "productos")</span>
+                </span>
+            }
+            else
+            {
+                <span class="view-meta-pill">
+                    <i class="bi bi-list-check"></i>
+                    <span>@totalProductsCount @(totalProductsCount == 1 ? "producto" : "productos")</span>
+                </span>
+            }
         </div>
     </div>
+</div>
 
     <!-- CONTENIDO PRINCIPAL: VISTA POR CATEGORÍAS (CONTÍFICO) O VISTA PLANA -->
     @if (viewMode == "categories")
@@ -835,6 +871,12 @@
     {
         currentPage = 1;
         await RefreshAllProductsDataAsync();
+    }
+
+    private async Task ClearSearchAsync()
+    {
+        searchTerm = string.Empty;
+        await OnFilterChangedAsync();
     }
 
     private void CloseAllDropdowns()

@@ -9,7 +9,13 @@
 
 <ToastContainer />
 
-<div class="layout-container">
+<div class="layout-container @(isSidebarOpen ? "sidebar-mobile-open" : "")">
+    <!-- Overlay oscurecedor para cerrar el menú en móviles -->
+    @if (isSidebarOpen)
+    {
+        <div class="sidebar-backdrop" @onclick="CloseSidebar"></div>
+    }
+
     <!-- Sidebar Izquierdo Fijo (260px) con fondo gris claro #F8FAFC y borde #E2E8F0 -->
     <aside class="sidebar">
         <!-- Encabezado superior con Logotipo y Título -->
@@ -21,6 +27,10 @@
                 <span class="brand-title">Inventory Flow</span>
                 <span class="brand-subtitle">MEDVET ENTERPRISE</span>
             </div>
+            <!-- Botón para cerrar menú en móviles -->
+            <button type="button" class="sidebar-close-btn" @onclick="CloseSidebar" aria-label="Cerrar menú">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
 
         <!-- Menú de Navegación Lateral Reorganizado -->
@@ -36,11 +46,18 @@
     <div class="main-wrapper">
         <!-- Topbar Fija (60px) -->
         <header class="topbar">
-            <!-- Barra de búsqueda minimalista con insignia Ctrl K a la izquierda -->
-            <div class="search-box">
-                <i class="bi bi-search search-icon"></i>
-                <input type="text" class="search-input" placeholder="Buscar productos, lotes o SKU..." />
-                <kbd class="search-kbd">Ctrl K</kbd>
+            <div class="topbar-left">
+                <!-- Botón Hamburguesa para móviles y pantallas compactas -->
+                <button type="button" class="sidebar-toggle-btn" @onclick="ToggleSidebar" aria-label="Abrir menú" title="Menú de navegación">
+                    <i class="bi bi-list"></i>
+                </button>
+
+                <!-- Barra de búsqueda minimalista con insignia Ctrl K a la izquierda -->
+                <div class="search-box">
+                    <i class="bi bi-search search-icon"></i>
+                    <input type="text" class="search-input" placeholder="Buscar productos, lotes o SKU..." />
+                    <kbd class="search-kbd">Ctrl K</kbd>
+                </div>
             </div>
 
             <!-- Acciones de la barra superior: Selector de Tema + Avatar de usuario -->
@@ -107,10 +124,13 @@
 @code {
     private bool isDropdownOpen;
     private bool isDarkMode;
+    private bool isSidebarOpen;
     private List<MenuDto> userMenus = new();
 
     private void ToggleDropdown() => isDropdownOpen = !isDropdownOpen;
     private void CloseDropdown() => isDropdownOpen = false;
+    private void ToggleSidebar() => isSidebarOpen = !isSidebarOpen;
+    private void CloseSidebar() => isSidebarOpen = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -161,6 +181,7 @@
     protected override async Task OnInitializedAsync()
     {
         CurrentUserService.OnChange += HandleUserChanged;
+        NavigationManager.LocationChanged += OnLocationChanged;
 
         if (!CurrentUserService.IsAuthenticated)
         {
@@ -170,6 +191,13 @@
 
         await LoadMenusAsync();
         ValidateRouteAccess();
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        isSidebarOpen = false;
+        isDropdownOpen = false;
+        StateHasChanged();
     }
 
     protected override void OnParametersSet()
@@ -268,5 +296,6 @@
     public void Dispose()
     {
         CurrentUserService.OnChange -= HandleUserChanged;
+        NavigationManager.LocationChanged -= OnLocationChanged;
     }
 }

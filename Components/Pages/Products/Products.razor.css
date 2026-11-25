@@ -38,12 +38,104 @@
     margin: 0.15rem 0 0 0;
 }
 
-/* BARRA DE HERRAMIENTAS: DISTRIBUCIÓN EN LÍNEA ÚNICA */
+/* BARRA DE HERRAMIENTAS: DOS NIVELES INTUITIVOS Y ORGANIZADOS */
+.products-toolbar-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.toolbar-row-primary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+}
+
+.filters-group {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+.actions-group {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.toolbar-row-secondary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    padding-top: 0.55rem;
+    border-top: 1px dashed #e2e8f0;
+}
+
+.view-controls-left {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.view-meta-right {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.view-meta-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--text-muted, #64748b);
+    background: var(--bg-subtle, #f8fafc);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 20px;
+    padding: 0.2rem 0.65rem;
+}
+
+.view-meta-pill i {
+    font-size: 0.8rem;
+    color: #0077b6;
+}
+
+.clear-search-btn {
+    cursor: pointer;
+    color: #94a3b8;
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.85rem;
+    transition: color 0.15s ease;
+}
+
+.clear-search-btn:hover {
+    color: #ef4444;
+}
+
 .table-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 0.65rem;
 }
 
@@ -51,16 +143,15 @@
     display: flex;
     align-items: center;
     gap: 0.45rem;
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
 }
 
 .toolbar-right {
     display: flex;
     align-items: center;
     flex-shrink: 0;
-    margin-left: auto;
 }
 
 .filter-search-box {
@@ -957,12 +1048,77 @@
     cursor: not-allowed;
 }
 
-@media (max-width: 1080px) {
-    .table-toolbar {
+@media (max-width: 1280px) {
+    .filters-group {
         flex-wrap: wrap;
     }
-    .toolbar-left {
+}
+
+@media (max-width: 768px) {
+    .products-toolbar-container {
+        padding: 0.75rem;
+        gap: 0.75rem;
+    }
+    .toolbar-row-primary {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.65rem;
+    }
+    .filters-group {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        gap: 0.5rem;
+    }
+    .actions-group {
+        width: 100%;
+        margin-left: 0;
+    }
+    .actions-group .btn-primary {
+        width: 100%;
+        justify-content: center;
+    }
+    .filter-search-box,
+    .filter-category-width,
+    .filter-status-width,
+    .filter-date-width {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .toolbar-row-secondary {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.55rem;
+    }
+    .view-controls-left {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .view-mode-toggle {
+        width: 100%;
+        display: flex;
+    }
+    .btn-toggle-view {
+        flex: 1;
+        justify-content: center;
+    }
+    .btn-expand-collapse {
+        width: 100%;
+        justify-content: center;
+    }
+    .view-meta-right {
+        width: 100%;
+        justify-content: flex-start;
+        margin-left: 0;
+    }
+    .category-card-header {
         flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .category-header-right {
+        width: 100%;
+        justify-content: flex-end;
     }
 }
 

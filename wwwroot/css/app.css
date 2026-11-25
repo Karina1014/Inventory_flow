@@ -1141,3 +1141,148 @@ body {
 [data-theme="dark"] .category-empty-sub {
     color: var(--text-muted) !important;
 }
+
+/* ==========================================================================
+   REGLAS GLOBALES DE RESPONSIVIDAD (MOBILE & TABLET ADAPTIVE DESIGN)
+   ========================================================================== */
+
+/* Asegurar que ninguna tabla desborde la pantalla en dispositivos pequeños */
+.table-wrapper {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    max-width: 100% !important;
+}
+
+/* Evitar que barras de herramientas colapsen de forma rígida */
+.table-toolbar {
+    flex-wrap: wrap !important;
+    gap: 0.65rem !important;
+}
+
+.table-toolbar .toolbar-left {
+    flex-wrap: wrap !important;
+    gap: 0.45rem !important;
+    min-width: 0 !important;
+}
+
+/* Pantallas medianas (Portátiles y tablets en horizontal <= 1280px) */
+@media (max-width: 1280px) {
+    .table-toolbar {
+        flex-wrap: wrap !important;
+    }
+
+    .table-toolbar .toolbar-left {
+        flex: 1 1 100% !important;
+        flex-wrap: wrap !important;
+    }
+
+    .table-toolbar .toolbar-right {
+        margin-left: 0 !important;
+        margin-top: 0.25rem !important;
+    }
+}
+
+/* Pantallas pequeñas (Tablets verticales y Smartphones <= 768px) */
+@media (max-width: 768px) {
+    .table-toolbar {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.65rem !important;
+    }
+
+    .table-toolbar .toolbar-left {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        gap: 0.5rem !important;
+    }
+
+    .table-toolbar .toolbar-right {
+        width: 100% !important;
+        margin-left: 0 !important;
+    }
+
+    .table-toolbar .toolbar-right button,
+    .table-toolbar .toolbar-right a {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+
+    .table-toolbar .filter-search-box,
+    .table-toolbar .custom-select-container {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* Modales responsivos */
+    .modal-box {
+        width: 94vw !important;
+        max-width: 94vw !important;
+        margin: 1rem auto !important;
+        padding: 1.25rem !important;
+    }
+
+    .form-row-2,
+    .form-row-3 {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Paginación en móviles */
+    .pagination-container {
+        flex-direction: column !important;
+        gap: 0.75rem !important;
+        align-items: center !important;
+    }
+}
+
+/* ==========================================================================
+   Modo Oscuro: Toolbar de Productos de dos niveles
+   ========================================================================== */
+[data-theme="dark"] .products-toolbar-container {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .toolbar-row-secondary {
+    border-top-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .view-meta-pill {
+    background: var(--bg-subtle) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .view-meta-pill i {
+    color: var(--brand-primary) !important;
+}
+
+[data-theme="dark"] .view-mode-toggle {
+    background: var(--bg-subtle) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .btn-toggle-view {
+    color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .btn-toggle-view:hover:not(.active) {
+    color: var(--text-main) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme="dark"] .btn-toggle-view.active {
+    background: var(--bg-surface) !important;
+    color: var(--brand-primary) !important;
+}
+
+[data-theme="dark"] .btn-expand-collapse {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-main) !important;
+}
+
+[data-theme="dark"] .btn-expand-collapse:hover {
+    background: var(--bg-elevated) !important;
+    color: var(--text-main) !important;
+}
