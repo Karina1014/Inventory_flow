@@ -18,6 +18,7 @@ public class NotificationsController : ControllerBase
 {
     private readonly ILowStockReportService _reportService;
     private readonly IN8nNotificationService _n8nNotificationService;
+    private readonly IExpirationAlertService _expirationAlertService;
     private readonly AplicationDbContext _db;
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _env;
@@ -25,21 +26,21 @@ public class NotificationsController : ControllerBase
     public NotificationsController(
         ILowStockReportService reportService,
         IN8nNotificationService n8nNotificationService,
+        IExpirationAlertService expirationAlertService,
         AplicationDbContext db,
         IConfiguration configuration,
         IWebHostEnvironment env)
     {
         _reportService = reportService;
         _n8nNotificationService = n8nNotificationService;
+        _expirationAlertService = expirationAlertService;
         _db = db;
         _configuration = configuration;
         _env = env;
     }
 
-    /// <summary>
-    /// Endpoint para n8n: Genera el PDF de alerta de stock, registra en N8nNotifications (Pending)
-    /// y retorna los datos listos para el nodo de Evolution API (WhatsApp).
-    /// </summary>
+    // Endpoint para n8n: Genera el PDF de alerta de stock, registra en N8nNotifications (Pending)
+    // y retorna los datos listos para el nodo de Evolution API (WhatsApp).
     [HttpPost("dispatch-stock-alert")]
     [HttpGet("dispatch-stock-alert")]
     public async Task<IActionResult> DispatchStockAlert(
@@ -114,9 +115,7 @@ public class NotificationsController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Simula una alerta en tiempo real de venta con stock bajo/agotado enviada a n8n por Webhook.
-    /// </summary>
+    // Simula una alerta en tiempo real de venta con stock bajo/agotado enviada a n8n por Webhook
     [HttpPost("test-sale-alert")]
     [HttpGet("test-sale-alert")]
     public async Task<IActionResult> TestSaleAlert(
@@ -151,6 +150,40 @@ public class NotificationsController : ControllerBase
         catch (Exception ex)
         {
             return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    // Consulta los lotes próximos a vencer agrupados por sucursal dentro del rango especificado (días).
+    // Endpoint ideal para el nodo HTTP Request de n8n en el flujo programado matutino.
+    [HttpGet("expiring-lots")]
+    public async Task<IActionResult> GetExpiringLots([FromQuery] int daysAhead = 30)
+    {
+        try
+        {
+            var report = await _expirationAlertService.GetExpiringLotsReportAsync(daysAhead);
+            return Ok(report);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = $"Error al consultar lotes próximos a vencer: {ex.Message}" });
+        }
+    }
+
+    // Dispara y despacha la alerta de caducidades a n8n / WhatsApp (Bodega Matriz y Sucursales)
+    [HttpPost("dispatch-expiring-lots")]
+    [HttpGet("dispatch-expiring-lots")]
+    public async Task<IActionResult> DispatchExpiringLots(
+        [FromQuery] int daysAhead = 30,
+        [FromQuery] string recipient = "593963124396")
+    {
+        try
+        {
+            var notif = await _expirationAlertService.DispatchExpiringLotsWhatsAppAlertsAsync(daysAhead, recipient, 1);
+            return Ok(notif);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = $"Error al despachar alerta de caducidades: {ex.Message}" });
         }
     }
 }
