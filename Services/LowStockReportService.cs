@@ -112,7 +112,53 @@ public class LowStockReportService : ILowStockReportService
 
         int thresholdValue = thresholdEntity?.Threshold ?? 5;
 
-        // 4. Consultar lotes con existencias en dicha sucursal
+        // 4. Obtener identificadores de productos asociados a esta sucursal (por lotes o movimientos)
+        var warehouseLotProductIds = await _db.Lots
+            .AsNoTracking()
+            .Where(l => l.IdWarehouse == idWarehouse)
+            .Select(l => l.IdProduct)
+            .Distinct()
+            .ToListAsync();
+
+        var warehouseMovementProductIds = await _db.InventoryMovements
+            .AsNoTracking()
+            .Where(m => m.IdOriginWarehouse == idWarehouse || m.IdDestinationWarehouse == idWarehouse)
+            .SelectMany(m => m.Details.Select(d => d.IdProduct))
+            .Distinct()
+            .ToListAsync();
+
+        var relevantProductIds = warehouseLotProductIds
+            .Union(warehouseMovementProductIds)
+            .ToHashSet();
+
+        // Si la sucursal no tiene historial ni productos asociados, retornar lista vacía
+        if (!relevantProductIds.Any())
+        {
+            var emptyHeader = new LowStockReportHeaderDto
+            {
+                CompanyName = !string.IsNullOrWhiteSpace(matriz?.Name) ? matriz.Name : "MedVet Enterprise",
+                CompanyRuc = "1792345678001",
+                CompanyAddress = !string.IsNullOrWhiteSpace(matriz?.Address) ? matriz.Address : "Av. Panamericana Norte y Galo Plaza, Carapungo, Quito",
+                CompanyPhone = "(02) 289-4560",
+
+                WarehouseId = warehouse.IdWarehouse,
+                WarehouseName = warehouse.Name,
+                WarehouseAddress = !string.IsNullOrWhiteSpace(warehouse.Address) ? warehouse.Address : "Sin dirección registrada",
+
+                GeneratedAt = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"),
+                ActiveThreshold = thresholdValue,
+
+                TotalCriticalCount = 0,
+                TotalWarningCount = 0,
+                TotalAlertCount = 0,
+
+                GeneratedBy = generatedBy
+            };
+
+            return (emptyHeader, new List<LowStockReportItemDto>());
+        }
+
+        // 5. Consultar lotes con existencias activas en dicha sucursal
         var lots = await _db.Lots
             .AsNoTracking()
             .Where(l => l.IdWarehouse == idWarehouse && l.IsActive && l.Quantity > 0)
@@ -126,14 +172,14 @@ public class LowStockReportService : ILowStockReportService
             .GroupBy(l => l.IdProduct)
             .ToDictionary(g => g.Key, g => g.OrderBy(l => l.ExpirationDate).First().ExpirationDate);
 
-        // 5. Consultar todos los productos activos de la empresa
+        // 6. Consultar únicamente los productos activos que pertenecen a la sucursal
         var products = await _db.Products
             .Include(p => p.Category)
             .AsNoTracking()
-            .Where(p => p.IsActive)
+            .Where(p => p.IsActive && relevantProductIds.Contains(p.IdProduct))
             .ToListAsync();
 
-        // 6. Filtrar productos que están bajo stock (stock <= umbral)
+        // 7. Filtrar productos que están bajo stock (stock <= umbral)
         var alertList = new List<LowStockReportItemDto>();
 
         foreach (var prod in products)
