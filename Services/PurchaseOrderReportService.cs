@@ -41,16 +41,16 @@ public class PurchaseOrderReportService : IPurchaseOrderReportService
             throw new InvalidOperationException($"La orden de compra con ID {idPurchaseOrder} no existe en la base de datos.");
         }
 
-        // Ubicar la plantilla RDLC de Report Builder
-        var reportPath = Path.Combine(_env.ContentRootPath, "Reports", "PurchaseOrderReport.rdlc");
+        // Ubicar la plantilla RDL oficial de Report Builder
+        var reportPath = Path.Combine(_env.ContentRootPath, "Reports", "PurchaseOrderReport.rdl");
         if (!File.Exists(reportPath))
         {
-            reportPath = Path.Combine(AppContext.BaseDirectory, "Reports", "PurchaseOrderReport.rdlc");
+            reportPath = Path.Combine(AppContext.BaseDirectory, "Reports", "PurchaseOrderReport.rdl");
         }
 
         if (!File.Exists(reportPath))
         {
-            throw new FileNotFoundException($"No se encontró la plantilla de reporte RDLC en la ruta: {reportPath}");
+            throw new FileNotFoundException($"No se encontró la plantilla de reporte en la ruta: {reportPath}");
         }
 
         // Consultar la bodega central matriz directamente de la base de datos

@@ -34,15 +34,15 @@ public class MatrixStockReportService : IMatrixStockReportService
     {
         var (header, items) = await BuildReportDataAsync("Bodeguero Principal", idWarehouse);
 
-        var reportPath = Path.Combine(_env.ContentRootPath, "Reports", "MatrixStockReport.rdlc");
+        var reportPath = Path.Combine(_env.ContentRootPath, "Reports", "MatrixStockReport.rdl");
         if (!File.Exists(reportPath))
         {
-            reportPath = Path.Combine(AppContext.BaseDirectory, "Reports", "MatrixStockReport.rdlc");
+            reportPath = Path.Combine(AppContext.BaseDirectory, "Reports", "MatrixStockReport.rdl");
         }
 
         if (!File.Exists(reportPath))
         {
-            throw new FileNotFoundException($"No se encontró la plantilla de reporte RDLC en: {reportPath}");
+            throw new FileNotFoundException($"No se encontró la plantilla de reporte en: {reportPath}");
         }
 
         var localReport = new LocalReport();

@@ -34,11 +34,27 @@ public class ReportsController : ControllerBase
 
     private bool IsAuthorized(string? apiKey)
     {
+        // 1. Si el usuario está autenticado en la sesión
         if (User.Identity?.IsAuthenticated == true)
         {
             return true;
         }
 
+        // 2. Permitir si la solicitud proviene del navegador local / misma aplicación (Blazor UI)
+        var host = Request.Host.Host;
+        var referer = Request.Headers.Referer.ToString();
+        if (!string.IsNullOrEmpty(referer) && referer.Contains(host, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var remoteIp = HttpContext.Connection.RemoteIpAddress;
+        if (remoteIp != null && (System.Net.IPAddress.IsLoopback(remoteIp) || remoteIp.ToString() == "127.0.0.1" || remoteIp.ToString() == "::1"))
+        {
+            return true;
+        }
+
+        // 3. Revisar por API Key (para llamadas de n8n / Evolution API)
         var configuredKey = _configuration["ReportSettings:ApiKey"] ?? "MedVet_Report_ApiKey_2026_Secure";
 
         // Revisar por cabecera HTTP

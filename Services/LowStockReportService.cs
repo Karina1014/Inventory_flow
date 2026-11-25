@@ -24,18 +24,18 @@ public class LowStockReportService : ILowStockReportService
 
     public async Task<byte[]> GenerateLowStockPdfByWarehouseAsync(int idWarehouse)
     {
-        var (header, items) = await BuildReportDataAsync(idWarehouse, "Servicio Automático n8n / Evolution API");
+        var (header, items) = await BuildReportDataAsync(idWarehouse, "Sistema MedVet / n8n");
 
-        // Ubicar la plantilla RDLC
-        var reportPath = Path.Combine(_env.ContentRootPath, "Reports", "LowStockWarehouseReport.rdlc");
+        // Ubicar la plantilla RDL oficial de Report Builder
+        var reportPath = Path.Combine(_env.ContentRootPath, "Reports", "LowStockWarehouseReport.rdl");
         if (!File.Exists(reportPath))
         {
-            reportPath = Path.Combine(AppContext.BaseDirectory, "Reports", "LowStockWarehouseReport.rdlc");
+            reportPath = Path.Combine(AppContext.BaseDirectory, "Reports", "LowStockWarehouseReport.rdl");
         }
 
         if (!File.Exists(reportPath))
         {
-            throw new FileNotFoundException($"No se encontró la plantilla de reporte RDLC en: {reportPath}");
+            throw new FileNotFoundException($"No se encontró la plantilla de reporte en: {reportPath}");
         }
 
         // Renderizar con ReportViewerCore
