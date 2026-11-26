@@ -19,6 +19,7 @@ public class InventoryMovementRepository : IInventoryMovementRepository
     private readonly AplicationDbContext _db;
     private readonly IMapper _mapper;
     private readonly IN8nNotificationService _n8nService;
+    private readonly INotificationRecipientService _recipientService;
     private readonly IConfiguration _config;
     private readonly ILogger<InventoryMovementRepository> _logger;
 
@@ -26,12 +27,14 @@ public class InventoryMovementRepository : IInventoryMovementRepository
         AplicationDbContext db,
         IMapper mapper,
         IN8nNotificationService n8nService,
+        INotificationRecipientService recipientService,
         IConfiguration config,
         ILogger<InventoryMovementRepository> logger)
     {
         _db = db;
         _mapper = mapper;
         _n8nService = n8nService;
+        _recipientService = recipientService;
         _config = config;
         _logger = logger;
     }
@@ -190,7 +193,8 @@ public class InventoryMovementRepository : IInventoryMovementRepository
             var warehouse = await _db.Warehouses.AsNoTracking().FirstOrDefaultAsync(w => w.IdWarehouse == idWarehouse);
             var warehouseName = warehouse?.Name ?? $"Sucursal #{idWarehouse}";
 
-            var recipient = _config["N8nSettings:MatrizRecipientPhone"] ?? "593963124396";
+            // Resolver dinámicamente el teléfono del Bodeguero Principal / Admin según rol en la base de datos
+            var recipient = await _recipientService.GetBodegueroPrincipalPhoneAsync();
 
             foreach (var prodId in productIds)
             {

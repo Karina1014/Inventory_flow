@@ -1,0 +1,94 @@
+{
+  "name": "MedVet - Alerta Stock Crítico tras Venta (Tiempo Real)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alerta-stock",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "webhook-stock-venta",
+      "name": "Webhook Venta Stock Bajo"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution-api:8080/message/sendText/medvet",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "429683C4C977415CAAFCCE10F7D57E11"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  number: $json.body.recipient,\n  text: $json.body.message\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ],
+      "id": "http-whatsapp-venta",
+      "name": "WhatsApp Evolution API"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.1.9:5099/api/notifications/update-status",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  idNotification: $('Webhook Venta Stock Bajo').item.json.body.notificationId,\n  status: \"Sent\",\n  response: \"Mensaje entregado exitosamente por WhatsApp vía Evolution API\"\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ],
+      "id": "http-actualizar-bd-venta",
+      "name": "Actualizar BD a Sent"
+    }
+  ],
+  "connections": {
+    "Webhook Venta Stock Bajo": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Evolution API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Evolution API": {
+      "main": [
+        [
+          {
+            "node": "Actualizar BD a Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

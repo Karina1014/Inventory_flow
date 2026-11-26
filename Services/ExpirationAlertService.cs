@@ -15,17 +15,20 @@ public class ExpirationAlertService : IExpirationAlertService
 {
     private readonly AplicationDbContext _db;
     private readonly IN8nNotificationService _n8nService;
+    private readonly INotificationRecipientService _recipientService;
     private readonly IConfiguration _config;
     private readonly ILogger<ExpirationAlertService> _logger;
 
     public ExpirationAlertService(
         AplicationDbContext db,
         IN8nNotificationService n8nService,
+        INotificationRecipientService recipientService,
         IConfiguration config,
         ILogger<ExpirationAlertService> logger)
     {
         _db = db;
         _n8nService = n8nService;
+        _recipientService = recipientService;
         _config = config;
         _logger = logger;
     }
@@ -136,10 +139,35 @@ public class ExpirationAlertService : IExpirationAlertService
     public async Task<N8nNotification> DispatchExpiringLotsWhatsAppAlertsAsync(int daysAhead = 30, string? matrizRecipient = null, int idUser = 1)
     {
         var report = await GetExpiringLotsReportAsync(daysAhead);
+
+        // 1. Resolver dinámicamente el teléfono del Bodeguero Principal / Matriz según su rol en BD
         var targetRecipient = !string.IsNullOrWhiteSpace(matrizRecipient)
             ? matrizRecipient
-            : (_config["N8nSettings:MatrizRecipientPhone"] ?? "593963124396");
+            : await _recipientService.GetBodegueroPrincipalPhoneAsync();
 
+        // 2. Notificar a las recepcionistas de cada sucursal con el desglose de sus lotes por vencer
+        foreach (var branchGroup in report.Warehouses)
+        {
+            var branchPhone = await _recipientService.GetBranchRecipientPhoneAsync(branchGroup.WarehouseId);
+            if (!string.IsNullOrWhiteSpace(branchPhone) && branchPhone != targetRecipient)
+            {
+                try
+                {
+                    await _n8nService.SendTextMessageAsync(
+                        branchPhone,
+                        branchGroup.FormattedWhatsAppMessage,
+                        branchGroup.WarehouseId,
+                        idUser
+                    );
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error al enviar alerta de caducidad a la recepcionista de la sucursal {WarehouseId}", branchGroup.WarehouseId);
+                }
+            }
+        }
+
+        // 3. Enviar el reporte consolidado global al Bodeguero Principal de Matriz
         var notification = await _n8nService.SendTextMessageAsync(
             targetRecipient,
             report.MatrizConsolidatedWhatsAppMessage,

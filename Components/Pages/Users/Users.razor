@@ -119,7 +119,15 @@
                                         <div class="user-avatar-sm">@GetInitials(user.Name ?? user.Username)</div>
                                         <div class="user-cell-info">
                                             <span class="col-name">@user.Name</span>
-                                            <span class="user-handle">@@@user.Username</span>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="user-handle">@@@user.Username</span>
+                                                @if (!string.IsNullOrWhiteSpace(user.Phone))
+                                                {
+                                                    <span class="badge bg-light text-dark border small" title="Número configurado para alertas de WhatsApp">
+                                                        <i class="bi bi-whatsapp text-success me-1"></i>@user.Phone
+                                                    </span>
+                                                }
+                                            </div>
                                         </div>
                                     </div>
                                 </td>
@@ -245,6 +253,27 @@
                 {
                     <span class="field-error">La contraseña debe tener al menos 6 caracteres.</span>
                 }
+            </div>
+
+            <div class="form-row-2">
+                <div class="form-group">
+                    <label class="form-label">Teléfono / WhatsApp (Notificaciones n8n)</label>
+                    <div class="input-box">
+                        <i class="bi bi-whatsapp input-icon text-success"></i>
+                        <input class="form-input" type="text" placeholder="Ej: 0963124396 o +593963124396"
+                               @bind="formPhone" @bind:event="oninput" />
+                    </div>
+                    <span class="text-muted" style="font-size: 0.72rem;">Recibirá alertas automáticas según su rol</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Correo electrónico</label>
+                    <div class="input-box">
+                        <i class="bi bi-envelope-fill input-icon"></i>
+                        <input class="form-input" type="email" placeholder="Ej: usuario@medvet.com"
+                               @bind="formEmail" @bind:event="oninput" />
+                    </div>
+                </div>
             </div>
 
             <div class="form-row-2">
@@ -455,6 +484,8 @@
     private int formIdRole;
     private int formIdWarehouse;
     private bool formIsActive = true;
+    private string formPhone = string.Empty;
+    private string formEmail = string.Empty;
 
     private User? selectedUser;
     private string errorMessage = string.Empty;
@@ -591,6 +622,8 @@
         formName = string.Empty;
         formUserName = string.Empty;
         formPassword = string.Empty;
+        formPhone = string.Empty;
+        formEmail = string.Empty;
         formIdRole = 0;
         formIdWarehouse = 0;
         formIsActive = true;
@@ -611,6 +644,8 @@
         selectedUser = user;
         formName = user.Name ?? string.Empty;
         formUserName = user.Username;
+        formPhone = user.Phone ?? string.Empty;
+        formEmail = user.Email ?? string.Empty;
         formPassword = string.Empty;
         formIdRole = user.IdRole ?? 0;
         formIdWarehouse = user.IdWarehouse ?? 0;
@@ -768,6 +803,8 @@
                 {
                     UserName = userName,
                     Name = formName.Trim(),
+                    Email = string.IsNullOrWhiteSpace(formEmail) ? null : formEmail.Trim(),
+                    Phone = string.IsNullOrWhiteSpace(formPhone) ? null : formPhone.Trim(),
                     Password = string.IsNullOrWhiteSpace(password) ? null : password,
                     IdRole = formIdRole,
                     IdWarehouse = formIdWarehouse,
@@ -780,9 +817,12 @@
                 {
                     UserName = userName,
                     Name = formName.Trim(),
+                    Email = string.IsNullOrWhiteSpace(formEmail) ? null : formEmail.Trim(),
+                    Phone = string.IsNullOrWhiteSpace(formPhone) ? null : formPhone.Trim(),
                     Password = password,
                     IdRole = formIdRole,
-                    IdWarehouse = formIdWarehouse
+                    IdWarehouse = formIdWarehouse,
+                    IsActive = formIsActive
                 });
             }
 

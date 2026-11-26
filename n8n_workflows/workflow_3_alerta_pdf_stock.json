@@ -1,0 +1,115 @@
+{
+  "name": "MedVet - Alerta PDF de Stock Bajo (WhatsApp Media)",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "trigger-manual-pdf",
+      "name": "Disparador Manual / Programado"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.1.9:5099/api/notifications/dispatch-stock-alert?warehouseId=3&recipient=593963124396",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "http-generar-pdf",
+      "name": "Generar Reporte PDF en .NET"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution-api:8080/message/sendMedia/medvet",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "429683C4C977415CAAFCCE10F7D57E11"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  number: $json.recipient,\n  mediatype: \"document\",\n  mimetype: \"application/pdf\",\n  caption: $json.caption,\n  media: $json.base64,\n  fileName: $json.fileName\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        0
+      ],
+      "id": "http-evolution-sendmedia",
+      "name": "Enviar PDF Evolution API"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.1.9:5099/api/notifications/update-status",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  idNotification: $('Generar Reporte PDF en .NET').item.json.idNotification,\n  status: \"Sent\",\n  response: \"PDF enviado exitosamente a WhatsApp por Evolution API\"\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        0
+      ],
+      "id": "http-actualizar-bd-pdf",
+      "name": "Actualizar BD a Sent"
+    }
+  ],
+  "connections": {
+    "Disparador Manual / Programado": {
+      "main": [
+        [
+          {
+            "node": "Generar Reporte PDF en .NET",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar Reporte PDF en .NET": {
+      "main": [
+        [
+          {
+            "node": "Enviar PDF Evolution API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar PDF Evolution API": {
+      "main": [
+        [
+          {
+            "node": "Actualizar BD a Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

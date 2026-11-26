@@ -155,6 +155,8 @@ public class UserRepository : IUserRepository
         {
             Username = createUserDto.UserName ?? "No Username",
             Name = createUserDto.Name,
+            Email = createUserDto.Email,
+            Phone = createUserDto.Phone,
             IdRole = createUserDto.IdRole,
             IdWarehouse = createUserDto.IdWarehouse > 0 ? createUserDto.IdWarehouse : null,
             Password = encriptedPassword,
@@ -174,6 +176,8 @@ public class UserRepository : IUserRepository
             ?? throw new KeyNotFoundException($"Usuario con Id {IdUser} no encontrado.");
 
         user.Name = updateUserDto.Name;
+        user.Email = updateUserDto.Email;
+        user.Phone = updateUserDto.Phone;
         user.Username = string.IsNullOrWhiteSpace(updateUserDto.UserName)
             ? user.Username
             : updateUserDto.UserName.Trim();

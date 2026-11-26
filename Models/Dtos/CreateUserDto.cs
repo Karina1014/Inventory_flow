@@ -19,4 +19,7 @@ public class CreateUserDto
     public bool IsActive{get;set;}
 
     public int IdWarehouse { get; set; }
+
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
 }

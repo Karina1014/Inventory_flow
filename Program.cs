@@ -45,6 +45,7 @@ builder.Services.AddTransient<IPurchaseOrderReportService, PurchaseOrderReportSe
 builder.Services.AddTransient<ILowStockReportService, LowStockReportService>();
 builder.Services.AddTransient<IMatrixStockReportService, MatrixStockReportService>();
 builder.Services.AddTransient<IExpirationAlertService, ExpirationAlertService>();
+builder.Services.AddTransient<INotificationRecipientService, NotificationRecipientService>();
 
 // 3. AutoMapper
 builder.Services.AddAutoMapper(cfg => {

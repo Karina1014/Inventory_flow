@@ -20,4 +20,7 @@ public class UpdateUserDto
     public bool IsActive { get; set; } = true;
 
     public int IdWarehouse { get; set; }
+
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
 }

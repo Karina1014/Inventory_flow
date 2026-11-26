@@ -9,6 +9,8 @@
 @inject IToastNotificationService ToastService
 @inject CurrentUserService CurrentUser
 @inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
+@inject INotificationRecipientService RecipientService
 
 <div class="page-container">
     <!-- ENCABEZADO -->
@@ -22,7 +24,11 @@
                 <p class="subtitle">Historial y despacho de alertas de stock en PDF y mensajes hacia n8n</p>
             </div>
         </div>
-        <div class="header-actions">
+        <div class="header-actions d-flex align-items-center gap-2">
+            <a href="@N8nExecutionsUrl" target="_blank" class="btn btn-outline-dark d-inline-flex align-items-center gap-2" title="Abrir consola de ejecuciones de n8n para inspeccionar nodos">
+                <i class="bi bi-diagram-3 text-primary"></i>
+                <span>Monitorear en n8n</span>
+            </a>
             <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-2" @onclick="OpenSendModal">
                 <i class="bi bi-send-plus"></i>
                 <span>Nueva Notificación</span>
@@ -191,9 +197,9 @@
                                     </span>
                                 </td>
                                 <td>
-                                    @if (!string.IsNullOrWhiteSpace(item.PdfPath))
+                                    @if (item.IdN8nNotificationType == 2 || !string.IsNullOrWhiteSpace(item.PdfPath))
                                     {
-                                        <a href="@item.PdfPath" target="_blank" class="btn btn-xs btn-outline-danger d-inline-flex align-items-center gap-1" title="Ver archivo PDF">
+                                        <a href="api/notifications/@item.IdN8nNotification/pdf" target="_blank" class="btn btn-xs btn-outline-danger d-inline-flex align-items-center gap-1" title="Ver reporte PDF en memoria">
                                             <i class="bi bi-file-earmark-pdf"></i> PDF
                                         </a>
                                     }
@@ -223,9 +229,17 @@
                                     }
                                 </td>
                                 <td class="text-end">
-                                    <button type="button" class="btn btn-sm btn-icon btn-light" @onclick="() => OpenDetailModal(item)" title="Ver detalle de respuesta n8n">
-                                        <i class="bi bi-eye"></i>
-                                    </button>
+                                    <div class="d-inline-flex align-items-center gap-1">
+                                        @if (item.Status != "Sent")
+                                        {
+                                            <button type="button" class="btn btn-sm btn-icon btn-outline-warning" @onclick="() => ResendNotificationAsync(item)" title="Reintentar / Reenviar a n8n" disabled="@isSending">
+                                                <i class="bi bi-arrow-repeat"></i>
+                                            </button>
+                                        }
+                                        <button type="button" class="btn btn-sm btn-icon btn-light" @onclick="() => OpenDetailModal(item)" title="Ver detalle de respuesta n8n">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -313,59 +327,183 @@
     </div>
 }
 
-<!-- MODAL: DETALLE Y RESPUESTA N8N -->
+<!-- MODAL: DETALLE Y TRAZABILIDAD N8N -->
 @if (selectedNotification != null)
 {
-    <div class="modal-backdrop"></div>
+    <div class="modal-backdrop" @onclick="() => selectedNotification = null"></div>
     <div class="custom-modal modal-lg">
-        <div class="modal-header">
-            <h5 class="modal-title">
-                <i class="bi bi-info-circle text-info me-2"></i>Detalle de Notificación #@selectedNotification.IdN8nNotification
-            </h5>
-            <button type="button" class="btn-close" @onclick="() => selectedNotification = null"></button>
+        <div class="modal-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+                <div class="modal-icon-badge">
+                    <i class="bi bi-bell-fill text-primary"></i>
+                </div>
+                <div>
+                    <h5 class="modal-title mb-0">Detalle de Notificación #@selectedNotification.IdN8nNotification</h5>
+                    <small class="text-muted">Trazabilidad de entrega en n8n y WhatsApp</small>
+                </div>
+            </div>
+            <button type="button" class="btn-close" @onclick="() => selectedNotification = null" aria-label="Cerrar"></button>
         </div>
-        <div class="modal-body">
-            <div class="detail-grid">
-                <div class="detail-item">
-                    <span class="detail-label">Fecha y Hora:</span>
-                    <span class="detail-value">@selectedNotification.SentDate.ToString("dd/MM/yyyy HH:mm:ss")</span>
+
+        <div class="modal-body p-4">
+            <!-- Banner de Estado de Entrega -->
+            <div class="delivery-status-banner @(selectedNotification.Status == "Sent" ? "status-sent" : selectedNotification.Status == "Failed" ? "status-failed" : "status-pending") mb-4">
+                <div class="status-banner-icon">
+                    @if (selectedNotification.Status == "Sent")
+                    {
+                        <i class="bi bi-check-circle-fill"></i>
+                    }
+                    else if (selectedNotification.Status == "Failed")
+                    {
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                    }
+                    else
+                    {
+                        <i class="bi bi-clock-history"></i>
+                    }
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">Tipo:</span>
-                    <span class="detail-value">@selectedNotification.NotificationType?.Name</span>
+                <div class="status-banner-text">
+                    <h6>
+                        @(selectedNotification.Status == "Sent" ? "Entrega Confirmada en WhatsApp" : selectedNotification.Status == "Failed" ? "Fallo en la Entrega" : "Notificación Pendiente de Confirmación")
+                    </h6>
+                    <p class="mb-0">
+                        @(selectedNotification.Status == "Sent" 
+                            ? "El webhook de n8n procesó y entregó el mensaje exitosamente al destinatario vía Evolution API."
+                            : selectedNotification.Status == "Failed" 
+                            ? "Ocurrió un error al despachar la notificación a través del orquestador n8n."
+                            : "La notificación fue registrada por .NET y enviada al flujo de automatización de n8n.")
+                    </p>
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">Destinatario:</span>
-                    <span class="detail-value">@selectedNotification.Recipient</span>
+            </div>
+
+            <!-- Fichas de Información General (2x2) -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <div class="info-card">
+                        <span class="info-card-label"><i class="bi bi-whatsapp text-success me-1"></i> Destinatario (WhatsApp)</span>
+                        <span class="info-card-value font-monospace">@selectedNotification.Recipient</span>
+                    </div>
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">Estado:</span>
-                    <span class="detail-value">@selectedNotification.Status</span>
+                <div class="col-md-6">
+                    <div class="info-card">
+                        <span class="info-card-label"><i class="bi bi-building text-primary me-1"></i> Sucursal Emisora</span>
+                        <span class="info-card-value">@(selectedNotification.Warehouse?.Name ?? "Medvet Principal")</span>
+                    </div>
                 </div>
-                <div class="detail-item full-width">
-                    <span class="detail-label">Mensaje Enviado:</span>
-                    <div class="detail-box">@selectedNotification.Message</div>
-                </div>
-                @if (!string.IsNullOrWhiteSpace(selectedNotification.PdfPath))
-                {
-                    <div class="detail-item full-width">
-                        <span class="detail-label">Archivo PDF generado:</span>
-                        <div class="d-flex align-items-center gap-2 mt-1">
-                            <span class="text-muted">@selectedNotification.PdfPath</span>
-                            <a href="@selectedNotification.PdfPath" target="_blank" class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-download"></i> Descargar
-                            </a>
+                <div class="col-md-6">
+                    <div class="info-card">
+                        <span class="info-card-label"><i class="bi bi-tag text-secondary me-1"></i> Tipo de Notificación</span>
+                        <div class="mt-1">
+                            @if (selectedNotification.IdN8nNotificationType == 2)
+                            {
+                                <span class="badge-type badge-pdf"><i class="bi bi-file-earmark-pdf-fill"></i> Alerta de Stock (PDF)</span>
+                            }
+                            else if (selectedNotification.Status == "Failed")
+                            {
+                                <span class="badge-type badge-error"><i class="bi bi-exclamation-triangle-fill"></i> Error</span>
+                            }
+                            else
+                            {
+                                <span class="badge-type badge-text"><i class="bi bi-chat-left-text-fill"></i> Mensaje de Texto</span>
+                            }
                         </div>
                     </div>
-                }
-                <div class="detail-item full-width">
-                    <span class="detail-label">Respuesta del Webhook n8n:</span>
-                    <pre class="response-box">@selectedNotification.Response</pre>
+                </div>
+                <div class="col-md-6">
+                    <div class="info-card">
+                        <span class="info-card-label"><i class="bi bi-calendar3 text-secondary me-1"></i> Fecha y Hora de Envío</span>
+                        <span class="info-card-value">@selectedNotification.SentDate.ToString("dd/MM/yyyy HH:mm:ss")</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contenido del Mensaje -->
+            <div class="content-section mb-4">
+                <label class="section-subtitle"><i class="bi bi-chat-text text-primary me-1"></i> Mensaje Enviado:</label>
+                <div class="whatsapp-bubble">
+                    <pre class="mb-0 whatsapp-text">@selectedNotification.Message</pre>
+                </div>
+            </div>
+
+            <!-- Archivo PDF Adjunto (si aplica) -->
+            @if (selectedNotification.IdN8nNotificationType == 2 || !string.IsNullOrWhiteSpace(selectedNotification.PdfPath))
+            {
+                <div class="content-section mb-4">
+                    <label class="section-subtitle"><i class="bi bi-file-earmark-pdf text-danger me-1"></i> Documento Oficial Adjunto:</label>
+                    <div class="pdf-attachment-card d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-3">
+                            <i class="bi bi-file-pdf-fill fs-2 text-danger"></i>
+                            <div>
+                                <strong class="d-block text-truncate" style="max-width: 380px;">
+                                    @(!string.IsNullOrWhiteSpace(selectedNotification.PdfPath) 
+                                        ? System.IO.Path.GetFileName(selectedNotification.PdfPath) 
+                                        : $"Alerta_Stock_{(selectedNotification.Warehouse?.Name?.Replace(" ", "_") ?? "General")}_{selectedNotification.SentDate:yyyyMMdd_HHmm}.pdf")
+                                </strong>
+                                <small class="text-muted">Reporte generado al vuelo en memoria (Streaming HTTP sin almacenamiento en disco)</small>
+                            </div>
+                        </div>
+                        <a href="api/notifications/@selectedNotification.IdN8nNotification/pdf" target="_blank" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1">
+                            <i class="bi bi-eye"></i> Ver / Abrir PDF
+                        </a>
+                    </div>
+                </div>
+            }
+
+            <!-- Alerta visual si la notificación falló -->
+            @if (selectedNotification.Status == "Failed")
+            {
+                <div class="alert alert-danger d-flex align-items-center justify-content-between p-3 mb-4 border-danger rounded-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-exclamation-triangle-fill fs-3 text-danger"></i>
+                        <div>
+                            <strong>Flujo con Error detectado:</strong>
+                            <div class="small">El orquestador n8n detuvo la ejecución en el nodo con error. Puedes inspeccionar el nodo exacto y las variables directamente en el editor visual.</div>
+                        </div>
+                    </div>
+                    <a href="@N8nExecutionsUrl" target="_blank" class="btn btn-sm btn-danger d-inline-flex align-items-center gap-1 text-nowrap ms-2">
+                        <i class="bi bi-diagram-3-fill"></i> Ir al Nodo en n8n
+                    </a>
+                </div>
+            }
+
+            <!-- Trazabilidad / Respuesta del Webhook n8n -->
+            <div class="content-section">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="section-subtitle mb-0"><i class="bi bi-terminal text-dark me-1"></i> Trazabilidad del Orquestador (Respuesta n8n):</label>
+                    <a href="@N8nExecutionsUrl" target="_blank" class="btn btn-xs btn-outline-primary d-inline-flex align-items-center gap-1" title="Ver ejecución detallada en el lienzo de n8n">
+                        <i class="bi bi-box-arrow-up-right"></i> Ver en n8n
+                    </a>
+                </div>
+                <div class="trace-terminal">
+                    <div class="terminal-header d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="terminal-dot red"></span>
+                            <span class="terminal-dot yellow"></span>
+                            <span class="terminal-dot green"></span>
+                            <span class="terminal-title">n8n Execution Log</span>
+                        </div>
+                        <span class="text-muted" style="font-size: 0.68rem; font-family: monospace;">status: @selectedNotification.Status</span>
+                    </div>
+                    <div class="terminal-body">
+                        <code>@selectedNotification.Response</code>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @onclick="() => selectedNotification = null">Cerrar</button>
+
+        <div class="modal-footer d-flex justify-content-between align-items-center">
+            <span class="text-muted small">
+                <i class="bi bi-shield-check text-success me-1"></i>Registro de auditoría persistido en BD
+            </span>
+            <div class="d-flex align-items-center gap-2">
+                @if (selectedNotification.Status != "Sent")
+                {
+                    <button type="button" class="btn btn-warning d-inline-flex align-items-center gap-1" @onclick="() => ResendNotificationAsync(selectedNotification)" disabled="@isSending">
+                        <i class="bi bi-arrow-repeat"></i> Reenviar a n8n
+                    </button>
+                }
+                <button type="button" class="btn btn-secondary px-4" @onclick="() => selectedNotification = null">Cerrar</button>
+            </div>
         </div>
     </div>
 }
@@ -380,6 +518,8 @@
     private bool isSendModalOpen = false;
     private N8nNotification? selectedNotification = null;
 
+    private string N8nExecutionsUrl => $"{Configuration["N8nSettings:BaseUrl"]?.TrimEnd('/') ?? "http://localhost:5678"}/executions";
+
     private string searchTerm = string.Empty;
     private int selectedTypeFilter = 0;
     private string selectedStatusFilter = "All";
@@ -387,7 +527,7 @@
     // Formulario modal
     private int formTypeId = 2; // Por defecto PDF (Alertas de stock)
     private int formWarehouseId = 3;
-    private string formRecipient = "593963124396";
+    private string formRecipient = string.Empty;
     private string formMessage = "Alerta de Stock Bajo detectada en inventario.";
 
     private IEnumerable<N8nNotification> FilteredNotifications
@@ -421,6 +561,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        formRecipient = await RecipientService.GetBodegueroPrincipalPhoneAsync();
         await LoadDataAsync();
     }
 
@@ -530,5 +671,52 @@
     private void OpenDetailModal(N8nNotification item)
     {
         selectedNotification = item;
+    }
+
+    private async Task ResendNotificationAsync(N8nNotification item)
+    {
+        if (isSending) return;
+        isSending = true;
+        try
+        {
+            ToastService.ShowInfo($"Reenviando notificación #{item.IdN8nNotification} hacia n8n...");
+            var userId = CurrentUser.IsAuthenticated ? CurrentUser.UserId : 1;
+
+            N8nNotification result;
+            if (item.IdN8nNotificationType == 2)
+            {
+                result = await NotificationService.SendStockAlertPdfAsync(item.Recipient, item.Message, item.IdWarehouse, userId);
+            }
+            else
+            {
+                result = await NotificationService.SendTextMessageAsync(item.Recipient, item.Message, item.IdWarehouse, userId);
+            }
+
+            if (result.Status == "Sent")
+            {
+                await NotificationRepo.UpdateStatusAsync(item.IdN8nNotification, "Sent", "Reenvío exitoso: " + result.Response);
+                ToastService.ShowSuccess($"¡Notificación #{item.IdN8nNotification} enviada exitosamente a WhatsApp!");
+            }
+            else
+            {
+                await NotificationRepo.UpdateStatusAsync(item.IdN8nNotification, result.Status, result.Response);
+                ToastService.ShowWarning($"Notificación reenviada con estado: {result.Status}");
+            }
+
+            if (selectedNotification?.IdN8nNotification == item.IdN8nNotification)
+            {
+                selectedNotification = await NotificationRepo.GetByIdAsync(item.IdN8nNotification);
+            }
+
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error al reenviar: {ex.Message}");
+        }
+        finally
+        {
+            isSending = false;
+        }
     }
 }

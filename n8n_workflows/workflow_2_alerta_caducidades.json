@@ -1,0 +1,124 @@
+{
+  "name": "MedVet - Alerta Programada de Caducidades (30 días)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "cron-caducidades-07am",
+      "name": "Cron Diario 07:00 AM"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.1.9:5099/api/notifications/dispatch-expiring-lots?daysAhead=30&recipient=593963124396",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "http-consultar-y-despachar-caducidades",
+      "name": "Consultar y Registrar Caducidades"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution-api:8080/message/sendText/medvet",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "429683C4C977415CAAFCCE10F7D57E11"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  number: $json.recipient,\n  text: $json.message\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        0
+      ],
+      "id": "http-whatsapp-matriz-caducidad",
+      "name": "WhatsApp Matriz Resumen"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.1.9:5099/api/notifications/update-status",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  idNotification: $('Consultar y Registrar Caducidades').item.json.idN8nNotification,\n  status: \"Sent\",\n  response: \"Reporte de caducidades enviado exitosamente por WhatsApp\"\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        0
+      ],
+      "id": "http-actualizar-bd-caducidad",
+      "name": "Actualizar BD a Sent"
+    }
+  ],
+  "connections": {
+    "Cron Diario 07:00 AM": {
+      "main": [
+        [
+          {
+            "node": "Consultar y Registrar Caducidades",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar y Registrar Caducidades": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Matriz Resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Matriz Resumen": {
+      "main": [
+        [
+          {
+            "node": "Actualizar BD a Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

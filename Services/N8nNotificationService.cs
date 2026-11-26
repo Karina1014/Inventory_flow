@@ -112,26 +112,13 @@ public class N8nNotificationService : IN8nNotificationService
 
     public async Task<N8nNotification> SendStockAlertPdfAsync(string recipient, string message, int idWarehouse, int idUser = 1)
     {
-        string relativePdfPath = string.Empty;
         string pdfBase64 = string.Empty;
         string fileName = $"AlertaStock_Bodega_{idWarehouse}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
 
         try
         {
-            // 1. Generar el PDF oficial de stock bajo con el servicio existente
+            // 1. Generar el PDF oficial de stock bajo en memoria (cero consumo de disco)
             var pdfBytes = await _lowStockReportService.GenerateLowStockPdfByWarehouseAsync(idWarehouse);
-
-            // 2. Guardar archivo local en wwwroot/reports/stock_alerts/
-            var reportsFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"), "reports", "stock_alerts");
-            if (!Directory.Exists(reportsFolder))
-            {
-                Directory.CreateDirectory(reportsFolder);
-            }
-
-            var fullPath = Path.Combine(reportsFolder, fileName);
-            await File.WriteAllBytesAsync(fullPath, pdfBytes);
-
-            relativePdfPath = $"reports/stock_alerts/{fileName}";
             pdfBase64 = Convert.ToBase64String(pdfBytes);
         }
         catch (Exception ex)
@@ -146,7 +133,7 @@ public class N8nNotificationService : IN8nNotificationService
             IdUser = idUser,
             Recipient = recipient,
             Message = message,
-            PdfPath = relativePdfPath,
+            PdfPath = string.Empty, // 100% en memoria / streaming bajo demanda
             Status = "Pending",
             Response = string.Empty,
             SentDate = DateTime.Now
@@ -173,7 +160,7 @@ public class N8nNotificationService : IN8nNotificationService
                 message = message,
                 warehouseId = idWarehouse,
                 fileName = fileName,
-                fileUrl = relativePdfPath,
+                fileUrl = $"/api/notifications/{notification.IdN8nNotification}/pdf",
                 pdfBase64 = pdfBase64,
                 notificationId = notification.IdN8nNotification,
                 sentAt = notification.SentDate.ToString("o")
