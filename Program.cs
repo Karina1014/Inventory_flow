@@ -46,6 +46,7 @@ builder.Services.AddTransient<ILowStockReportService, LowStockReportService>();
 builder.Services.AddTransient<IMatrixStockReportService, MatrixStockReportService>();
 builder.Services.AddTransient<IExpirationAlertService, ExpirationAlertService>();
 builder.Services.AddTransient<INotificationRecipientService, NotificationRecipientService>();
+builder.Services.AddTransient<IFinancialAiAssistantService, FinancialAiAssistantService>();
 
 // 3. AutoMapper
 builder.Services.AddAutoMapper(cfg => {
