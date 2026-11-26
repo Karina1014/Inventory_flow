@@ -2,8 +2,10 @@
 @layout MainLayout
 @using Inventory_Flow.Models
 @using Inventory_Flow.Models.Dtos.Ai
+@using Inventory_Flow.Repository.IRepository
 @using Inventory_Flow.Services
 @inject IFinancialAiAssistantService AiAssistantService
+@inject IWarehouseRepository WarehouseRepo
 @inject NavigationManager NavigationManager
 @inject IToastNotificationService ToastService
 
@@ -23,9 +25,9 @@
             }
             else
             {
-                <button class="btn-secondary" @onclick="ResetForm">
-                    <i class="bi bi-plus-lg"></i>
-                    <span>Nuevo análisis</span>
+                <button class="btn-secondary" @onclick="ResetInventoryForm">
+                    <i class="bi bi-arrow-clockwise"></i>
+                    <span>Restablecer Filtros</span>
                 </button>
             }
         </div>
@@ -58,7 +60,7 @@
             <div class="panel-header">
                 <div class="d-flex align-items-center gap-2">
                     <span class="sparkle-icon"><i class="bi bi-stars"></i></span>
-                    <span class="panel-title">Auditoría Financiera de Órdenes de Compra (Gemini 2.0 Flash)</span>
+                    <span class="panel-title">Auditoría Financiera de Órdenes de Compra (Gemini Live)</span>
                 </div>
                 <span class="record-count">Detección de sobreprecios, cambios de proveedor y cantidades inusuales</span>
             </div>
@@ -74,7 +76,7 @@
                         else if (pendingOrders.Count == 0)
                         {
                             <div class="alert alert-info py-2 px-3 mb-0 small d-flex align-items-center justify-content-between">
-                                <span><i class="bi bi-info-circle me-1"></i>No hay órdenes pendientes en este momento. Se analizará la orden demostrativa disponible.</span>
+                                <span><i class="bi bi-info-circle me-1"></i>No hay órdenes pendientes en este momento. Puedes crear una nueva en Órdenes de Compra.</span>
                                 <button type="button" class="btn btn-sm btn-outline-primary" @onclick='() => NavigationManager.NavigateTo("purchase-orders")'>
                                     Crear Orden
                                 </button>
@@ -117,7 +119,7 @@
         {
             <div class="panel p-4 text-center">
                 <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
-                <h5 class="fw-bold text-dark">Analizando con Google Gemini 2.0 Flash...</h5>
+                <h5 class="fw-bold text-dark">Analizando con Google Gemini en Vivo...</h5>
                 <p class="text-muted small mb-0">Consultando histórico de compras en SQL Server, evaluando variaciones de precios y proyectando meses de cobertura.</p>
             </div>
         }
@@ -292,7 +294,7 @@
                 <i class="bi bi-cash-coin text-primary"></i>
                 <span class="empty-result-title">Auditoría Financiera Lista</span>
                 <span class="empty-result-text">
-                    Selecciona una orden de compra pendiente de aprobación y haz clic en <strong>Analizar con Asistente IA</strong> para auditar precios y cantidades con Gemini.
+                    Selecciona una orden de compra pendiente de aprobación y haz clic en <strong>Analizar con Asistente IA</strong> para auditar precios y cantidades en vivo con Gemini.
                 </span>
             </div>
         }
@@ -301,177 +303,180 @@
     <!-- ==================== PESTAÑA 2: ANALÍTICA GLOBAL DE INVENTARIO ==================== -->
     @if (activeTab == TabInventory)
     {
-        <div class="demo-note">
-            <i class="bi bi-info-circle"></i>
-            <span>Métricas globales consolidadas del inventario para la toma de decisiones gerenciales.</span>
-        </div>
-
-        <div class="panel form-panel">
+        <div class="panel form-panel mb-3">
             <div class="panel-header">
-                <span class="panel-title">Parámetros del análisis</span>
-                <span class="record-count">Valores por defecto: puedes ajustarlos</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="sparkle-icon"><i class="bi bi-stars"></i></span>
+                    <span class="panel-title">Diagnóstico Integral del Inventario con Google Gemini</span>
+                </div>
+                <span class="record-count">Métricas extraídas 100% en vivo desde SQL Server</span>
             </div>
 
             <div class="form-body">
                 <div class="form-grid grid-3">
                     <div class="form-group">
-                        <label class="form-label">Inicio</label>
-                        <input type="date" class="form-input" @bind="startDate" @bind:format="yyyy-MM-dd" />
+                        <label class="form-label">Fecha Inicio</label>
+                        <input type="date" class="form-input" @bind="inventoryStartDate" @bind:format="yyyy-MM-dd" />
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Fin</label>
-                        <input type="date" class="form-input" @bind="endDate" @bind:format="yyyy-MM-dd" />
+                        <label class="form-label">Fecha Fin</label>
+                        <input type="date" class="form-input" @bind="inventoryEndDate" @bind:format="yyyy-MM-dd" />
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Sucursal</label>
-                        <select class="form-input" @bind="warehouse">
-                            @foreach (var option in warehouseOptions)
+                        <label class="form-label">Almacén / Sucursal</label>
+                        <select class="form-input" @bind="selectedWarehouseId">
+                            <option value="0">Todas las sucursales (Consolidado)</option>
+                            @foreach (var w in availableWarehouses)
                             {
-                                <option value="@option">@option</option>
+                                <option value="@w.IdWarehouse">@w.Name</option>
                             }
                         </select>
                     </div>
                 </div>
 
-                <div class="form-grid grid-4">
-                    <div class="form-group">
-                        <label class="form-label">Rotación</label>
-                        <input type="number" step="0.1" class="form-input" @bind="rotation" />
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Quiebre (%)</label>
-                        <input type="number" step="0.1" class="form-input" @bind="stockoutPercent" />
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Sobre stock (%)</label>
-                        <input type="number" step="0.1" class="form-input" @bind="overstockPercent" />
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Envejecido (%)</label>
-                        <input type="number" step="0.1" class="form-input" @bind="agingPercent" />
-                    </div>
-                </div>
-
-                <div class="form-grid grid-2">
-                    <div class="form-group">
-                        <label class="form-label">Margen (%)</label>
-                        <input type="number" step="0.1" class="form-input" @bind="marginPercent" />
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Demanda</label>
-                        <select class="form-input" @bind="demandTrend">
-                            <option value="Estable">Estable</option>
-                            <option value="Creciente">Creciente</option>
-                            <option value="Decreciente">Decreciente</option>
-                        </select>
-                    </div>
-                </div>
-
                 <div class="form-actions">
-                    <button class="btn-primary" @onclick="Analyze" disabled="@isLoading">
-                        @if (isLoading)
+                    <button class="btn-primary" @onclick="AnalyzeGlobalInventoryAsync" disabled="@isAnalyzingGlobal">
+                        @if (isAnalyzingGlobal)
                         {
-                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                            <span>Analizando...</span>
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Analizando en vivo con Gemini...</span>
                         }
                         else
                         {
-                            <i class="bi bi-stars"></i>
-                            <span>Analizar</span>
+                            <i class="bi bi-stars me-1"></i>
+                            <span>Ejecutar Diagnóstico IA del Inventario</span>
                         }
                     </button>
                     <span class="form-hint">
-                        Período de @TotalDays días · @warehouse
+                        Período de @TotalInventoryDays días · @(selectedWarehouseId == 0 ? "Consolidado" : availableWarehouses.FirstOrDefault(w => w.IdWarehouse == selectedWarehouseId)?.Name ?? "Sucursal")
                     </span>
                 </div>
             </div>
         </div>
 
-        <div class="real-kpis">
-            @foreach (var kpi in RealKpis)
-            {
-                <div class="real-kpi-card">
-                    <span class="real-kpi-label">@kpi.Label</span>
-                    <span class="real-kpi-value">@kpi.Value</span>
-                    <span class="real-kpi-hint">@kpi.Hint</span>
-                </div>
-            }
-        </div>
-
-        @if (showResult)
+        @if (isAnalyzingGlobal)
         {
-            <div class="panel summary-panel">
+            <div class="panel p-4 text-center">
+                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                <h5 class="fw-bold text-dark">Calculando KPIs y Generando Diagnóstico con Gemini...</h5>
+                <p class="text-muted small mb-0">Extrayendo existencias, caducidades y valor total desde SQL Server.</p>
+            </div>
+        }
+        else if (globalAiResult != null)
+        {
+            <!-- KPIs Reales de SQL Server -->
+            <div class="real-kpis mb-3">
+                <div class="real-kpi-card">
+                    <span class="real-kpi-label">Valor del Inventario</span>
+                    <span class="real-kpi-value text-primary">$@globalAiResult.TotalInventoryValue.ToString("N2")</span>
+                    <span class="real-kpi-hint">@globalAiResult.TotalUnitsCount.ToString("N0") unidades en stock</span>
+                </div>
+                <div class="real-kpi-card">
+                    <span class="real-kpi-label">Productos Bajo Stock</span>
+                    <span class="real-kpi-value @(globalAiResult.LowStockProductsCount > 0 ? "text-warning" : "text-success")">@globalAiResult.LowStockProductsCount</span>
+                    <span class="real-kpi-hint">requieren reposición</span>
+                </div>
+                <div class="real-kpi-card">
+                    <span class="real-kpi-label">Lotes Vencidos / Próximos</span>
+                    <span class="real-kpi-value @(globalAiResult.ExpiredLotsCount > 0 ? "text-danger" : "text-secondary")">@globalAiResult.ExpiredLotsCount / @globalAiResult.ExpiringSoonLotsCount</span>
+                    <span class="real-kpi-hint">ventana de 30 días</span>
+                </div>
+                <div class="real-kpi-card">
+                    <span class="real-kpi-label">Movimientos Realizados</span>
+                    <span class="real-kpi-value text-dark">@globalAiResult.TotalMovementsCount</span>
+                    <span class="real-kpi-hint">en el período evaluado</span>
+                </div>
+            </div>
+
+            <!-- Resumen Ejecutivo Gemini -->
+            <div class="panel summary-panel mb-3">
                 <div class="panel-header">
-                    <span class="panel-title">Resumen ejecutivo</span>
-                    <span class="record-count">Modelo de ejemplo · @DateTime.Now.ToString("dd/MM/yyyy HH:mm")</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-chat-quote-fill text-primary"></i>
+                        <span class="panel-title">Resumen Ejecutivo del Inventario</span>
+                    </div>
+                    <span class="record-count">@globalAiResult.AiModelUsed · @globalAiResult.AnalyzedAt.ToString("dd/MM/yyyy HH:mm")</span>
                 </div>
                 <div class="summary-body">
-                    <i class="bi bi-chat-quote-fill summary-icon"></i>
-                    <p class="summary-text">@executiveSummary</p>
+                    <p class="summary-text mb-0">@globalAiResult.ExecutiveSummary</p>
                 </div>
             </div>
 
-            <div class="kpi-chips">
-                @foreach (var kpi in demoKpis)
-                {
-                    <div class="kpi-chip @kpi.StatusClass">
-                        <span class="kpi-chip-name">@kpi.Name</span>
-                        <span class="kpi-chip-value">@kpi.Value</span>
-                        <span class="kpi-chip-target">Objetivo: @kpi.Target</span>
-                    </div>
-                }
-            </div>
-
+            <!-- Hallazgos y Recomendaciones en 2 Columnas -->
             <div class="analytics-columns">
                 <div class="panel">
                     <div class="panel-header">
-                        <span class="panel-title">Hallazgos</span>
-                        <span class="record-count">@demoFindings.Count</span>
+                        <span class="panel-title">Hallazgos Operativos IA (@globalAiResult.Findings.Count)</span>
                     </div>
                     <div class="findings-list">
-                        @foreach (var finding in demoFindings)
+                        @if (globalAiResult.Findings.Count == 0)
                         {
-                            <div class="finding-item">
-                                <span class="sev-badge @finding.SeverityClass">@finding.Severity</span>
-                                <div class="finding-body">
-                                    <span class="finding-type">@finding.Type</span>
-                                    <p class="finding-message">@finding.Message</p>
-                                    <span class="finding-evidence">@finding.Evidence</span>
+                            <div class="p-3 text-muted small">No se detectaron anomalías críticas en el inventario.</div>
+                        }
+                        else
+                        {
+                            @foreach (var finding in globalAiResult.Findings)
+                            {
+                                <div class="finding-item">
+                                    <span class="sev-badge @finding.SeverityClass">@finding.Severity</span>
+                                    <div class="finding-body">
+                                        <span class="finding-type">@finding.Type</span>
+                                        <p class="finding-message">@finding.Message</p>
+                                        <span class="finding-evidence">@finding.Evidence</span>
+                                    </div>
                                 </div>
-                            </div>
+                            }
                         }
                     </div>
                 </div>
 
                 <div class="panel">
                     <div class="panel-header">
-                        <span class="panel-title">Recomendaciones</span>
-                        <span class="record-count">@demoRecommendations.Count</span>
+                        <span class="panel-title">Recomendaciones Estratégicas (@globalAiResult.Recommendations.Count)</span>
                     </div>
                     <div class="table-wrapper">
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>Acción</th>
+                                    <th>Acción Recomendada</th>
                                     <th>Objetivo</th>
                                     <th>Cantidad</th>
                                     <th>Prioridad</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var rec in demoRecommendations)
+                                @if (globalAiResult.Recommendations.Count == 0)
                                 {
                                     <tr>
-                                        <td>@rec.Action</td>
-                                        <td class="col-name">@rec.Target</td>
-                                        <td>@rec.QuantityLabel</td>
-                                        <td><span class="sev-badge @rec.PriorityClass">@rec.Priority</span></td>
+                                        <td colspan="4" class="text-center text-muted py-3">Inventario en balance óptimo.</td>
                                     </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var rec in globalAiResult.Recommendations)
+                                    {
+                                        <tr>
+                                            <td>@rec.Action</td>
+                                            <td class="col-name">@rec.Target</td>
+                                            <td>@rec.QuantityLabel</td>
+                                            <td><span class="sev-badge @rec.PriorityClass">@rec.Priority</span></td>
+                                        </tr>
+                                    }
                                 }
                             </tbody>
                         </table>
                     </div>
                 </div>
+            </div>
+        }
+        else
+        {
+            <div class="panel empty-result">
+                <i class="bi bi-graph-up-arrow text-primary"></i>
+                <span class="empty-result-title">Diagnóstico General del Inventario</span>
+                <span class="empty-result-text">
+                    Haz clic en <strong>Ejecutar Diagnóstico IA del Inventario</strong> para extraer las existencias en vivo de SQL Server y analizarlas con Gemini.
+                </span>
             </div>
         }
     }
@@ -482,15 +487,27 @@
     private const string TabInventory = "inventory";
     private string activeTab = TabFinancial;
 
+    // Pestaña 1: Asistente Financiero
     private List<PurchaseOrder> pendingOrders = new();
     private int selectedOrderId = 0;
     private bool isLoadingOrders = false;
     private bool isAnalyzing = false;
     private FinancialOrderAnalysisDto? analysisResult;
 
+    // Pestaña 2: Analítica Global
+    private List<Warehouse> availableWarehouses = new();
+    private int selectedWarehouseId = 0;
+    private DateTime inventoryStartDate = DateTime.Today.AddDays(-30);
+    private DateTime inventoryEndDate = DateTime.Today;
+    private bool isAnalyzingGlobal = false;
+    private GlobalInventoryAiAnalysisDto? globalAiResult;
+
+    private int TotalInventoryDays => Math.Max((inventoryEndDate.Date - inventoryStartDate.Date).Days, 1);
+
     protected override async Task OnInitializedAsync()
     {
         await LoadPendingOrdersAsync();
+        availableWarehouses = WarehouseRepo.GetWarehouses().Where(w => w.IsActive).OrderBy(w => w.Name).ToList();
     }
 
     private void SwitchTab(string tab)
@@ -532,16 +549,47 @@
         try
         {
             analysisResult = await AiAssistantService.AnalyzePurchaseOrderAsync(selectedOrderId);
-            ToastService.Success($"Análisis completado con éxito mediante {analysisResult.AiModelUsed}.", "Auditoría IA");
+            ToastService.Success($"Análisis generado en vivo con {analysisResult.AiModelUsed}.", "Gemini IA");
         }
         catch (Exception ex)
         {
-            ToastService.Error($"Error en el análisis de la orden: {ex.Message}", "Error IA");
+            ToastService.Error($"Error en el análisis de Gemini: {ex.Message}", "Error IA");
         }
         finally
         {
             isAnalyzing = false;
         }
+    }
+
+    private async Task AnalyzeGlobalInventoryAsync()
+    {
+        isAnalyzingGlobal = true;
+        globalAiResult = null;
+        try
+        {
+            globalAiResult = await AiAssistantService.AnalyzeGlobalInventoryAsync(
+                selectedWarehouseId > 0 ? selectedWarehouseId : null,
+                inventoryStartDate,
+                inventoryEndDate);
+
+            ToastService.Success($"Diagnóstico completado en vivo con {globalAiResult.AiModelUsed}.", "Gemini IA");
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error al analizar inventario con Gemini: {ex.Message}", "Error IA");
+        }
+        finally
+        {
+            isAnalyzingGlobal = false;
+        }
+    }
+
+    private void ResetInventoryForm()
+    {
+        inventoryStartDate = DateTime.Today.AddDays(-30);
+        inventoryEndDate = DateTime.Today;
+        selectedWarehouseId = 0;
+        globalAiResult = null;
     }
 
     private string GetVerdictBannerClass(string riskLevel) => riskLevel switch
@@ -557,80 +605,4 @@
         "Moderado" => "bi-exclamation-triangle-fill",
         _ => "bi-check-circle-fill"
     };
-
-    // Pestaña 2: Analítica Global
-    private readonly List<string> warehouseOptions = new() { "Sede Principal", "Sucursal Norte", "Sucursal Sur" };
-    private DateTime startDate = DateTime.Today.AddDays(-30);
-    private DateTime endDate = DateTime.Today;
-    private string warehouse = "Sede Principal";
-    private decimal rotation = 1.5m;
-    private decimal stockoutPercent = 5m;
-    private decimal overstockPercent = 10m;
-    private decimal agingPercent = 15m;
-    private decimal marginPercent = 25m;
-    private string demandTrend = "Estable";
-
-    private bool isLoading;
-    private bool showResult;
-
-    private int TotalDays => Math.Max((endDate.Date - startDate.Date).Days, 1);
-
-    private const string executiveSummary =
-        "El inventario está sobreabastecido: el sobre stock real (27,1 %) más que duplica el objetivo del 10 % y " +
-        "40 de 59 productos activos están en o por debajo del umbral de 30 unidades.";
-
-    private List<RealKpi> RealKpis => new()
-    {
-        new("Valor del inventario", "$ 12.268,50", "4.102 unidades"),
-        new("Productos bajo stock", "40", "Umbral activo 30 u."),
-        new("Quiebre real", "1,7%", $"Supuesto {stockoutPercent:0.#}%"),
-        new("Sobre stock real", "27,1%", $"Supuesto {overstockPercent:0.#}%"),
-        new("Vencidos / por vencer", "2 / 0", "Ventana 30 días"),
-        new("Movimientos", "3", "0 salidas · 3 transferencias")
-    };
-
-    private readonly List<DemoFinding> demoFindings = new()
-    {
-        new("Sobre stock", "Alta", "16 productos superan el triple del umbral vigente.", "Sobre stock real 27,1 %"),
-        new("Caducidad", "Alta", "2 lotes con stock ya vencieron.", "2 lotes vencidos")
-    };
-
-    private readonly List<DemoRecommendation> demoRecommendations = new()
-    {
-        new("Dar de baja los lotes vencidos", "2 lotes", "—", "Alta"),
-        new("Reabastecer productos en umbral", "40 productos", "240 u.", "Alta")
-    };
-
-    private readonly List<DemoKpi> demoKpis = new()
-    {
-        new("Rotación", "0,0", "1,5", "chip-critico"),
-        new("Quiebre", "1,7 %", "5 %", "chip-ok")
-    };
-
-    private async Task Analyze()
-    {
-        isLoading = true;
-        showResult = false;
-        await Task.Delay(500);
-        isLoading = false;
-        showResult = true;
-    }
-
-    private void ResetForm()
-    {
-        startDate = DateTime.Today.AddDays(-30);
-        endDate = DateTime.Today;
-        showResult = false;
-    }
-
-    private record RealKpi(string Label, string Value, string Hint);
-    private record DemoFinding(string Type, string Severity, string Message, string Evidence)
-    {
-        public string SeverityClass => Severity == "Alta" ? "sev-alta" : "sev-media";
-    }
-    private record DemoRecommendation(string Action, string Target, string QuantityLabel, string Priority)
-    {
-        public string PriorityClass => Priority == "Alta" ? "sev-alta" : "sev-media";
-    }
-    private record DemoKpi(string Name, string Value, string Target, string StatusClass);
 }

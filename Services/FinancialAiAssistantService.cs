@@ -4,7 +4,6 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Inventory_Flow.Data;
 using Inventory_Flow.Models;
@@ -36,7 +35,6 @@ public class FinancialAiAssistantService : IFinancialAiAssistantService
 
     public async Task<List<PurchaseOrder>> GetPendingOrdersForAnalysisAsync()
     {
-        // Estado 2: PENDIENTE_APROBACION_FINANCIERA
         return await _db.PurchaseOrders
             .Include(o => o.Supplier)
             .Include(o => o.DestinationWarehouse)
@@ -92,12 +90,10 @@ public class FinancialAiAssistantService : IFinancialAiAssistantService
             var product = detail.Product;
             int productId = detail.IdProduct;
 
-            // 1. Stock físico actual en la bodega destino
             int currentStock = await _db.Lots
                 .Where(l => l.IdProduct == productId && l.IdWarehouse == order.IdDestinationWarehouse && l.IsActive && l.Quantity > 0)
                 .SumAsync(l => (int?)l.Quantity) ?? 0;
 
-            // 2. Historial de compras anteriores del mismo producto
             var pastDetails = await _db.PurchaseOrderDetails
                 .Include(pod => pod.PurchaseOrder)
                 .Where(pod => pod.IdProduct == productId && pod.IdPurchaseOrder != order.IdPurchaseOrder && pod.UnitPrice > 0)
@@ -115,7 +111,6 @@ public class FinancialAiAssistantService : IFinancialAiAssistantService
                 priceVariance = Math.Round(((detail.UnitPrice - lastPrice.Value) / lastPrice.Value) * 100m, 1);
             }
 
-            // 3. Estimación de consumo mensual basado en rotación de movimientos
             var sixtyDaysAgo = DateTime.Today.AddDays(-60);
             var movementsOutCount = await _db.InventoryMovementDetails
                 .Include(imd => imd.InventoryMovement)
@@ -125,7 +120,6 @@ public class FinancialAiAssistantService : IFinancialAiAssistantService
             int estimatedMonthlyDemand = Math.Max((int)Math.Round(movementsOutCount / 2.0), Math.Max(activeThreshold, 8));
             decimal monthsCoverage = estimatedMonthlyDemand > 0 ? Math.Round((decimal)(currentStock + detail.Quantity) / estimatedMonthlyDemand, 1) : 1m;
 
-            // Reglas de alerta preliminar
             bool hasPriceAlert = priceVariance > 10.0m;
             bool hasQuantityAlert = monthsCoverage > 4.0m || detail.Quantity > (estimatedMonthlyDemand * 3);
 
@@ -179,193 +173,319 @@ public class FinancialAiAssistantService : IFinancialAiAssistantService
         result.PotentialOvercostAmount = Math.Round(totalPotentialOvercost, 2);
         result.AveragePriceVariancePct = result.ItemsAnalysis.Count > 0 ? Math.Round(totalVariancePct / result.ItemsAnalysis.Count, 1) : 0;
 
-        // Intentar enriquecer con Google Gemini API
-        bool geminiSuccess = await TryEnrichWithGeminiAsync(order, result);
-
-        if (!geminiSuccess)
-        {
-            ApplyLocalHeuristicVerdict(result);
-        }
+        await EnrichOrderWithGeminiLiveAsync(order, result);
 
         return result;
     }
 
-    private async Task<bool> TryEnrichWithGeminiAsync(PurchaseOrder order, FinancialOrderAnalysisDto dto)
+    public async Task<GlobalInventoryAiAnalysisDto> AnalyzeGlobalInventoryAsync(int? warehouseId, DateTime startDate, DateTime endDate)
+    {
+        var warehouseQuery = _db.Warehouses.AsNoTracking();
+        Warehouse? selectedWh = null;
+        if (warehouseId.HasValue && warehouseId.Value > 0)
+        {
+            selectedWh = await warehouseQuery.FirstOrDefaultAsync(w => w.IdWarehouse == warehouseId.Value);
+        }
+
+        var lotsQuery = _db.Lots
+            .Include(l => l.Product)
+            .Where(l => l.IsActive && l.Quantity > 0);
+
+        if (selectedWh != null)
+        {
+            lotsQuery = lotsQuery.Where(l => l.IdWarehouse == selectedWh.IdWarehouse);
+        }
+
+        var activeLots = await lotsQuery.AsNoTracking().ToListAsync();
+
+        var today = DateTime.Today;
+        int totalUnits = activeLots.Sum(l => l.Quantity);
+        decimal totalValue = Math.Round(activeLots.Sum(l => l.Quantity * (l.Product?.SuggestedPrice ?? 0)), 2);
+        int expiredLotsCount = activeLots.Count(l => l.ExpirationDate.Date < today);
+        int expiringSoonCount = activeLots.Count(l => l.ExpirationDate.Date >= today && l.ExpirationDate.Date <= today.AddDays(30));
+
+        var thresholdEntity = await _db.ThresholdInvetories.AsNoTracking().FirstOrDefaultAsync(t => t.IsActive);
+        int activeThreshold = thresholdEntity?.Threshold ?? 5;
+
+        var productQuantities = activeLots
+            .GroupBy(l => l.IdProduct)
+            .Select(g => new { ProductId = g.Key, Stock = g.Sum(x => x.Quantity) })
+            .ToList();
+
+        int lowStockCount = productQuantities.Count(p => p.Stock <= activeThreshold);
+
+        var movementsCount = await _db.InventoryMovements
+            .Where(m => m.MovementDate >= startDate && m.MovementDate <= endDate)
+            .CountAsync();
+
+        var dto = new GlobalInventoryAiAnalysisDto
+        {
+            TotalInventoryValue = totalValue,
+            TotalUnitsCount = totalUnits,
+            LowStockProductsCount = lowStockCount,
+            ExpiredLotsCount = expiredLotsCount,
+            ExpiringSoonLotsCount = expiringSoonCount,
+            TotalMovementsCount = movementsCount,
+            AnalyzedAt = DateTime.Now
+        };
+
+        await EnrichGlobalInventoryWithGeminiLiveAsync(selectedWh?.Name ?? "Consolidado Red de Clínicas", dto);
+
+        return dto;
+    }
+
+    private async Task EnrichOrderWithGeminiLiveAsync(PurchaseOrder order, FinancialOrderAnalysisDto dto)
     {
         string? apiKey = _configuration["GeminiSettings:ApiKey"];
-        string model = _configuration["GeminiSettings:Model"] ?? "gemini-2.0-flash";
+        string model = _configuration["GeminiSettings:Model"] ?? "gemini-3.5-flash";
         string baseUrl = _configuration["GeminiSettings:BaseUrl"] ?? "https://generativelanguage.googleapis.com/v1beta";
 
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            _logger.LogWarning("Gemini API Key no está configurada. Usando motor de diagnóstico local.");
-            return false;
+            throw new InvalidOperationException("No se encontró la Gemini API Key en appsettings.json. Ingrésala para ejecutar el análisis cognitivo.");
         }
 
-        try
+        var promptBuilder = new StringBuilder();
+        promptBuilder.AppendLine("Eres el Asistente Experto en Auditoría Financiera y Cadena de Suministro de 'MedVet Enterprise' (Clínica Veterinaria Integral).");
+        promptBuilder.AppendLine("Analiza en tiempo real la siguiente orden de compra pendiente de aprobación financiera y emite un veredicto estructurado para el aprobador.");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine($"DATOS DE LA ORDEN:");
+        promptBuilder.AppendLine($"- Número: {order.OrderNumber}");
+        promptBuilder.AppendLine($"- Proveedor: {order.Supplier?.CompanyName}");
+        promptBuilder.AppendLine($"- Tipo: {order.PurchaseOrderType?.Name}");
+        promptBuilder.AppendLine($"- Monto Total: ${order.TotalAmount:N2}");
+        promptBuilder.AppendLine($"- Total Ítems: {dto.ItemsAnalysis.Count}");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("DETALLE DE PRODUCTOS EVALUADOS:");
+
+        foreach (var it in dto.ItemsAnalysis)
         {
-            var promptBuilder = new StringBuilder();
-            promptBuilder.AppendLine("Eres el Asistente Experto en Auditoría Financiera y Cadena de Suministro de 'MedVet Enterprise' (Clínica Veterinaria Integral).");
-            promptBuilder.AppendLine("Analiza la siguiente orden de compra pendiente de aprobación financiera y emite un veredicto estructurado para el aprobador.");
-            promptBuilder.AppendLine();
-            promptBuilder.AppendLine($"DATOS DE LA ORDEN:");
-            promptBuilder.AppendLine($"- Número: {order.OrderNumber}");
-            promptBuilder.AppendLine($"- Proveedor: {order.Supplier?.CompanyName}");
-            promptBuilder.AppendLine($"- Tipo: {order.PurchaseOrderType?.Name}");
-            promptBuilder.AppendLine($"- Monto Total: ${order.TotalAmount:N2}");
-            promptBuilder.AppendLine($"- Total Ítems: {dto.ItemsAnalysis.Count}");
-            promptBuilder.AppendLine();
-            promptBuilder.AppendLine("DETALLE DE PRODUCTOS EVALUADOS:");
+            promptBuilder.AppendLine($"* {it.ProductName} (SKU: {it.ProductCode}):");
+            promptBuilder.AppendLine($"  - Cantidad pedida: {it.RequestedQuantity} u. | Stock actual: {it.CurrentPhysicalStock} u. | Consumo mensual est.: {it.MonthlyConsumptionAvg} u.");
+            promptBuilder.AppendLine($"  - Precio unitario: ${it.CurrentUnitPrice:N2} | Último precio: ${(it.LastPurchasedPrice.HasValue ? $"${it.LastPurchasedPrice:N2}" : "Sin compras previas")} | Variación: {it.PriceVariancePct:+#0.0;-#0.0;0}%");
+            promptBuilder.AppendLine($"  - Meses de cobertura resultante: {it.MonthsOfCoverage:0.#} meses");
+        }
 
-            foreach (var it in dto.ItemsAnalysis)
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("INSTRUCCIONES DE RESPUESTA:");
+        promptBuilder.AppendLine("Responde ÚNICAMENTE en formato JSON plano con la siguiente estructura exacta:");
+        promptBuilder.AppendLine("{");
+        promptBuilder.AppendLine("  \"riskLevel\": \"Bajo\" | \"Moderado\" | \"Alto\",");
+        promptBuilder.AppendLine("  \"recommendation\": \"Aprobación Viable\" | \"Revisión Recomendada\" | \"Alerta Crítica de Gasto\",");
+        promptBuilder.AppendLine("  \"executiveSummary\": \"Diagnóstico exhaustivo y profesional explicando la justificación financiera, impacto de sobreprecio y riesgo de meses de stock.\",");
+        promptBuilder.AppendLine("  \"itemInsights\": [");
+        promptBuilder.AppendLine("    {");
+        promptBuilder.AppendLine("      \"productId\": 0,");
+        promptBuilder.AppendLine("      \"priceInsight\": \"Evaluación detallada del precio pactado vs histórico\",");
+        promptBuilder.AppendLine("      \"quantityInsight\": \"Evaluación detallada de la cantidad pedida vs meses de rotación\"");
+        promptBuilder.AppendLine("    }");
+        promptBuilder.AppendLine("  ]");
+        promptBuilder.AppendLine("}");
+
+        var requestBody = new
+        {
+            contents = new[]
             {
-                promptBuilder.AppendLine($"* {it.ProductName} (SKU: {it.ProductCode}):");
-                promptBuilder.AppendLine($"  - Cantidad pedida: {it.RequestedQuantity} u. | Stock actual: {it.CurrentPhysicalStock} u. | Consumo mensual est.: {it.MonthlyConsumptionAvg} u.");
-                promptBuilder.AppendLine($"  - Precio unitario: ${it.CurrentUnitPrice:N2} | Último precio: ${(it.LastPurchasedPrice.HasValue ? $"${it.LastPurchasedPrice:N2}" : "Sin compras previas")} | Variación: {it.PriceVariancePct:+#0.0;-#0.0;0}%");
-                promptBuilder.AppendLine($"  - Meses de cobertura resultante: {it.MonthsOfCoverage:0.#} meses");
-            }
-
-            promptBuilder.AppendLine();
-            promptBuilder.AppendLine("INSTRUCCIONES DE RESPUESTA:");
-            promptBuilder.AppendLine("Responde ÚNICAMENTE en formato JSON plano con la siguiente estructura exacta sin texto adicional:");
-            promptBuilder.AppendLine("{");
-            promptBuilder.AppendLine("  \"riskLevel\": \"Bajo\" | \"Moderado\" | \"Alto\",");
-            promptBuilder.AppendLine("  \"recommendation\": \"Aprobación Viable\" | \"Revisión Recomendada\" | \"Alerta Crítica de Gasto\",");
-            promptBuilder.AppendLine("  \"executiveSummary\": \"Resumen ejecutivo claro de 2 a 3 frases explicando si conviene aprobar, negociar precio o reducir cantidad.\",");
-            promptBuilder.AppendLine("  \"itemInsights\": [");
-            promptBuilder.AppendLine("    {");
-            promptBuilder.AppendLine("      \"productId\": 0,");
-            promptBuilder.AppendLine("      \"priceInsight\": \"Explicación corta sobre el precio de este producto\",");
-            promptBuilder.AppendLine("      \"quantityInsight\": \"Explicación corta sobre la cantidad pedida\"");
-            promptBuilder.AppendLine("    }");
-            promptBuilder.AppendLine("  ]");
-            promptBuilder.AppendLine("}");
-
-            var requestBody = new
-            {
-                contents = new[]
+                new
                 {
-                    new
+                    parts = new[]
                     {
-                        parts = new[]
-                        {
-                            new { text = promptBuilder.ToString() }
-                        }
+                        new { text = promptBuilder.ToString() }
                     }
-                },
-                generationConfig = new
-                {
-                    temperature = 0.2,
-                    responseMimeType = "application/json"
                 }
-            };
-
-            var client = _httpClientFactory.CreateClient();
-            client.Timeout = TimeSpan.FromSeconds(25);
-
-            string url = $"{baseUrl.TrimEnd('/')}/models/{model}:generateContent?key={apiKey}";
-            var jsonPayload = JsonSerializer.Serialize(requestBody);
-            var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-
-            var response = await client.PostAsync(url, content);
-            if (!response.IsSuccessStatusCode)
+            },
+            generationConfig = new
             {
-                string errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("Gemini API respondió con código {StatusCode}: {Error}", response.StatusCode, errorContent);
-                return false;
+                temperature = 0.2,
+                responseMimeType = "application/json"
             }
+        };
 
-            string responseJson = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(responseJson);
+        var client = _httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(30);
 
-            var root = doc.RootElement;
-            if (root.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
+        string url = $"{baseUrl.TrimEnd('/')}/models/{model}:generateContent?key={apiKey}";
+        var jsonPayload = JsonSerializer.Serialize(requestBody);
+        var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+        var response = await client.PostAsync(url, content);
+        if (!response.IsSuccessStatusCode)
+        {
+            string errorContent = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Google Gemini API devolvió error {response.StatusCode}: {errorContent}");
+        }
+
+        string responseJson = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(responseJson);
+
+        var root = doc.RootElement;
+        if (root.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
+        {
+            var firstCandidate = candidates[0];
+            if (firstCandidate.TryGetProperty("content", out var candidateContent) &&
+                candidateContent.TryGetProperty("parts", out var parts) && parts.GetArrayLength() > 0)
             {
-                var firstCandidate = candidates[0];
-                if (firstCandidate.TryGetProperty("content", out var candidateContent) &&
-                    candidateContent.TryGetProperty("parts", out var parts) && parts.GetArrayLength() > 0)
+                string rawText = parts[0].GetProperty("text").GetString() ?? "";
+                if (!string.IsNullOrWhiteSpace(rawText))
                 {
-                    string rawText = parts[0].GetProperty("text").GetString() ?? "";
-                    if (!string.IsNullOrWhiteSpace(rawText))
+                    var parsedResponse = JsonSerializer.Deserialize<GeminiAnalysisResponse>(rawText, new JsonSerializerOptions
                     {
-                        var parsedResponse = JsonSerializer.Deserialize<GeminiAnalysisResponse>(rawText, new JsonSerializerOptions
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                    if (parsedResponse != null)
+                    {
+                        dto.RiskLevel = !string.IsNullOrWhiteSpace(parsedResponse.RiskLevel) ? parsedResponse.RiskLevel.Trim() : "Moderado";
+                        dto.Recommendation = !string.IsNullOrWhiteSpace(parsedResponse.Recommendation) ? parsedResponse.Recommendation.Trim() : "Revisión Recomendada";
+                        dto.ExecutiveSummary = !string.IsNullOrWhiteSpace(parsedResponse.ExecutiveSummary) ? parsedResponse.ExecutiveSummary.Trim() : "Análisis generado por Gemini.";
+                        dto.AiModelUsed = $"{model} (Google Gemini API - Generación en Vivo)";
+
+                        if (parsedResponse.ItemInsights != null)
                         {
-                            PropertyNameCaseInsensitive = true
-                        });
-
-                        if (parsedResponse != null)
-                        {
-                            if (!string.IsNullOrWhiteSpace(parsedResponse.RiskLevel))
+                            foreach (var insight in parsedResponse.ItemInsights)
                             {
-                                dto.RiskLevel = parsedResponse.RiskLevel.Trim();
-                            }
-                            if (!string.IsNullOrWhiteSpace(parsedResponse.Recommendation))
-                            {
-                                dto.Recommendation = parsedResponse.Recommendation.Trim();
-                            }
-                            if (!string.IsNullOrWhiteSpace(parsedResponse.ExecutiveSummary))
-                            {
-                                dto.ExecutiveSummary = parsedResponse.ExecutiveSummary.Trim();
-                            }
-
-                            dto.AiModelUsed = $"{model} (Google Gemini API)";
-
-                            if (parsedResponse.ItemInsights != null && parsedResponse.ItemInsights.Count > 0)
-                            {
-                                foreach (var insight in parsedResponse.ItemInsights)
+                                var targetItem = dto.ItemsAnalysis.FirstOrDefault(i => i.ProductId == insight.ProductId);
+                                if (targetItem != null)
                                 {
-                                    var targetItem = dto.ItemsAnalysis.FirstOrDefault(i => i.ProductId == insight.ProductId);
-                                    if (targetItem != null)
-                                    {
-                                        if (!string.IsNullOrWhiteSpace(insight.PriceInsight))
-                                        {
-                                            targetItem.PriceInsight = insight.PriceInsight.Trim();
-                                        }
-                                        if (!string.IsNullOrWhiteSpace(insight.QuantityInsight))
-                                        {
-                                            targetItem.QuantityInsight = insight.QuantityInsight.Trim();
-                                        }
-                                    }
+                                    if (!string.IsNullOrWhiteSpace(insight.PriceInsight))
+                                        targetItem.PriceInsight = insight.PriceInsight.Trim();
+                                    if (!string.IsNullOrWhiteSpace(insight.QuantityInsight))
+                                        targetItem.QuantityInsight = insight.QuantityInsight.Trim();
                                 }
                             }
-
-                            return true;
                         }
+                        return;
                     }
                 }
             }
+        }
 
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error comunicando con Gemini API para análisis de orden {OrderNumber}", order.OrderNumber);
-            return false;
-        }
+        throw new InvalidOperationException("No se pudo interpretar la respuesta generada por Gemini API.");
     }
 
-    private void ApplyLocalHeuristicVerdict(FinancialOrderAnalysisDto dto)
+    private async Task EnrichGlobalInventoryWithGeminiLiveAsync(string warehouseName, GlobalInventoryAiAnalysisDto dto)
     {
-        dto.AiModelUsed = "Motor Heurístico Local (Respaldo)";
+        string? apiKey = _configuration["GeminiSettings:ApiKey"];
+        string model = _configuration["GeminiSettings:Model"] ?? "gemini-3.5-flash";
+        string baseUrl = _configuration["GeminiSettings:BaseUrl"] ?? "https://generativelanguage.googleapis.com/v1beta";
 
-        if (dto.AnomalousPriceCount >= 2 || dto.PotentialOvercostAmount > 100 || dto.ItemsAnalysis.Any(i => i.ItemStatus == "Crítico"))
+        if (string.IsNullOrWhiteSpace(apiKey))
         {
-            dto.RiskLevel = "Alto";
-            dto.Recommendation = "Alerta Crítica de Gasto";
-            dto.ExecutiveSummary = $"Se detectaron incrementos de precio significativos ({dto.AveragePriceVariancePct:+#0.0}% prom.) con sobrecosto estimado de ${dto.PotentialOvercostAmount:N2}. Se recomienda renegociar con el proveedor antes de aprobar.";
+            throw new InvalidOperationException("No se encontró la Gemini API Key en appsettings.json.");
         }
-        else if (dto.AnomalousPriceCount > 0 || dto.AnomalousQuantityCount > 0)
+
+        var promptBuilder = new StringBuilder();
+        promptBuilder.AppendLine("Eres el Director de Inteligencia y Logística de MedVet Enterprise (Cadena de Clínicas Veterinarias).");
+        promptBuilder.AppendLine($"Analiza los siguientes KPIs reales extraídos en vivo desde la base de datos SQL Server:");
+        promptBuilder.AppendLine($"- Almacén / Alcance: {warehouseName}");
+        promptBuilder.AppendLine($"- Unidades Físicas Totales en Stock: {dto.TotalUnitsCount} unidades");
+        promptBuilder.AppendLine($"- Valorización del Inventario: ${dto.TotalInventoryValue:N2}");
+        promptBuilder.AppendLine($"- Lotes Vencidos en Cuarentena: {dto.ExpiredLotsCount}");
+        promptBuilder.AppendLine($"- Lotes Próximos a Vencer (30 días): {dto.ExpiringSoonLotsCount}");
+        promptBuilder.AppendLine($"- Productos Bajo Umbral Mínimo: {dto.LowStockProductsCount}");
+        promptBuilder.AppendLine($"- Movimientos Realizados en el Período: {dto.TotalMovementsCount}");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("INSTRUCCIONES DE RESPUESTA:");
+        promptBuilder.AppendLine("Genera un análisis ejecutivo real en formato JSON estructurado plano con:");
+        promptBuilder.AppendLine("{");
+        promptBuilder.AppendLine("  \"executiveSummary\": \"Párrafo ejecutivo analizando la liquidez, capital inmovilizado y riesgo sanitario de caducidades.\",");
+        promptBuilder.AppendLine("  \"findings\": [");
+        promptBuilder.AppendLine("    {");
+        promptBuilder.AppendLine("      \"type\": \"Sobre stock | Caducidad | Stock | Rotación | Margen\",");
+        promptBuilder.AppendLine("      \"severity\": \"Alta\" | \"Media\" | \"Baja\",");
+        promptBuilder.AppendLine("      \"message\": \"Descripción del hallazgo detectado\",");
+        promptBuilder.AppendLine("      \"evidence\": \"Datos numéricos que respaldan el hallazgo\"");
+        promptBuilder.AppendLine("    }");
+        promptBuilder.AppendLine("  ],");
+        promptBuilder.AppendLine("  \"recommendations\": [");
+        promptBuilder.AppendLine("    {");
+        promptBuilder.AppendLine("      \"action\": \"Acción operativa recomendada\",");
+        promptBuilder.AppendLine("      \"target\": \"Área u objetivo\",");
+        promptBuilder.AppendLine("      \"quantityLabel\": \"Cantidad sugerida o —\",");
+        promptBuilder.AppendLine("      \"priority\": \"Alta\" | \"Media\" | \"Baja\"");
+        promptBuilder.AppendLine("    }");
+        promptBuilder.AppendLine("  ]");
+        promptBuilder.AppendLine("}");
+
+        var requestBody = new
         {
-            dto.RiskLevel = "Moderado";
-            dto.Recommendation = "Revisión Recomendada";
-            dto.ExecutiveSummary = $"La orden presenta desviaciones menores en {dto.AnomalousPriceCount} precios y {dto.AnomalousQuantityCount} cantidades respecto al histórico de consumo. Aprobación viable con supervisión.";
-        }
-        else
+            contents = new[]
+            {
+                new { parts = new[] { new { text = promptBuilder.ToString() } } }
+            },
+            generationConfig = new
+            {
+                temperature = 0.2,
+                responseMimeType = "application/json"
+            }
+        };
+
+        var client = _httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(30);
+
+        string url = $"{baseUrl.TrimEnd('/')}/models/{model}:generateContent?key={apiKey}";
+        var jsonPayload = JsonSerializer.Serialize(requestBody);
+        var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+        var response = await client.PostAsync(url, content);
+        if (!response.IsSuccessStatusCode)
         {
-            dto.RiskLevel = "Bajo";
-            dto.Recommendation = "Aprobación Viable";
-            dto.ExecutiveSummary = "Todos los precios pactados se alinean con las compras anteriores del catálogo y las cantidades solicitadas responden a la demanda mensual estimada sin riesgo de sobre-stock.";
+            string errorContent = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Gemini API error {response.StatusCode}: {errorContent}");
         }
+
+        string responseJson = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(responseJson);
+
+        var root = doc.RootElement;
+        if (root.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
+        {
+            var firstCandidate = candidates[0];
+            if (firstCandidate.TryGetProperty("content", out var candidateContent) &&
+                candidateContent.TryGetProperty("parts", out var parts) && parts.GetArrayLength() > 0)
+            {
+                string rawText = parts[0].GetProperty("text").GetString() ?? "";
+                if (!string.IsNullOrWhiteSpace(rawText))
+                {
+                    var parsed = JsonSerializer.Deserialize<GeminiGlobalResponse>(rawText, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                    if (parsed != null)
+                    {
+                        dto.ExecutiveSummary = parsed.ExecutiveSummary ?? "Análisis completado.";
+                        dto.AiModelUsed = $"{model} (Google Gemini API - Generación en Vivo)";
+
+                        if (parsed.Findings != null)
+                        {
+                            dto.Findings = parsed.Findings.Select(f => new AiFindingDto
+                            {
+                                Type = f.Type ?? "General",
+                                Severity = f.Severity ?? "Media",
+                                Message = f.Message ?? "",
+                                Evidence = f.Evidence ?? ""
+                            }).ToList();
+                        }
+
+                        if (parsed.Recommendations != null)
+                        {
+                            dto.Recommendations = parsed.Recommendations.Select(r => new AiRecommendationDto
+                            {
+                                Action = r.Action ?? "",
+                                Target = r.Target ?? "",
+                                QuantityLabel = r.QuantityLabel ?? "—",
+                                Priority = r.Priority ?? "Media"
+                            }).ToList();
+                        }
+
+                        return;
+                    }
+                }
+            }
+        }
+
+        throw new InvalidOperationException("No se pudo interpretar la respuesta generada por Gemini API.");
     }
 
     private class GeminiAnalysisResponse
@@ -381,5 +501,28 @@ public class FinancialAiAssistantService : IFinancialAiAssistantService
         public int ProductId { get; set; }
         public string? PriceInsight { get; set; }
         public string? QuantityInsight { get; set; }
+    }
+
+    private class GeminiGlobalResponse
+    {
+        public string? ExecutiveSummary { get; set; }
+        public List<GeminiFindingItem>? Findings { get; set; }
+        public List<GeminiRecItem>? Recommendations { get; set; }
+    }
+
+    private class GeminiFindingItem
+    {
+        public string? Type { get; set; }
+        public string? Severity { get; set; }
+        public string? Message { get; set; }
+        public string? Evidence { get; set; }
+    }
+
+    private class GeminiRecItem
+    {
+        public string? Action { get; set; }
+        public string? Target { get; set; }
+        public string? QuantityLabel { get; set; }
+        public string? Priority { get; set; }
     }
 }

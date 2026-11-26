@@ -76,3 +76,46 @@ public class FinancialItemAnalysisDto
         _ => "badge-success"
     };
 }
+
+public class GlobalInventoryAiAnalysisDto
+{
+    public decimal TotalInventoryValue { get; set; }
+    public int TotalUnitsCount { get; set; }
+    public int LowStockProductsCount { get; set; }
+    public int ExpiredLotsCount { get; set; }
+    public int ExpiringSoonLotsCount { get; set; }
+    public int TotalMovementsCount { get; set; }
+    public string ExecutiveSummary { get; set; } = string.Empty;
+    public string AiModelUsed { get; set; } = string.Empty;
+    public DateTime AnalyzedAt { get; set; } = DateTime.Now;
+    public List<AiFindingDto> Findings { get; set; } = new();
+    public List<AiRecommendationDto> Recommendations { get; set; } = new();
+}
+
+public class AiFindingDto
+{
+    public string Type { get; set; } = string.Empty;
+    public string Severity { get; set; } = "Media";
+    public string Message { get; set; } = string.Empty;
+    public string Evidence { get; set; } = string.Empty;
+    public string SeverityClass => Severity switch
+    {
+        "Alta" => "sev-alta",
+        "Media" => "sev-media",
+        _ => "sev-baja"
+    };
+}
+
+public class AiRecommendationDto
+{
+    public string Action { get; set; } = string.Empty;
+    public string Target { get; set; } = string.Empty;
+    public string QuantityLabel { get; set; } = string.Empty;
+    public string Priority { get; set; } = "Media";
+    public string PriorityClass => Priority switch
+    {
+        "Alta" => "sev-alta",
+        "Media" => "sev-media",
+        _ => "sev-baja"
+    };
+}

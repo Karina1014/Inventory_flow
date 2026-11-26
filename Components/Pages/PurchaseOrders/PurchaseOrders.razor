@@ -2,6 +2,7 @@
 @layout MainLayout
 @using Inventory_Flow.Models
 @using Inventory_Flow.Models.Dtos
+@using Inventory_Flow.Models.Dtos.Ai
 @using Inventory_Flow.Repository.IRepository
 @inject IPurchaseOrderRepository OrderRepo
 @inject IPurchaseOrderCatalogRepository CatalogRepo
@@ -10,6 +11,7 @@
 @inject IProductRepository ProductRepo
 @inject Inventory_Flow.Services.CurrentUserService CurrentUserService
 @inject Inventory_Flow.Services.IToastNotificationService ToastService
+@inject Inventory_Flow.Services.IFinancialAiAssistantService AiAssistantService
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
 
@@ -358,6 +360,9 @@ else
 
                             <!-- Botones de Acción Financiera -->
                             <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+                                <button type="button" class="btn btn-outline-primary btn-sm fw-semibold" @onclick="() => OpenAiAuditModal(fo)">
+                                    <i class="bi bi-stars me-1 text-primary"></i>Diagnóstico IA
+                                </button>
                                 <button type="button" class="btn btn-flat-secondary btn-sm" @onclick="() => OpenDetailModal(fo)">
                                     <i class="bi bi-card-checklist me-1"></i>Ver Ítems
                                 </button>
@@ -729,6 +734,162 @@ else
     </div>
 }
 
+<!-- ==================== MODAL: AUDITORÍA FINANCIERA IA (GEMINI) ==================== -->
+@if (showAiAuditModal && selectedOrder != null)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-dialog-custom modal-dialog-lg" style="max-width: 860px;">
+            <div class="modal-header-custom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="header-icon-box text-primary" style="width:36px; height:36px; font-size:1.1rem; background-color:#E0F2FE;">
+                        <i class="bi bi-stars"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark">Auditoría Financiera Inteligente</h5>
+                        <span class="text-muted small">Orden N° @selectedOrder.OrderNumber · Proveedor: @(selectedOrder.Supplier?.CompanyName ?? "N/D")</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" @onclick="CloseModals"></button>
+            </div>
+
+            <div class="modal-body-custom">
+                @if (isAuditingWithAi)
+                {
+                    <div class="py-5 text-center">
+                        <div class="spinner-border text-primary mb-3" style="width: 2.5rem; height: 2.5rem;" role="status"></div>
+                        <h6 class="fw-bold text-dark">Analizando con Google Gemini 2.0 Flash...</h6>
+                        <p class="text-muted small mb-0">Evaluando histórico de compras, variaciones de precios y proyección de inventario.</p>
+                    </div>
+                }
+                else if (aiAuditResult != null)
+                {
+                    <!-- Veredicto Principal -->
+                    <div class="p-3 mb-3 rounded text-white d-flex flex-wrap align-items-center justify-content-between gap-2"
+                         style="@(aiAuditResult.RiskLevel == "Alto" ? "background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);" : (aiAuditResult.RiskLevel == "Moderado" ? "background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);" : "background: linear-gradient(135deg, #10B981 0%, #047857 100%);"))">
+                        <div class="d-flex align-items-center gap-3">
+                            <i class="bi @(aiAuditResult.RiskLevel == "Alto" ? "bi-exclamation-octagon-fill" : (aiAuditResult.RiskLevel == "Moderado" ? "bi-exclamation-triangle-fill" : "bi-check-circle-fill")) fs-2"></i>
+                            <div>
+                                <h6 class="mb-0 fw-bold fs-5">Veredicto IA: @aiAuditResult.Recommendation</h6>
+                                <span class="small opacity-90">Nivel de Riesgo @aiAuditResult.RiskLevel · @aiAuditResult.AiModelUsed</span>
+                            </div>
+                        </div>
+                        <span class="badge bg-white text-dark fw-bold px-3 py-2">
+                            Total: $@aiAuditResult.TotalAmount.ToString("N2")
+                        </span>
+                    </div>
+
+                    <!-- Resumen Ejecutivo -->
+                    <div class="p-3 bg-light rounded border mb-3">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="bi bi-chat-quote-fill text-primary fs-5 mt-1"></i>
+                            <div>
+                                <span class="fw-bold text-dark d-block mb-1">Diagnóstico Ejecutivo Gemini:</span>
+                                <p class="mb-0 text-secondary small" style="line-height: 1.55;">@aiAuditResult.ExecutiveSummary</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Métricas Resumen -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-4">
+                            <div class="p-2 border rounded bg-white text-center">
+                                <span class="d-block small text-muted">Variación Promedio</span>
+                                <strong class="@(aiAuditResult.AveragePriceVariancePct > 5 ? "text-danger" : "text-success")">
+                                    @(aiAuditResult.AveragePriceVariancePct > 0 ? "+" : "")@aiAuditResult.AveragePriceVariancePct.ToString("0.#")%
+                                </strong>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 border rounded bg-white text-center">
+                                <span class="d-block small text-muted">Sobrecosto Estimado</span>
+                                <strong class="@(aiAuditResult.PotentialOvercostAmount > 0 ? "text-danger" : "text-success")">
+                                    $@aiAuditResult.PotentialOvercostAmount.ToString("N2")
+                                </strong>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 border rounded bg-white text-center">
+                                <span class="d-block small text-muted">Alertas Detectadas</span>
+                                <strong class="@(aiAuditResult.AnomalousPriceCount + aiAuditResult.AnomalousQuantityCount > 0 ? "text-warning" : "text-success")">
+                                    @(aiAuditResult.AnomalousPriceCount + aiAuditResult.AnomalousQuantityCount) anomalías
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Ítems Auditados -->
+                    <div class="table-responsive border rounded">
+                        <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.82rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Pedido vs. Stock</th>
+                                    <th>Precio</th>
+                                    <th>Último Hist.</th>
+                                    <th>Var. %</th>
+                                    <th>Diagnóstico</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var it in aiAuditResult.ItemsAnalysis)
+                                {
+                                    <tr>
+                                        <td>
+                                            <span class="fw-semibold text-dark d-block">@it.ProductName</span>
+                                            <span class="text-muted" style="font-size:0.75rem;">@it.ProductCode</span>
+                                        </td>
+                                        <td>
+                                            <span>@it.RequestedQuantity u.</span>
+                                            <span class="text-muted d-block" style="font-size:0.75rem;">Cob.: @it.MonthsOfCoverage.ToString("0.#") m.</span>
+                                        </td>
+                                        <td class="fw-semibold">$@it.CurrentUnitPrice.ToString("N2")</td>
+                                        <td>@(it.LastPurchasedPrice.HasValue ? $"${it.LastPurchasedPrice.Value:N2}" : "—")</td>
+                                        <td>
+                                            @if (it.PriceVariancePct > 10)
+                                            {
+                                                <span class="badge bg-danger">+@it.PriceVariancePct.ToString("0.#")%</span>
+                                            }
+                                            else if (it.PriceVariancePct > 0)
+                                            {
+                                                <span class="badge bg-warning text-dark">+@it.PriceVariancePct.ToString("0.#")%</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-success">@it.PriceVariancePct.ToString("0.#")%</span>
+                                            }
+                                        </td>
+                                        <td style="max-width: 220px;">
+                                            <span class="d-block" style="font-size: 0.77rem;">@it.PriceInsight</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge @(it.ItemStatus == "Normal" ? "bg-success" : (it.ItemStatus == "Sobrecompra" ? "bg-warning text-dark" : "bg-danger"))">
+                                                @it.ItemStatus
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+            <div class="modal-footer-custom d-flex justify-content-between">
+                <button type="button" class="btn btn-flat-secondary" @onclick="CloseModals">Cerrar</button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => ProceedToRejectFromAi()">
+                        <i class="bi bi-x-circle me-1"></i>Rechazar Gasto
+                    </button>
+                    <button type="button" class="btn btn-success btn-sm fw-semibold" @onclick="() => ProceedToApproveFromAi()">
+                        <i class="bi bi-check2-circle me-1"></i>Aprobar Presupuesto
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 <!-- ==================== MODAL: RESOLUCIÓN FINANCIERA ==================== -->
 @if (showApprovalModal && selectedOrder != null)
 {
@@ -1010,6 +1171,10 @@ else
     private bool showApprovalModal = false;
     private bool showCancelModal = false;
     private bool showReceiveModal = false;
+    private bool showAiAuditModal = false;
+
+    private bool isAuditingWithAi = false;
+    private FinancialOrderAnalysisDto? aiAuditResult;
 
     private ReceivePurchaseOrderDto receiveDto = new();
     private string receiveErrorMessage = string.Empty;
@@ -1479,6 +1644,45 @@ else
         await JSRuntime.InvokeVoidAsync("open", url, "_blank");
     }
 
+    private async Task OpenAiAuditModal(PurchaseOrder order)
+    {
+        selectedOrder = order;
+        showAiAuditModal = true;
+        isAuditingWithAi = true;
+        aiAuditResult = null;
+
+        try
+        {
+            aiAuditResult = await AiAssistantService.AnalyzePurchaseOrderAsync(order.IdPurchaseOrder);
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error al ejecutar diagnóstico IA: {ex.Message}", "Asistente IA");
+        }
+        finally
+        {
+            isAuditingWithAi = false;
+        }
+    }
+
+    private void ProceedToRejectFromAi()
+    {
+        showAiAuditModal = false;
+        if (selectedOrder != null)
+        {
+            OpenApprovalModal(selectedOrder, false);
+        }
+    }
+
+    private void ProceedToApproveFromAi()
+    {
+        showAiAuditModal = false;
+        if (selectedOrder != null)
+        {
+            OpenApprovalModal(selectedOrder, true);
+        }
+    }
+
     private void CloseModals()
     {
         showCreateModal = false;
@@ -1486,6 +1690,8 @@ else
         showApprovalModal = false;
         showCancelModal = false;
         showReceiveModal = false;
+        showAiAuditModal = false;
+        aiAuditResult = null;
         selectedOrder = null;
         createErrorMessage = string.Empty;
         receiveErrorMessage = string.Empty;

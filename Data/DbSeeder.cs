@@ -692,6 +692,97 @@ public static class DbSeeder
             }
         }
 
+        // 7.1 Asegurar Órdenes Demostrativas para Auditoría Financiera IA (Gemini)
+        if (matrizWarehouse != null && activeProducts.Count >= 4)
+        {
+            var pendingOrdersCount = await db.PurchaseOrders.CountAsync(o => o.IdPurchaseOrderStatus == 2);
+            if (pendingOrdersCount < 2)
+            {
+                var supplier1 = await db.Suppliers.FirstOrDefaultAsync();
+                var supplier2 = await db.Suppliers.Skip(1).FirstOrDefaultAsync() ?? supplier1;
+
+                if (supplier1 != null)
+                {
+                    var p1 = activeProducts[0];
+                    var p2 = activeProducts[1];
+                    var p3 = activeProducts[2];
+
+                    // Escenario A: Sobreprecio Detectado (+28% sobre el precio de referencia)
+                    var orderAiOvercost = new PurchaseOrder
+                    {
+                        OrderNumber = "OC-2026-0004-IA",
+                        OrderDate = DateTime.Now.AddHours(-2),
+                        IdSupplier = supplier1.IdSupplier,
+                        IdDestinationWarehouse = matrizWarehouse.IdWarehouse,
+                        IdUser = adminUser.IdUser,
+                        IdPurchaseOrderType = 1, // Desabastecimiento Crítico
+                        IdPurchaseOrderStatus = 2, // PENDIENTE_APROBACION_FINANCIERA
+                        ExpectedDeliveryDate = DateTime.Now.AddDays(3),
+                        Observation = "Reposición de emergencia con sobrecosto alertado por el proveedor debido a escasez de materia prima.",
+                        Subtotal = 1180.00m,
+                        TaxAmount = 177.00m,
+                        TotalAmount = 1357.00m
+                    };
+                    orderAiOvercost.Details.Add(new PurchaseOrderDetail
+                    {
+                        IdProduct = p1.IdProduct,
+                        Quantity = 40,
+                        ReceivedQuantity = 0,
+                        UnitPrice = Math.Round(p1.SuggestedPrice * 1.28m, 2),
+                        Subtotal = Math.Round(40 * (p1.SuggestedPrice * 1.28m), 2),
+                        TaxPercentage = 15.00m,
+                        TaxAmount = Math.Round(Math.Round(40 * (p1.SuggestedPrice * 1.28m), 2) * 0.15m, 2),
+                        Total = Math.Round(Math.Round(40 * (p1.SuggestedPrice * 1.28m), 2) * 1.15m, 2),
+                        Notes = "Alerta: Precio cotizado con incremento de distribuidor"
+                    });
+                    orderAiOvercost.Details.Add(new PurchaseOrderDetail
+                    {
+                        IdProduct = p2.IdProduct,
+                        Quantity = 35,
+                        ReceivedQuantity = 0,
+                        UnitPrice = p2.SuggestedPrice,
+                        Subtotal = Math.Round(35 * p2.SuggestedPrice, 2),
+                        TaxPercentage = 15.00m,
+                        TaxAmount = Math.Round(Math.Round(35 * p2.SuggestedPrice, 2) * 0.15m, 2),
+                        Total = Math.Round(Math.Round(35 * p2.SuggestedPrice, 2) * 1.15m, 2),
+                        Notes = "Precio normal de catálogo"
+                    });
+
+                    // Escenario B: Sobrecompra Inusual (Cantidad 5 veces mayor a la rotación)
+                    var orderAiOverstock = new PurchaseOrder
+                    {
+                        OrderNumber = "OC-2026-0005-IA",
+                        OrderDate = DateTime.Now.AddHours(-1),
+                        IdSupplier = supplier2?.IdSupplier ?? supplier1.IdSupplier,
+                        IdDestinationWarehouse = matrizWarehouse.IdWarehouse,
+                        IdUser = adminUser.IdUser,
+                        IdPurchaseOrderType = 2, // Reposición Periódica CEDI
+                        IdPurchaseOrderStatus = 2, // PENDIENTE_APROBACION_FINANCIERA
+                        ExpectedDeliveryDate = DateTime.Now.AddDays(4),
+                        Observation = "Adquisición por volumen mayor al consumo proyectado de la clínica.",
+                        Subtotal = 2100.00m,
+                        TaxAmount = 315.00m,
+                        TotalAmount = 2415.00m
+                    };
+                    orderAiOverstock.Details.Add(new PurchaseOrderDetail
+                    {
+                        IdProduct = p3.IdProduct,
+                        Quantity = 180,
+                        ReceivedQuantity = 0,
+                        UnitPrice = p3.SuggestedPrice,
+                        Subtotal = Math.Round(180 * p3.SuggestedPrice, 2),
+                        TaxPercentage = 15.00m,
+                        TaxAmount = Math.Round(Math.Round(180 * p3.SuggestedPrice, 2) * 0.15m, 2),
+                        Total = Math.Round(Math.Round(180 * p3.SuggestedPrice, 2) * 1.15m, 2),
+                        Notes = "Volumen alto solicitado para CEDI Carapungo"
+                    });
+
+                    db.PurchaseOrders.AddRange(orderAiOvercost, orderAiOverstock);
+                    await db.SaveChangesAsync();
+                }
+            }
+        }
+
         // 8. Semilla Completa de Requisiciones Internas (Sucursales -> Matriz Carapungo)
         if (!await db.InternalRequisitions.AnyAsync() && matrizWarehouse != null && branch1 != null && activeProducts.Count >= 6)
         {

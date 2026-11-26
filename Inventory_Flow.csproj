@@ -1,10 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Copyright>© 2026 Universidad Central del Ecuador</Copyright>
+    <UserSecretsId>e9a1d6bd-0f95-48a0-9310-9d5ea0a8d89a</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
