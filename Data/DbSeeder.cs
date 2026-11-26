@@ -437,6 +437,117 @@ public static class DbSeeder
             }
         }
 
+        // 6.1 Sincronización y Semilla Integral para todos los productos del catálogo
+        if (matrizWarehouse != null && activeProducts.Count > 0)
+        {
+            var existingProductIdsInMatriz = await db.Lots
+                .Where(l => l.IdWarehouse == matrizWarehouse.IdWarehouse && l.IsActive && l.Quantity > 0)
+                .Select(l => l.IdProduct)
+                .Distinct()
+                .ToListAsync();
+
+            var productsWithoutLots = activeProducts
+                .Where(p => !existingProductIdsInMatriz.Contains(p.IdProduct))
+                .ToList();
+
+            if (productsWithoutLots.Count > 0)
+            {
+                // Dejamos exactamente los últimos 2 o 3 productos intencionalmente AGOTADOS (sin stock)
+                // para simular casos reales de quiebre de stock para la tesis (alertas n8n y órdenes de compra)
+                int depletedToKeep = Math.Min(3, productsWithoutLots.Count);
+                var productsToSeed = productsWithoutLots.Take(productsWithoutLots.Count - depletedToKeep).ToList();
+
+                var newLots = new List<Lot>();
+                int seedIndex = 1;
+
+                foreach (var prod in productsToSeed)
+                {
+                    string prefix = (seedIndex % 3 == 0) ? "LOT-VET" : ((seedIndex % 3 == 1) ? "LOT-MED" : "LOT-CEDI");
+
+                    // 2 productos con bajo stock intencional (2-3 unidades) para pruebas de umbral
+                    if (seedIndex <= 2)
+                    {
+                        newLots.Add(new Lot
+                        {
+                            IdProduct = prod.IdProduct,
+                            IdWarehouse = matrizWarehouse.IdWarehouse,
+                            LotNumber = $"{prefix}-2026-{seedIndex:D3}",
+                            Quantity = 3,
+                            ExpirationDate = DateTime.Today.AddMonths(14),
+                            CreationDate = DateTime.Now.AddDays(-10),
+                            IsActive = true
+                        });
+                    }
+                    else if (seedIndex == 3)
+                    {
+                        // 1 producto con alerta próxima a vencer (20 días)
+                        newLots.Add(new Lot
+                        {
+                            IdProduct = prod.IdProduct,
+                            IdWarehouse = matrizWarehouse.IdWarehouse,
+                            LotNumber = $"{prefix}-ALERTA-{seedIndex:D3}",
+                            Quantity = 25,
+                            ExpirationDate = DateTime.Today.AddDays(20),
+                            CreationDate = DateTime.Now.AddDays(-20),
+                            IsActive = true
+                        });
+                    }
+                    else
+                    {
+                        // Stock óptimo y saludable en Matriz Carapungo (35 a 95 unidades)
+                        int qty = 35 + ((seedIndex * 7) % 55);
+                        newLots.Add(new Lot
+                        {
+                            IdProduct = prod.IdProduct,
+                            IdWarehouse = matrizWarehouse.IdWarehouse,
+                            LotNumber = $"{prefix}-2026-{seedIndex:D3}",
+                            Quantity = qty,
+                            ExpirationDate = DateTime.Today.AddMonths(8 + (seedIndex % 18)),
+                            CreationDate = DateTime.Now.AddDays(-15),
+                            IsActive = true
+                        });
+                    }
+
+                    // Sembrar stock proporcional en sucursales periféricas
+                    if (branch1 != null && branch1.IdWarehouse != matrizWarehouse.IdWarehouse && seedIndex % 2 == 0)
+                    {
+                        newLots.Add(new Lot
+                        {
+                            IdProduct = prod.IdProduct,
+                            IdWarehouse = branch1.IdWarehouse,
+                            LotNumber = $"LOT-SUC1-{seedIndex:D3}",
+                            Quantity = 10 + (seedIndex % 15),
+                            ExpirationDate = DateTime.Today.AddMonths(12 + (seedIndex % 12)),
+                            CreationDate = DateTime.Now.AddDays(-10),
+                            IsActive = true
+                        });
+                    }
+
+                    if (branch2 != null && branch2.IdWarehouse != matrizWarehouse.IdWarehouse && branch2.IdWarehouse != branch1?.IdWarehouse && seedIndex % 3 == 0)
+                    {
+                        newLots.Add(new Lot
+                        {
+                            IdProduct = prod.IdProduct,
+                            IdWarehouse = branch2.IdWarehouse,
+                            LotNumber = $"LOT-SUC2-{seedIndex:D3}",
+                            Quantity = 8 + (seedIndex % 12),
+                            ExpirationDate = DateTime.Today.AddMonths(14 + (seedIndex % 10)),
+                            CreationDate = DateTime.Now.AddDays(-8),
+                            IsActive = true
+                        });
+                    }
+
+                    seedIndex++;
+                }
+
+                if (newLots.Count > 0)
+                {
+                    db.Lots.AddRange(newLots);
+                    await db.SaveChangesAsync();
+                }
+            }
+        }
+
         // 7. Semilla de Órdenes de Compra Demostrativas
         if (!await db.PurchaseOrders.AnyAsync())
         {

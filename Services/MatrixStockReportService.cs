@@ -224,9 +224,9 @@ public class MatrixStockReportService : IMatrixStockReportService
             }
         }
 
-        // 5. Ordenar: Agotados primero, luego vencidos, luego próximos a vencer, luego bajo stock, luego vigentes
+        // 5. Ordenar: Vencidos primero, luego próximos a vencer, luego bajo stock, luego vigentes, y al final agotados
         var sortedList = itemList
-            .OrderBy(i => i.Status == "AGOTADO" ? 0 : (i.Status == "VENCIDO" ? 1 : (i.Status == "PRÓXIMO A VENCER" ? 2 : (i.Status == "BAJO STOCK" ? 3 : 4))))
+            .OrderBy(i => i.Status == "VENCIDO" ? 0 : (i.Status == "PRÓXIMO A VENCER" ? 1 : (i.Status == "BAJO STOCK" ? 2 : (i.Status == "VIGENTE" ? 3 : 4))))
             .ThenBy(i => i.Quantity)
             .ThenBy(i => i.ProductName)
             .ToList();
@@ -252,14 +252,14 @@ public class MatrixStockReportService : IMatrixStockReportService
             ExpirationAlertDays = alertDays,
 
             TotalProductsCount = sortedList.Select(i => i.ProductCode).Distinct().Count(),
-            TotalLotsCount = sortedList.Count,
+            TotalLotsCount = sortedList.Count(i => i.Quantity > 0),
             TotalUnitsCount = sortedList.Sum(i => i.Quantity),
             TotalValuedAmount = Math.Round(sortedList.Sum(i => i.TotalValue), 2),
 
             ExpiringSoonLotsCount = sortedList.Count(i => i.Status == "PRÓXIMO A VENCER"),
             ExpiredLotsCount = sortedList.Count(i => i.Status == "VENCIDO"),
             ValidLotsCount = sortedList.Count(i => i.Status == "VIGENTE"),
-            LowStockProductsCount = sortedList.Count(i => i.Quantity <= thresholdValue),
+            LowStockProductsCount = sortedList.Count(i => i.Status == "BAJO STOCK"),
             ActiveThreshold = thresholdValue,
 
             GeneratedBy = generatedBy
