@@ -448,3 +448,133 @@
 @media (max-width: 600px) {
     .grid-2, .grid-4 { grid-template-columns: 1fr; }
 }
+
+/* Pestañas de Navegación IA */
+.ai-tabs-container {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 0.25rem;
+}
+
+.ai-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.65rem 1.15rem;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: #64748b;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 6px 6px 0 0;
+}
+
+.ai-tab-btn:hover {
+    color: #0284c7;
+    background: #f8fafc;
+}
+
+.ai-tab-btn.active {
+    color: #0284c7;
+    border-bottom-color: #0284c7;
+    background: #f0f9ff;
+}
+
+.ai-tab-badge {
+    padding: 0.2rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border-radius: 12px;
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.sparkle-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #e0f2fe;
+    color: #0284c7;
+    border-radius: 8px;
+    font-size: 0.95rem;
+}
+
+/* Banners de Veredicto IA */
+.ai-verdict-banner {
+    padding: 1.25rem 1.5rem;
+    color: #ffffff;
+}
+
+.banner-risk-high {
+    background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+}
+
+.banner-risk-med {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.banner-risk-low {
+    background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+}
+
+.verdict-icon-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    font-size: 1.6rem;
+}
+
+.verdict-subtext {
+    font-size: 0.82rem;
+    opacity: 0.92;
+    display: block;
+    margin-top: 0.2rem;
+}
+
+.ai-badge-pill {
+    padding: 0.25rem 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Micro Cards de Métricas */
+.kpi-micro-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.75rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.micro-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+}
+
+.micro-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.micro-hint {
+    font-size: 0.74rem;
+    color: #94a3b8;
+}
