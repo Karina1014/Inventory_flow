@@ -12,7 +12,7 @@
     </NavLink>
 
     <!-- 2. INVENTARIO (Sección desplegable controlada por estado booleano en C#) -->
-    @if (HasCategoryAccess("/inventario", "/requisitions", "/purchase-orders", "/lots", "/movements"))
+    @if (HasCategoryAccess("/inventario", "/products", "/categories", "/requisitions", "/purchase-orders", "/lots", "/movements"))
     {
         <div class="nav-group">
             <button type="button" class="nav-item-link nav-group-toggle" @onclick="ToggleInventory">
@@ -31,6 +31,20 @@
                         <NavLink class="submenu-link" href="inventario" Match="NavLinkMatch.Prefix">
                             <i class="bi bi-box-seam"></i>
                             <span>Control de Inventario</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/products"))
+                    {
+                        <NavLink class="submenu-link" href="products" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-capsule"></i>
+                            <span>Productos</span>
+                        </NavLink>
+                    }
+                    @if (HasAccess("/categories"))
+                    {
+                        <NavLink class="submenu-link" href="categories" Match="NavLinkMatch.Prefix">
+                            <i class="bi bi-tags"></i>
+                            <span>Categorías</span>
                         </NavLink>
                     }
                     @if (HasAccess("/requisitions"))
@@ -67,7 +81,7 @@
     }
 
     <!-- 3. ADMINISTRACIÓN (Sección desplegable para catálogos y configuración maestra) -->
-    @if (HasCategoryAccess("/products", "/categories", "/thresholds", "/movementtypes", "/warehouses", "/suppliers", "/users", "/roles"))
+    @if (HasCategoryAccess("/thresholds", "/movementtypes", "/warehouses", "/suppliers", "/users", "/roles"))
     {
         <div class="nav-group">
             <button type="button" class="nav-item-link nav-group-toggle" @onclick="ToggleAdmin">
@@ -81,20 +95,6 @@
             @if (isAdminOpen)
             {
                 <div class="submenu">
-                    @if (HasAccess("/products"))
-                    {
-                        <NavLink class="submenu-link" href="products" Match="NavLinkMatch.Prefix">
-                            <i class="bi bi-capsule"></i>
-                            <span>Productos</span>
-                        </NavLink>
-                    }
-                    @if (HasAccess("/categories"))
-                    {
-                        <NavLink class="submenu-link" href="categories" Match="NavLinkMatch.Prefix">
-                            <i class="bi bi-tags"></i>
-                            <span>Categorías</span>
-                        </NavLink>
-                    }
                     @if (HasAccess("/thresholds"))
                     {
                         <NavLink class="submenu-link" href="thresholds" Match="NavLinkMatch.Prefix">
