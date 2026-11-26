@@ -13,6 +13,25 @@
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
 
+@if (!IsAdminUser)
+{
+    <div class="page-container d-flex justify-content-center align-items-center" style="min-height: 60vh;">
+        <div class="text-center p-4 bg-white rounded shadow-sm border" style="max-width: 480px;">
+            <div class="mb-3 text-warning" style="font-size: 3rem;">
+                <i class="bi bi-shield-lock-fill"></i>
+            </div>
+            <h4 class="fw-bold text-dark">Acceso Restringido</h4>
+            <p class="text-muted small mb-4">
+                El módulo de Órdenes de Compra y Aprobación Financiera es exclusivo para el perfil de Administrador.
+            </p>
+            <button class="btn btn-brand-primary" @onclick='() => NavigationManager.NavigateTo("dashboard")'>
+                <i class="bi bi-arrow-left me-1"></i> Regresar al Dashboard
+            </button>
+        </div>
+    </div>
+}
+else
+{
 <div class="page-container">
     <!-- Migas de Pan (Breadcrumb) -->
     <nav aria-label="breadcrumb" class="mb-3">
@@ -948,8 +967,14 @@
         </div>
     </div>
 }
+}
 
 @code {
+    private bool IsAdminUser => CurrentUserService.IsAdmin
+        || string.Equals(CurrentUserService.Role, "Administrador", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(CurrentUserService.Role, "Admin", StringComparison.OrdinalIgnoreCase)
+        || (CurrentUserService.Role?.Contains("Admin", StringComparison.OrdinalIgnoreCase) == true);
+
     private const string TabOrders = "orders";
     private const string TabFinancial = "financial";
 
@@ -1023,6 +1048,13 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (!IsAdminUser)
+        {
+            ToastService.Warning("El módulo de Órdenes de Compra es exclusivo para Administradores.", "Acceso Restringido");
+            NavigationManager.NavigateTo("dashboard");
+            return;
+        }
+
         try
         {
             await LoadCatalogsAsync();

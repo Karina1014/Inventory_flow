@@ -54,7 +54,7 @@
                             <span>Requisiciones</span>
                         </NavLink>
                     }
-                    @if (HasAccess("/purchase-orders"))
+                    @if (IsAdminUser() && HasAccess("/purchase-orders"))
                     {
                         <NavLink class="submenu-link" href="purchase-orders" Match="NavLinkMatch.Prefix">
                             <i class="bi bi-cart-check"></i>
@@ -244,22 +244,33 @@
         }
     }
 
+    private bool IsAdminUser()
+    {
+        return CurrentUserService.IsAdmin
+            || string.Equals(CurrentUserService.Role, "Administrador", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(CurrentUserService.Role, "Admin", StringComparison.OrdinalIgnoreCase)
+            || (CurrentUserService.Role?.Contains("Admin", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
     private bool HasAccess(string url)
     {
-        // 1. Administrador siempre tiene acceso total a todos los módulos
-        if (string.Equals(CurrentUserService.Role, "Administrador", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(CurrentUserService.Role, "Admin", StringComparison.OrdinalIgnoreCase)
-            || (CurrentUserService.Role?.Contains("Admin", StringComparison.OrdinalIgnoreCase) == true))
+        var cleanTarget = url.TrimStart('/');
+
+        // 1. Órdenes de Compra es exclusivo para Administradores
+        if (string.Equals(cleanTarget, "purchase-orders", StringComparison.OrdinalIgnoreCase))
+        {
+            return IsAdminUser();
+        }
+
+        // 2. Administrador siempre tiene acceso total a todos los módulos
+        if (IsAdminUser())
         {
             return true;
         }
 
-        var cleanTarget = url.TrimStart('/');
-
-        // 2. Módulos recién integrados visibles por defecto
+        // 3. Módulos recién integrados visibles por defecto
         if (string.Equals(cleanTarget, "suppliers", StringComparison.OrdinalIgnoreCase)
             || string.Equals(cleanTarget, "requisitions", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(cleanTarget, "purchase-orders", StringComparison.OrdinalIgnoreCase)
             || string.Equals(cleanTarget, "inventario", StringComparison.OrdinalIgnoreCase)
             || string.Equals(cleanTarget, "dashboard", StringComparison.OrdinalIgnoreCase)
             || string.Equals(cleanTarget, "n8n-notifications", StringComparison.OrdinalIgnoreCase)
@@ -268,7 +279,7 @@
             return true;
         }
 
-        // 3. Validación de permisos por menú en BD
+        // 4. Validación de permisos por menú en BD
         if (userMenus == null || userMenus.Count == 0)
         {
             return true;
@@ -279,9 +290,7 @@
 
     private bool HasCategoryAccess(params string[] urls)
     {
-        if (string.Equals(CurrentUserService.Role, "Administrador", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(CurrentUserService.Role, "Admin", StringComparison.OrdinalIgnoreCase)
-            || (CurrentUserService.Role?.Contains("Admin", StringComparison.OrdinalIgnoreCase) == true))
+        if (IsAdminUser())
         {
             return true;
         }

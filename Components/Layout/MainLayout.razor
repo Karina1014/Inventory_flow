@@ -241,6 +241,14 @@
         }
     }
 
+    private bool IsAdminUser()
+    {
+        return CurrentUserService.IsAdmin
+            || string.Equals(CurrentUserService.Role, "Administrador", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(CurrentUserService.Role, "Admin", StringComparison.OrdinalIgnoreCase)
+            || (CurrentUserService.Role?.Contains("Admin", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
     private void ValidateRouteAccess()
     {
         if (!CurrentUserService.IsAuthenticated)
@@ -249,20 +257,25 @@
         }
 
         // 1. Administrador siempre tiene acceso total a todos los módulos
-        if (string.Equals(CurrentUserService.Role, "Administrador", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(CurrentUserService.Role, "Admin", StringComparison.OrdinalIgnoreCase)
-            || (CurrentUserService.Role?.Contains("Admin", StringComparison.OrdinalIgnoreCase) == true))
+        if (IsAdminUser())
         {
             return;
         }
 
         var relativePath = "/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('?')[0].Trim('/');
+
+        // 2. Órdenes de Compra es exclusivo para Administradores
+        if (string.Equals(relativePath, "/purchase-orders", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigationManager.NavigateTo("dashboard");
+            return;
+        }
+
         if (string.Equals(relativePath, "/dashboard", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/profile", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/login", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/inventario", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/requisitions", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(relativePath, "/purchase-orders", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/suppliers", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/n8n-notifications", StringComparison.OrdinalIgnoreCase)
             || string.Equals(relativePath, "/", StringComparison.OrdinalIgnoreCase))

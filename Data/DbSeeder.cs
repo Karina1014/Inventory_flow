@@ -87,19 +87,18 @@ public static class DbSeeder
             await EnsureMenuAsync("Kardex", "Reportes", "/kardex", "bi bi-journal-text", 17, adminRole.IdRole);
         }
 
-        // Menús para BODEGUERO PRINCIPAL (Gestión de CEDI Carapungo y compras)
+        // Menús para BODEGUERO PRINCIPAL (Gestión de CEDI Carapungo y despachos)
         if (bodegueroPrincipalRole != null)
         {
             await EnsureMenuAsync("Dashboard", "", "/dashboard", "bi bi-grid-fill", 1, bodegueroPrincipalRole.IdRole);
             await EnsureMenuAsync("Control de Inventario", "Operaciones", "/inventario", "bi bi-box-seam", 2, bodegueroPrincipalRole.IdRole);
             await EnsureMenuAsync("Requisiciones", "Operaciones", "/requisitions", "bi bi-send-check", 3, bodegueroPrincipalRole.IdRole);
-            await EnsureMenuAsync("Órdenes de Compra", "Operaciones", "/purchase-orders", "bi bi-cart-check", 4, bodegueroPrincipalRole.IdRole);
-            await EnsureMenuAsync("Lotes", "Operaciones", "/lots", "bi bi-boxes", 5, bodegueroPrincipalRole.IdRole);
-            await EnsureMenuAsync("Movimientos", "Operaciones", "/movements", "bi bi-arrow-left-right", 6, bodegueroPrincipalRole.IdRole);
-            await EnsureMenuAsync("Productos", "Catálogos", "/products", "bi bi-box-seam", 7, bodegueroPrincipalRole.IdRole);
-            await EnsureMenuAsync("Proveedores", "Catálogos", "/suppliers", "bi bi-truck", 8, bodegueroPrincipalRole.IdRole);
-            await EnsureMenuAsync("Reporte de stock", "Reportes", "/stockreport", "bi bi-clipboard-data", 9, bodegueroPrincipalRole.IdRole);
-            await EnsureMenuAsync("Kardex", "Reportes", "/kardex", "bi bi-journal-text", 10, bodegueroPrincipalRole.IdRole);
+            await EnsureMenuAsync("Lotes", "Operaciones", "/lots", "bi bi-boxes", 4, bodegueroPrincipalRole.IdRole);
+            await EnsureMenuAsync("Movimientos", "Operaciones", "/movements", "bi bi-arrow-left-right", 5, bodegueroPrincipalRole.IdRole);
+            await EnsureMenuAsync("Productos", "Catálogos", "/products", "bi bi-box-seam", 6, bodegueroPrincipalRole.IdRole);
+            await EnsureMenuAsync("Proveedores", "Catálogos", "/suppliers", "bi bi-truck", 7, bodegueroPrincipalRole.IdRole);
+            await EnsureMenuAsync("Reporte de stock", "Reportes", "/stockreport", "bi bi-clipboard-data", 8, bodegueroPrincipalRole.IdRole);
+            await EnsureMenuAsync("Kardex", "Reportes", "/kardex", "bi bi-journal-text", 9, bodegueroPrincipalRole.IdRole);
         }
 
         // Menús para BODEGUERO SUCURSAL
@@ -113,14 +112,26 @@ public static class DbSeeder
             await EnsureMenuAsync("Reporte de stock", "Reportes", "/stockreport", "bi bi-clipboard-data", 6, bodegueroRole.IdRole);
         }
 
-        // Menús para FINANCIERO (Aprobación de compras y auditoría de Kardex)
+        // Menús para FINANCIERO (Auditoría de Kardex y Reportes)
         if (financieroRole != null)
         {
             await EnsureMenuAsync("Dashboard", "", "/dashboard", "bi bi-grid-fill", 1, financieroRole.IdRole);
-            await EnsureMenuAsync("Aprobación de Compras", "Finanzas", "/purchase-orders", "bi bi-cash-coin", 2, financieroRole.IdRole);
-            await EnsureMenuAsync("Kardex", "Finanzas", "/kardex", "bi bi-journal-text", 3, financieroRole.IdRole);
-            await EnsureMenuAsync("Reporte de stock", "Reportes", "/stockreport", "bi bi-clipboard-data", 4, financieroRole.IdRole);
-            await EnsureMenuAsync("Análisis IA", "Reportes", "/analytics", "bi bi-stars", 5, financieroRole.IdRole);
+            await EnsureMenuAsync("Kardex", "Finanzas", "/kardex", "bi bi-journal-text", 2, financieroRole.IdRole);
+            await EnsureMenuAsync("Reporte de stock", "Reportes", "/stockreport", "bi bi-clipboard-data", 3, financieroRole.IdRole);
+            await EnsureMenuAsync("Análisis IA", "Reportes", "/analytics", "bi bi-stars", 4, financieroRole.IdRole);
+        }
+
+        // Asegurar que Órdenes de Compra pertenezca ÚNICAMENTE al rol Administrador en la BD
+        if (adminRole != null)
+        {
+            var nonAdminOrderMenus = await db.Menus
+                .Where(m => m.Url.Contains("purchase-orders") && m.IdRole != adminRole.IdRole)
+                .ToListAsync();
+
+            if (nonAdminOrderMenus.Any())
+            {
+                db.Menus.RemoveRange(nonAdminOrderMenus);
+            }
         }
 
         await db.SaveChangesAsync();

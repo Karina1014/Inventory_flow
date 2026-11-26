@@ -40,13 +40,16 @@
                         <span class="banner-counter">@metrics.PendingRequisitionsCount</span>
                     }
                 </button>
-                <button class="btn-banner btn-banner-ghost" @onclick='() => NavigationManager.NavigateTo("purchase-orders")'>
-                    <i class="bi bi-cart-check"></i> Órdenes de Compra
-                    @if (metrics.PendingPurchaseOrdersCount > 0)
-                    {
-                        <span class="banner-counter banner-counter-amber">@metrics.PendingPurchaseOrdersCount</span>
-                    }
-                </button>
+                @if (IsAdminUser)
+                {
+                    <button class="btn-banner btn-banner-ghost" @onclick='() => NavigationManager.NavigateTo("purchase-orders")'>
+                        <i class="bi bi-cart-check"></i> Órdenes de Compra
+                        @if (metrics.PendingPurchaseOrdersCount > 0)
+                        {
+                            <span class="banner-counter banner-counter-amber">@metrics.PendingPurchaseOrdersCount</span>
+                        }
+                    </button>
+                }
                 <button class="btn-banner btn-banner-ghost" @onclick='() => NavigationManager.NavigateTo("movements")'>
                     <i class="bi bi-arrow-left-right"></i> Movimientos
                 </button>
@@ -592,6 +595,11 @@
             isLoading = false;
         }
     }
+
+    private bool IsAdminUser => CurrentUserService.IsAdmin
+        || string.Equals(CurrentUserService.Role, "Administrador", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(CurrentUserService.Role, "Admin", StringComparison.OrdinalIgnoreCase)
+        || (CurrentUserService.Role?.Contains("Admin", StringComparison.OrdinalIgnoreCase) == true);
 
     private async Task SeedDemoDataAsync()
     {
