@@ -253,8 +253,13 @@
                 <label class="form-label">Modo <span class="required">*</span></label>
                 <div class="input-box">
                     <i class="bi bi-arrow-left-right input-icon"></i>
-                    <input class="form-input" type="text" placeholder="Ej: Entrada, Salida, Ajuste"
-                           @bind="formMode" @bind:event="oninput" />
+                    <select class="form-input" @bind="formMode">
+                        <option value="">Seleccione el modo...</option>
+                        @foreach (var mode in availableModes)
+                        {
+                            <option value="@mode">@mode</option>
+                        }
+                    </select>
                 </div>
                 @if (showValidation && string.IsNullOrWhiteSpace(formMode))
                 {
@@ -353,16 +358,21 @@
         try
         {
             var all = MovementRepo.GetMovementTypes();
-            availableModes = all
-                .Select(m => m.Mode?.Trim())
-                .Where(m => !string.IsNullOrWhiteSpace(m))
+            var distinctDbModes = all
+                .Where(m => !string.IsNullOrWhiteSpace(m.Mode))
+                .Select(m => m.Mode.Trim())
                 .Distinct()
                 .OrderBy(m => m)
-                .ToList()!;
+                .ToList();
+
+            // Modos consultados directamente desde la base de datos
+            availableModes = distinctDbModes.Count > 0 
+                ? distinctDbModes 
+                : new List<string> { "Ingreso", "Egreso", "Traslado" };
         }
         catch
         {
-            availableModes = new List<string> { "Entrada", "Salida", "Ajuste" };
+            availableModes = new List<string> { "Ingreso", "Egreso", "Traslado" };
         }
 
         await LoadMovementTypesAsync();
@@ -509,18 +519,18 @@
     private string GetModeBadgeClass(string? mode)
     {
         var m = mode?.Trim().ToLowerInvariant() ?? string.Empty;
-        if (m.Contains("entrada") || m.Contains("ingreso")) return "badge-entrada";
-        if (m.Contains("salida") || m.Contains("egreso")) return "badge-salida";
-        if (m.Contains("ajuste")) return "badge-ajuste";
+        if (m == "ingreso" || m == "entrada" || m == "e") return "badge-entrada";
+        if (m == "egreso" || m == "salida" || m == "s") return "badge-salida";
+        if (m == "traslado" || m == "transferencia" || m == "t") return "badge-traslado";
         return "badge-default";
     }
 
     private string GetModeIconClass(string? mode)
     {
         var m = mode?.Trim().ToLowerInvariant() ?? string.Empty;
-        if (m.Contains("entrada") || m.Contains("ingreso")) return "bi bi-arrow-down-left";
-        if (m.Contains("salida") || m.Contains("egreso")) return "bi bi-arrow-up-right";
-        if (m.Contains("ajuste")) return "bi bi-arrow-repeat";
+        if (m == "ingreso" || m == "entrada" || m == "e") return "bi bi-arrow-down-left";
+        if (m == "egreso" || m == "salida" || m == "s") return "bi bi-arrow-up-right";
+        if (m == "traslado" || m == "transferencia" || m == "t") return "bi bi-arrow-left-right";
         return "bi bi-arrow-left-right";
     }
 

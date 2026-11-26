@@ -211,19 +211,61 @@ public static class DbSeeder
             await db.SaveChangesAsync();
         }
 
-        // 4.3 Semilla de Tipos de Movimiento si no existen
-        if (!await db.MovementTypes.AnyAsync())
+        // 4.3 Sincronización oficial de los 3 Tipos de Movimiento: Ingreso, Egreso y Traslado
+        var currentMovementTypes = await db.MovementTypes.ToListAsync();
+
+        // 1. Ingreso
+        var ingresoType = currentMovementTypes.FirstOrDefault(m => 
+            m.Mode.Equals("Ingreso", StringComparison.OrdinalIgnoreCase) || 
+            m.Mode.Equals("E", StringComparison.OrdinalIgnoreCase) || 
+            m.Code == "ING" || m.Code == "01");
+
+        if (ingresoType == null)
         {
-            db.MovementTypes.AddRange(new[]
-            {
-                new MovementType { Code = "01", Mode = "E", Description = "Entrada por compra a proveedor" },
-                new MovementType { Code = "02", Mode = "S", Description = "Salida por venta clínica o farmacia" },
-                new MovementType { Code = "03", Mode = "T", Description = "Transferencia entre sucursales" },
-                new MovementType { Code = "04", Mode = "A", Description = "Ajuste manual de inventario" },
-                new MovementType { Code = "20", Mode = "T", Description = "Traslado CEDI Carapungo a Sucursal" }
-            });
-            await db.SaveChangesAsync();
+            ingresoType = new MovementType { Code = "01", Mode = "Ingreso", Description = "Ingreso de mercadería / inventario" };
+            db.MovementTypes.Add(ingresoType);
         }
+        else
+        {
+            ingresoType.Mode = "Ingreso";
+            ingresoType.Description = "Ingreso de mercadería / inventario";
+        }
+
+        // 2. Egreso
+        var egresoType = currentMovementTypes.FirstOrDefault(m => 
+            m.Mode.Equals("Egreso", StringComparison.OrdinalIgnoreCase) || 
+            m.Mode.Equals("S", StringComparison.OrdinalIgnoreCase) || 
+            m.Code == "EGR" || m.Code == "02");
+
+        if (egresoType == null)
+        {
+            egresoType = new MovementType { Code = "02", Mode = "Egreso", Description = "Egreso por venta o consumo" };
+            db.MovementTypes.Add(egresoType);
+        }
+        else
+        {
+            egresoType.Mode = "Egreso";
+            egresoType.Description = "Egreso por venta o consumo";
+        }
+
+        // 3. Traslado
+        var trasladoType = currentMovementTypes.FirstOrDefault(m => 
+            m.Mode.Equals("Traslado", StringComparison.OrdinalIgnoreCase) || 
+            m.Mode.Equals("T", StringComparison.OrdinalIgnoreCase) || 
+            m.Code == "TRA" || m.Code == "03");
+
+        if (trasladoType == null)
+        {
+            trasladoType = new MovementType { Code = "03", Mode = "Traslado", Description = "Traslado entre sucursales" };
+            db.MovementTypes.Add(trasladoType);
+        }
+        else
+        {
+            trasladoType.Mode = "Traslado";
+            trasladoType.Description = "Traslado entre sucursales";
+        }
+
+        await db.SaveChangesAsync();
 
         // 4.4 Semilla de Productos Farmacéuticos Veterinarios si no existen
         if (!await db.Products.AnyAsync())
@@ -675,119 +717,189 @@ public static class DbSeeder
             await db.SaveChangesAsync();
         }
 
-        // 9. Semilla de Movimientos Históricos por Mensualidad (Últimos 6 meses) para Gráfica y Top Productos Más Vendidos
-        if (await db.InventoryMovements.CountAsync() < 10 && matrizWarehouse != null && activeProducts.Count >= 8)
+        // 9. Semilla de Movimientos de Inventario (Ingreso, Egreso, Traslado)
+        if (!await db.InventoryMovements.AnyAsync() && matrizWarehouse != null)
         {
-            var entryType = await db.MovementTypes.FirstOrDefaultAsync(m => m.Code == "01" || m.Mode == "E");
-            var saleType = await db.MovementTypes.FirstOrDefaultAsync(m => m.Code == "02" || m.Mode == "S");
-            var sampleLot = await db.Lots.FirstOrDefaultAsync(l => l.IsActive) ?? await db.Lots.FirstOrDefaultAsync();
+            var destBranch1 = branch1 ?? matrizWarehouse;
+            var destBranch2 = branch2 ?? destBranch1;
 
-            if (entryType != null && saleType != null && sampleLot != null)
+            var entryType = await db.MovementTypes.FirstOrDefaultAsync(m => m.Mode == "Ingreso" || m.Code == "01" || m.Code == "ING" || m.Mode == "E")
+                ?? await db.MovementTypes.FirstOrDefaultAsync();
+
+            var saleType = await db.MovementTypes.FirstOrDefaultAsync(m => m.Mode == "Egreso" || m.Code == "02" || m.Code == "EGR" || m.Mode == "S")
+                ?? entryType;
+
+            var transferType = await db.MovementTypes.FirstOrDefaultAsync(m => m.Mode == "Traslado" || m.Code == "03" || m.Code == "TRA" || m.Mode == "T")
+                ?? entryType;
+
+            var prods = await db.Products.Where(p => p.IsActive).Take(10).ToListAsync();
+            var lots = await db.Lots.Where(l => l.IsActive && l.Quantity > 0).ToListAsync();
+
+            if (entryType != null && saleType != null && transferType != null && prods.Count >= 2)
             {
-                int[] monthlyEntryBase = { 95, 120, 110, 145, 160, 185 };
-                int[] monthlySaleBase = { 72, 98, 105, 128, 142, 168 };
+                var movsToSeed = new List<InventoryMovement>();
 
-                for (int mOffset = 5; mOffset >= 0; mOffset--)
+                // 1. Ingreso por compra a proveedor (CEDI Carapungo)
+                var mov1 = new InventoryMovement
                 {
-                    var monthDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 10).AddMonths(-mOffset);
-                    if (monthDate > DateTime.Now) monthDate = DateTime.Now.AddHours(-2);
-
-                    int idx = 5 - mOffset;
-
-                    // Movimiento de Entrada Mensual (Abastecimiento CEDI)
-                    var entryMov = new InventoryMovement
+                    MovementDate = DateTime.Now.AddDays(-15),
+                    IdMovementType = entryType.IdMovementType,
+                    IdDestinationWarehouse = matrizWarehouse.IdWarehouse,
+                    IdOriginWarehouse = null,
+                    IdUser = adminUser.IdUser,
+                    Observation = "Ingreso de fármacos y biológicos por compra formal a proveedor Zoetis",
+                    ReferenceSource = "ORDEN_COMPRA",
+                    ReferenceId = 101
+                };
+                mov1.Details.Add(new InventoryMovementDetail
+                {
+                    IdProduct = prods[0].IdProduct,
+                    IdLot = lots.FirstOrDefault(l => l.IdProduct == prods[0].IdProduct)?.IdLot ?? lots.FirstOrDefault()?.IdLot,
+                    Quantity = 40,
+                    UnitCost = prods[0].SuggestedPrice
+                });
+                if (prods.Count > 1)
+                {
+                    mov1.Details.Add(new InventoryMovementDetail
                     {
-                        MovementDate = monthDate.AddDays(-3),
-                        IdMovementType = entryType.IdMovementType,
-                        IdDestinationWarehouse = matrizWarehouse.IdWarehouse,
-                        IdUser = adminUser.IdUser,
-                        Observation = $"Ingreso mensual de lote farmacéutico en CEDI Carapungo ({monthDate:MMMM yyyy})",
-                        ReferenceSource = "ORDEN_COMPRA"
-                    };
-
-                    var pA = activeProducts[idx % 6 + 1];
-                    var pB = activeProducts[(idx + 2) % 6 + 1];
-
-                    entryMov.Details.Add(new InventoryMovementDetail
-                    {
-                        IdProduct = pA.IdProduct,
-                        IdLot = sampleLot.IdLot,
-                        Quantity = monthlyEntryBase[idx] / 2,
-                        UnitCost = pA.SuggestedPrice
+                        IdProduct = prods[1].IdProduct,
+                        IdLot = lots.FirstOrDefault(l => l.IdProduct == prods[1].IdProduct)?.IdLot ?? lots.FirstOrDefault()?.IdLot,
+                        Quantity = 30,
+                        UnitCost = prods[1].SuggestedPrice
                     });
-                    entryMov.Details.Add(new InventoryMovementDetail
-                    {
-                        IdProduct = pB.IdProduct,
-                        IdLot = sampleLot.IdLot,
-                        Quantity = monthlyEntryBase[idx] - (monthlyEntryBase[idx] / 2),
-                        UnitCost = pB.SuggestedPrice
-                    });
-
-                    // Movimiento de Salida / Venta Mensual (Top Productos Más Vendidos)
-                    var saleMov = new InventoryMovement
-                    {
-                        MovementDate = monthDate,
-                        IdMovementType = saleType.IdMovementType,
-                        IdOriginWarehouse = matrizWarehouse.IdWarehouse,
-                        IdUser = adminUser.IdUser,
-                        Observation = $"Consolidado de salidas y ventas clínicas veterinarias ({monthDate:MMMM yyyy})",
-                        ReferenceSource = "VENTA_CLINICA"
-                    };
-
-                    var top1 = activeProducts[1]; // Amoxicilina 500 mg
-                    var top2 = activeProducts[2]; // Amoxicilina + ác. clavulánico
-                    var top3 = activeProducts[6]; // Meloxicam inyectable
-                    var top4 = activeProducts[3]; // Enrofloxacina 50 mg
-                    var top5 = activeProducts[4]; // Doxiciclina 100 mg
-                    var top6 = activeProducts[7]; // Meloxicam oral
-
-                    int totalSaleMonth = monthlySaleBase[idx];
-                    saleMov.Details.Add(new InventoryMovementDetail
-                    {
-                        IdProduct = top1.IdProduct,
-                        IdLot = sampleLot.IdLot,
-                        Quantity = (int)(totalSaleMonth * 0.28),
-                        UnitCost = top1.SuggestedPrice
-                    });
-                    saleMov.Details.Add(new InventoryMovementDetail
-                    {
-                        IdProduct = top2.IdProduct,
-                        IdLot = sampleLot.IdLot,
-                        Quantity = (int)(totalSaleMonth * 0.22),
-                        UnitCost = top2.SuggestedPrice
-                    });
-                    saleMov.Details.Add(new InventoryMovementDetail
-                    {
-                        IdProduct = top3.IdProduct,
-                        IdLot = sampleLot.IdLot,
-                        Quantity = (int)(totalSaleMonth * 0.18),
-                        UnitCost = top3.SuggestedPrice
-                    });
-                    saleMov.Details.Add(new InventoryMovementDetail
-                    {
-                        IdProduct = top4.IdProduct,
-                        IdLot = sampleLot.IdLot,
-                        Quantity = (int)(totalSaleMonth * 0.14),
-                        UnitCost = top4.SuggestedPrice
-                    });
-                    saleMov.Details.Add(new InventoryMovementDetail
-                    {
-                        IdProduct = top5.IdProduct,
-                        IdLot = sampleLot.IdLot,
-                        Quantity = (int)(totalSaleMonth * 0.10),
-                        UnitCost = top5.SuggestedPrice
-                    });
-                    saleMov.Details.Add(new InventoryMovementDetail
-                    {
-                        IdProduct = top6.IdProduct,
-                        IdLot = sampleLot.IdLot,
-                        Quantity = Math.Max(4, totalSaleMonth - (int)(totalSaleMonth * 0.92)),
-                        UnitCost = top6.SuggestedPrice
-                    });
-
-                    db.InventoryMovements.AddRange(entryMov, saleMov);
                 }
+                movsToSeed.Add(mov1);
 
+                // 2. Ingreso para reposición periódica en CEDI Carapungo (Medvet Principal)
+                var mov2 = new InventoryMovement
+                {
+                    MovementDate = DateTime.Now.AddDays(-10),
+                    IdMovementType = entryType.IdMovementType,
+                    IdDestinationWarehouse = matrizWarehouse.IdWarehouse,
+                    IdOriginWarehouse = null,
+                    IdUser = adminUser.IdUser,
+                    Observation = "Ingreso de antibióticos y analgésicos veterinarios por orden de compra CEDI",
+                    ReferenceSource = "REPOSICION_CENTRAL",
+                    ReferenceId = 102
+                };
+                var p2 = prods.Count > 2 ? prods[2] : prods[0];
+                mov2.Details.Add(new InventoryMovementDetail
+                {
+                    IdProduct = p2.IdProduct,
+                    IdLot = lots.FirstOrDefault(l => l.IdProduct == p2.IdProduct)?.IdLot ?? lots.FirstOrDefault()?.IdLot,
+                    Quantity = 25,
+                    UnitCost = p2.SuggestedPrice
+                });
+                movsToSeed.Add(mov2);
+
+                // 3. Egreso por venta clínica y farmacia (Matriz Carapungo)
+                var mov3 = new InventoryMovement
+                {
+                    MovementDate = DateTime.Now.AddDays(-5),
+                    IdMovementType = saleType.IdMovementType,
+                    IdOriginWarehouse = matrizWarehouse.IdWarehouse,
+                    IdDestinationWarehouse = null,
+                    IdUser = adminUser.IdUser,
+                    Observation = "Egreso por venta directa en mostrador de farmacia veterinaria",
+                    ReferenceSource = "VENTA_FARMACIA",
+                    ReferenceId = 201
+                };
+                mov3.Details.Add(new InventoryMovementDetail
+                {
+                    IdProduct = prods[0].IdProduct,
+                    IdLot = lots.FirstOrDefault(l => l.IdProduct == prods[0].IdProduct)?.IdLot ?? lots.FirstOrDefault()?.IdLot,
+                    Quantity = 5,
+                    UnitCost = prods[0].SuggestedPrice
+                });
+                movsToSeed.Add(mov3);
+
+                // 4. Egreso por atención médica de urgencias en Sucursal Llano Grande
+                var mov4 = new InventoryMovement
+                {
+                    MovementDate = DateTime.Now.AddDays(-3),
+                    IdMovementType = saleType.IdMovementType,
+                    IdOriginWarehouse = destBranch1.IdWarehouse,
+                    IdDestinationWarehouse = null,
+                    IdUser = adminUser.IdUser,
+                    Observation = "Egreso de antibióticos y analgésicos para cirugía canina",
+                    ReferenceSource = "ATENCION_CLINICA",
+                    ReferenceId = 202
+                };
+                var p4 = prods.Count > 3 ? prods[3] : prods[1];
+                mov4.Details.Add(new InventoryMovementDetail
+                {
+                    IdProduct = p4.IdProduct,
+                    IdLot = lots.FirstOrDefault(l => l.IdProduct == p4.IdProduct)?.IdLot ?? lots.FirstOrDefault()?.IdLot,
+                    Quantity = 3,
+                    UnitCost = p4.SuggestedPrice
+                });
+                movsToSeed.Add(mov4);
+
+                // 5. Traslado desde Matriz Carapungo hacia Sucursal Llano Grande
+                var mov5 = new InventoryMovement
+                {
+                    MovementDate = DateTime.Now.AddDays(-2),
+                    IdMovementType = transferType.IdMovementType,
+                    IdOriginWarehouse = matrizWarehouse.IdWarehouse,
+                    IdDestinationWarehouse = destBranch1.IdWarehouse,
+                    IdUser = adminUser.IdUser,
+                    Observation = "Traslado planificado de mercadería desde CEDI Carapungo a Llano Grande",
+                    ReferenceSource = "TRANSFERENCIA_INTERNA",
+                    ReferenceId = 301
+                };
+                var p5 = prods.Count > 4 ? prods[4] : prods[0];
+                mov5.Details.Add(new InventoryMovementDetail
+                {
+                    IdProduct = p5.IdProduct,
+                    IdLot = lots.FirstOrDefault(l => l.IdProduct == p5.IdProduct)?.IdLot ?? lots.FirstOrDefault()?.IdLot,
+                    Quantity = 10,
+                    UnitCost = p5.SuggestedPrice
+                });
+                movsToSeed.Add(mov5);
+
+                // 6. Traslado desde Matriz Carapungo hacia Sucursal Pusuquí
+                var mov6 = new InventoryMovement
+                {
+                    MovementDate = DateTime.Now.AddHours(-6),
+                    IdMovementType = transferType.IdMovementType,
+                    IdOriginWarehouse = matrizWarehouse.IdWarehouse,
+                    IdDestinationWarehouse = destBranch2.IdWarehouse,
+                    IdUser = adminUser.IdUser,
+                    Observation = "Traslado de urgencia para abastecimiento de Sucursal Pusuquí",
+                    ReferenceSource = "REQUISICION_INTERNA",
+                    ReferenceId = 302
+                };
+                var p6 = prods.Count > 5 ? prods[5] : prods[1];
+                mov6.Details.Add(new InventoryMovementDetail
+                {
+                    IdProduct = p6.IdProduct,
+                    IdLot = lots.FirstOrDefault(l => l.IdProduct == p6.IdProduct)?.IdLot ?? lots.FirstOrDefault()?.IdLot,
+                    Quantity = 8,
+                    UnitCost = p6.SuggestedPrice
+                });
+                movsToSeed.Add(mov6);
+
+                db.InventoryMovements.AddRange(movsToSeed);
+                await db.SaveChangesAsync();
+            }
+        }
+
+        // Regla estricta: Garantizar que todo Ingreso histórico o existente apunte exclusivamente a la Bodega Matriz
+        if (matrizWarehouse != null)
+        {
+            var branchIngresos = await db.InventoryMovements
+                .Include(m => m.MovementType)
+                .Where(m => m.MovementType != null && 
+                            (m.MovementType.Mode == "Ingreso" || m.MovementType.Mode == "E") && 
+                            m.IdDestinationWarehouse != matrizWarehouse.IdWarehouse)
+                .ToListAsync();
+
+            if (branchIngresos.Count > 0)
+            {
+                foreach (var m in branchIngresos)
+                {
+                    m.IdDestinationWarehouse = matrizWarehouse.IdWarehouse;
+                }
                 await db.SaveChangesAsync();
             }
         }

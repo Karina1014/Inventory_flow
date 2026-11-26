@@ -78,24 +78,38 @@ public class InventoryMovementRepository : IInventoryMovementRepository
         var movementType = await _db.MovementTypes.FindAsync(dto.IdMovementType)
             ?? throw new InvalidOperationException($"El tipo de movimiento {dto.IdMovementType} no existe.");
 
-        var mode = movementType.Mode.ToUpperInvariant();
+        var rawMode = movementType.Mode?.Trim().ToUpperInvariant() ?? string.Empty;
+        bool isEntry = rawMode == "E" || rawMode == "INGRESO" || rawMode == "ENTRADA";
+        bool isExit = rawMode == "S" || rawMode == "EGRESO" || rawMode == "SALIDA";
+        bool isTransfer = rawMode == "T" || rawMode == "TRASLADO" || rawMode == "TRANSFERENCIA";
 
-        if (mode == "E")
+        if (isEntry)
         {
             if (!dto.IdDestinationWarehouse.HasValue)
-                throw new InvalidOperationException("Un movimiento de entrada debe tener un almacén de destino.");
+                throw new InvalidOperationException("Un movimiento de ingreso debe tener un almacén de destino.");
+
+            // Regla de Negocio MedVet: El ingreso de mercadería siempre es por la bodega matriz (Medvet Principal / Carapungo)
+            var matrizWarehouse = await _db.Warehouses.AsNoTracking().FirstOrDefaultAsync(w => 
+                w.Name.Contains("Matriz") || w.Name.Contains("Carapungo") || w.Name.Contains("Principal"))
+                ?? await _db.Warehouses.AsNoTracking().OrderBy(w => w.IdWarehouse).FirstOrDefaultAsync();
+
+            if (matrizWarehouse != null && dto.IdDestinationWarehouse.Value != matrizWarehouse.IdWarehouse)
+            {
+                throw new InvalidOperationException($"El ingreso de mercadería solo está permitido en la bodega central ({matrizWarehouse.Name}). Las sucursales se abastecen exclusivamente mediante Traslados.");
+            }
+
             dto.IdOriginWarehouse = null;
         }
-        else if (mode == "S")
+        else if (isExit)
         {
             if (!dto.IdOriginWarehouse.HasValue)
-                throw new InvalidOperationException("Un movimiento de salida debe tener un almacén de origen.");
+                throw new InvalidOperationException("Un movimiento de egreso debe tener un almacén de origen.");
             dto.IdDestinationWarehouse = null;
         }
-        else if (mode == "T")
+        else if (isTransfer)
         {
             if (!dto.IdOriginWarehouse.HasValue || !dto.IdDestinationWarehouse.HasValue)
-                throw new InvalidOperationException("Una transferencia requiere almacén de origen y de destino.");
+                throw new InvalidOperationException("Un traslado requiere almacén de origen y de destino.");
             if (dto.IdOriginWarehouse == dto.IdDestinationWarehouse)
                 throw new InvalidOperationException("El almacén de origen y destino no pueden ser el mismo.");
         }
@@ -115,17 +129,17 @@ public class InventoryMovementRepository : IInventoryMovementRepository
                     var sourceLot = await _db.Lots.FindAsync(detail.IdLot.Value);
                     if (sourceLot != null)
                     {
-                        if (mode == "S")
+                        if (isExit)
                         {
                             if (sourceLot.Quantity < detail.Quantity)
                                 throw new InvalidOperationException($"Stock insuficiente en el lote {sourceLot.LotNumber}. Disponible: {sourceLot.Quantity}, solicitado: {detail.Quantity}");
                             sourceLot.Quantity -= detail.Quantity;
                         }
-                        else if (mode == "E")
+                        else if (isEntry)
                         {
                             sourceLot.Quantity += detail.Quantity;
                         }
-                        else if (mode == "T")
+                        else if (isTransfer)
                         {
                             if (sourceLot.Quantity < detail.Quantity)
                                 throw new InvalidOperationException($"Stock insuficiente en el lote {sourceLot.LotNumber} para transferir. Disponible: {sourceLot.Quantity}, solicitado: {detail.Quantity}");
@@ -167,7 +181,7 @@ public class InventoryMovementRepository : IInventoryMovementRepository
             await transaction.CommitAsync();
 
             // Verificación y despacho de alerta en tiempo real tras egreso/venta
-            if (mode == "S" && dto.IdOriginWarehouse.HasValue)
+            if (isExit && dto.IdOriginWarehouse.HasValue)
             {
                 await CheckAndNotifyLowStockAsync(dto.IdOriginWarehouse.Value, movement.Details, movement.IdUser ?? 1);
             }

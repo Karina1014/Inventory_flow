@@ -201,12 +201,18 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Almacén Destino</label>
+                    <label class="form-label">
+                        Almacén Destino
+                        @if (IsCurrentModeEntry)
+                        {
+                            <span class="text-primary small fw-semibold">(Exclusivo Medvet Principal)</span>
+                        }
+                    </label>
                     <div class="input-box">
                         <i class="bi bi-building input-icon"></i>
-                        <select class="form-input" @bind="formDestWarehouseId" disabled="@(isEditing || isDestDisabled)">
+                        <select class="form-input" @bind="formDestWarehouseId" disabled="@(isEditing || isDestDisabled || IsCurrentModeEntry)">
                             <option value="">(Ninguno)</option>
-                            @foreach (var w in warehouses)
+                            @foreach (var w in (IsCurrentModeEntry && MatrizWarehouse != null ? warehouses.Where(x => x.IdWarehouse == MatrizWarehouse.IdWarehouse) : warehouses))
                             {
                                 <option value="@w.IdWarehouse">@w.Name</option>
                             }
@@ -274,7 +280,7 @@
                                     <tr>
                                         <td>
                                             <select class="table-input" value="@row.IdProduct" @onchange="(e) => OnProductSelected(row, e)">
-                                                @if (CurrentMovementMode != "E" && (!formOriginWarehouseId.HasValue || formOriginWarehouseId.Value <= 0))
+                                                @if (!IsCurrentModeEntry && (!formOriginWarehouseId.HasValue || formOriginWarehouseId.Value <= 0))
                                                 {
                                                     <option value="0">Primero seleccione el Almacén Origen</option>
                                                 }
@@ -291,7 +297,7 @@
                                                         @foreach (var p in availableProducts)
                                                         {
                                                             <option value="@p.IdProduct">
-                                                                @p.Code - @p.Name @(CurrentMovementMode != "E" ? $"(Disp: {p.Stock})" : "")
+                                                                @p.Code - @p.Name @(!IsCurrentModeEntry ? $"(Disp: {p.Stock})" : "")
                                                             </option>
                                                         }
                                                     }
@@ -313,7 +319,7 @@
                                             </span>
                                         </td>
                                         <td>
-                                            <input type="number" class="table-input text-end" min="1" max="@(row.AvailableStock > 0 && CurrentMovementMode != "E" ? row.AvailableStock : int.MaxValue)" 
+                                            <input type="number" class="table-input text-end" min="1" max="@(row.AvailableStock > 0 && !IsCurrentModeEntry ? row.AvailableStock : int.MaxValue)" 
                                                    @bind="row.Quantity" @bind:event="oninput" />
                                         </td>
                                         <td>
@@ -504,17 +510,29 @@
     private string? formReferenceSource = string.Empty;
     private List<CreateInventoryMovementDetailDto> formDetails = new();
 
-    private bool isOriginDisabled => CurrentMovementMode == "E";
-    private bool isDestDisabled => CurrentMovementMode == "S";
+    private bool isOriginDisabled => IsCurrentModeEntry;
+    private bool isDestDisabled => IsCurrentModeExit;
 
     private string CurrentMovementMode
     {
         get
         {
             var mt = movementTypes.FirstOrDefault(m => m.IdMovementType == formMovementTypeId);
-            return mt?.Mode.ToUpperInvariant() ?? string.Empty;
+            return mt?.Mode.Trim().ToUpperInvariant() ?? string.Empty;
         }
     }
+
+    private bool IsCurrentModeEntry => CurrentMovementMode == "E" || CurrentMovementMode == "INGRESO" || CurrentMovementMode == "ENTRADA";
+    private bool IsCurrentModeExit => CurrentMovementMode == "S" || CurrentMovementMode == "EGRESO" || CurrentMovementMode == "SALIDA";
+    private bool IsCurrentModeTransfer => CurrentMovementMode == "T" || CurrentMovementMode == "TRASLADO" || CurrentMovementMode == "TRANSFERENCIA";
+
+    private Warehouse? MatrizWarehouse => warehouses.FirstOrDefault(w => 
+        w.Name.Contains("Matriz", StringComparison.OrdinalIgnoreCase) || 
+        w.Name.Contains("Carapungo", StringComparison.OrdinalIgnoreCase) || 
+        w.Name.Contains("Principal", StringComparison.OrdinalIgnoreCase)) 
+        ?? warehouses.FirstOrDefault();
+
+    private int? MatrizWarehouseId => MatrizWarehouse?.IdWarehouse;
 
     protected override async Task OnInitializedAsync()
     {
@@ -579,22 +597,29 @@
             currentPage = newPage;
     }
 
-    private string GetModeBadgeClass(string mode) => mode switch
+    private string GetModeBadgeClass(string mode)
     {
-        "E" => "badge-active",
-        "S" => "badge-inactive",
-        "T" => "badge-transfer",
-        _ => "badge-default"
-    };
+        var m = mode?.Trim().ToUpperInvariant() ?? "";
+        if (m == "E" || m == "INGRESO" || m == "ENTRADA") return "badge-active";
+        if (m == "S" || m == "EGRESO" || m == "SALIDA") return "badge-inactive";
+        if (m == "T" || m == "TRASLADO" || m == "TRANSFERENCIA") return "badge-transfer";
+        return "badge-default";
+    }
 
     private void OnMovementTypeChanged(ChangeEventArgs e)
     {
         if (int.TryParse(e.Value?.ToString(), out int id))
         {
             formMovementTypeId = id;
-            var mode = CurrentMovementMode;
-            if (mode == "E") formOriginWarehouseId = null;
-            if (mode == "S") formDestWarehouseId = null;
+            if (IsCurrentModeEntry)
+            {
+                formOriginWarehouseId = null;
+                formDestWarehouseId = MatrizWarehouseId;
+            }
+            if (IsCurrentModeExit)
+            {
+                formDestWarehouseId = null;
+            }
             RecalculateRowStocks();
         }
     }
@@ -606,7 +631,7 @@
             formOriginWarehouseId = whId > 0 ? whId : null;
             
             // Si el producto actual de alguna fila ya no existe en el nuevo almacén origen, resetear la fila
-            if (CurrentMovementMode != "E" && formOriginWarehouseId.HasValue)
+            if (!IsCurrentModeEntry && formOriginWarehouseId.HasValue)
             {
                 var validProductIds = GetAvailableProductsForOrigin().Select(p => p.IdProduct).ToHashSet();
                 foreach (var row in formDetails)
@@ -641,8 +666,8 @@
 
     private IEnumerable<ProductStockDisplay> GetAvailableProductsForOrigin()
     {
-        // Si es una Entrada ('E'), puede ingresar cualquier producto activo del catálogo
-        if (CurrentMovementMode == "E")
+        // Si es un Ingreso ('E'), puede ingresar cualquier producto activo del catálogo
+        if (IsCurrentModeEntry)
         {
             return products.Where(p => p.IsActive).Select(p => new ProductStockDisplay
             {
@@ -778,7 +803,7 @@
         formDate = DateTime.Now;
         formMovementTypeId = movementTypes.FirstOrDefault()?.IdMovementType ?? 0;
         formOriginWarehouseId = null;
-        formDestWarehouseId = null;
+        formDestWarehouseId = IsCurrentModeEntry ? MatrizWarehouseId : null;
         formObservation = string.Empty;
         formReferenceId = null;
         formReferenceSource = string.Empty;
@@ -847,22 +872,21 @@
             return;
         }
 
-        var mode = CurrentMovementMode;
-        if (mode == "E" && !formDestWarehouseId.HasValue)
+        if (IsCurrentModeEntry && !formDestWarehouseId.HasValue)
         {
-            errorMessage = "Para una entrada debe seleccionar el Almacén Destino.";
+            errorMessage = "Para un ingreso debe seleccionar el Almacén Destino.";
             return;
         }
-        if (mode == "S" && !formOriginWarehouseId.HasValue)
+        if (IsCurrentModeExit && !formOriginWarehouseId.HasValue)
         {
-            errorMessage = "Para una salida debe seleccionar el Almacén Origen.";
+            errorMessage = "Para un egreso debe seleccionar el Almacén Origen.";
             return;
         }
-        if (mode == "T")
+        if (IsCurrentModeTransfer)
         {
             if (!formOriginWarehouseId.HasValue || !formDestWarehouseId.HasValue)
             {
-                errorMessage = "Para una transferencia debe seleccionar ambos almacenes.";
+                errorMessage = "Para un traslado debe seleccionar ambos almacenes.";
                 return;
             }
             if (formOriginWarehouseId == formDestWarehouseId)
@@ -894,8 +918,8 @@
                     return;
                 }
 
-                // Validación de stock para salidas o transferencias
-                if (mode == "S" || mode == "T")
+                // Validación de stock para salidas (egreso) o transferencias (traslado)
+                if (IsCurrentModeExit || IsCurrentModeTransfer)
                 {
                     foreach (var det in formDetails)
                     {

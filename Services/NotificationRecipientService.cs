@@ -36,7 +36,7 @@ public class NotificationRecipientService : INotificationRecipientService
                 .Include(u => u.Role)
                 .AsNoTracking()
                 .Where(u => u.IsActive && !string.IsNullOrWhiteSpace(u.Phone))
-                .Where(u => u.Role != null && (u.Role.Name.Contains("Bodeguero Principal") || u.Role.Name.Contains("Principal")))
+                .Where(u => u.Role != null && u.Role.Name != null && (u.Role.Name.Contains("Bodeguero Principal") || u.Role.Name.Contains("Principal")))
                 .OrderByDescending(u => u.UpdatedAt)
                 .FirstOrDefaultAsync();
 
@@ -47,7 +47,7 @@ public class NotificationRecipientService : INotificationRecipientService
                     .Include(u => u.Role)
                     .AsNoTracking()
                     .Where(u => u.IsActive && !string.IsNullOrWhiteSpace(u.Phone))
-                    .Where(u => u.Role != null && (u.Role.IsAdmin || u.Role.Name == "Administrador" || u.Role.Name == "Admin"))
+                    .Where(u => u.Role != null && (u.Role.IsAdmin || (u.Role.Name != null && (u.Role.Name == "Administrador" || u.Role.Name == "Admin"))))
                     .OrderByDescending(u => u.UpdatedAt)
                     .FirstOrDefaultAsync();
             }
@@ -75,7 +75,7 @@ public class NotificationRecipientService : INotificationRecipientService
                 .Include(u => u.Role)
                 .AsNoTracking()
                 .Where(u => u.IsActive && u.IdWarehouse == idWarehouse && !string.IsNullOrWhiteSpace(u.Phone))
-                .OrderByDescending(u => u.Role != null && (u.Role.Name.Contains("Bodeguero") || u.Role.Name.Contains("Asistente")))
+                .OrderByDescending(u => u.Role != null && u.Role.Name != null && (u.Role.Name.Contains("Bodeguero") || u.Role.Name.Contains("Asistente")))
                 .ThenByDescending(u => u.UpdatedAt)
                 .FirstOrDefaultAsync();
 
