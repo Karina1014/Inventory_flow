@@ -1,9 +1,12 @@
 @page "/inventario"
 @layout MainLayout
 @inject NavigationManager NavigationManager
+@inject Inventory_Flow.Data.AplicationDbContext Db
 @inject Inventory_Flow.Services.IToastNotificationService ToastService
+@using Microsoft.EntityFrameworkCore
+@using Inventory_Flow.Models
 
-<!-- Migas de Pan (Bootstrap Breadcrumb) -->
+<!-- Migas de Pan (Breadcrumb) -->
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
         <li class="breadcrumb-item">
@@ -12,7 +15,7 @@
             </a>
         </li>
         <li class="breadcrumb-item">
-            <span class="text-muted">Operaciones</span>
+            <span class="text-muted">Inventario</span>
         </li>
         <li class="breadcrumb-item active fw-semibold text-dark" aria-current="page">
             Control de Inventario
@@ -28,23 +31,59 @@
         </div>
         <div>
             <h1 class="h4 mb-0 fw-bold text-dark">Control de Inventario</h1>
-            <p class="text-muted small mb-0">Gestiona las existencias en almacenes, monitoreo de rotación y estados de stock.</p>
+            <p class="text-muted small mb-0">Existencias físicas consolidadas en tiempo real por sucursal y monitoreo de umbrales.</p>
         </div>
     </div>
     <div class="d-flex gap-2">
-        <button type="button" class="btn btn-brand-primary" @onclick="CreateNewItem">
-            <i class="bi bi-plus-lg"></i>
-            <span>Nuevo Registro</span>
+        <button type="button" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1" @onclick="LoadDataAsync">
+            <i class="bi bi-arrow-clockwise"></i>
+            <span>Actualizar</span>
         </button>
+        <a href="movements" class="btn btn-brand-primary d-inline-flex align-items-center gap-1">
+            <i class="bi bi-arrow-left-right"></i>
+            <span>Registrar Movimiento</span>
+        </a>
     </div>
 </div>
 
-<!-- Barra de Filtros Principal Enlazada con @bind -->
-<div class="card p-3 mb-3">
+<!-- Tarjetas Resumen de Estado -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card p-3 border-0 shadow-sm h-100">
+            <span class="text-muted small fw-semibold">Total Productos</span>
+            <h3 class="fw-bold mb-0 text-dark">@Items.Count</h3>
+            <small class="text-muted">En el catálogo analizado</small>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card p-3 border-0 shadow-sm h-100" style="border-left: 4px solid #166534 !important;">
+            <span class="text-success small fw-semibold">En Stock Óptimo</span>
+            <h3 class="fw-bold mb-0 text-success">@Items.Count(i => i.Stock > i.MinThreshold)</h3>
+            <small class="text-muted">&gt; @globalThreshold unidades</small>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card p-3 border-0 shadow-sm h-100" style="border-left: 4px solid #92400E !important;">
+            <span class="text-warning small fw-semibold">Bajo Umbral</span>
+            <h3 class="fw-bold mb-0 text-warning">@Items.Count(i => i.Stock > 0 && i.Stock <= i.MinThreshold)</h3>
+            <small class="text-muted">Requiere reposición</small>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card p-3 border-0 shadow-sm h-100" style="border-left: 4px solid #991B1B !important;">
+            <span class="text-danger small fw-semibold">Agotados</span>
+            <h3 class="fw-bold mb-0 text-danger">@Items.Count(i => i.Stock == 0)</h3>
+            <small class="text-muted">Sin existencias físicas</small>
+        </div>
+    </div>
+</div>
+
+<!-- Barra de Filtros Principal -->
+<div class="card p-3 mb-3 border-0 shadow-sm">
     <div class="row g-3 align-items-end">
         <!-- Selector Segmentado Manejado con Estado en C# -->
         <div class="col-12 col-lg-5">
-            <label class="form-label small fw-semibold text-muted mb-1">Filtro de Estado</label>
+            <label class="form-label small fw-semibold text-muted mb-1">Filtrar por Estado</label>
             <div class="segmented-control">
                 @foreach (var tab in statusTabs)
                 {
@@ -57,106 +96,84 @@
             </div>
         </div>
 
-        <!-- Select con asterisco rojo (*) para campos obligatorios y enlazado con @bind -->
+        <!-- Selector de Almacén / Sucursal desde Base de Datos -->
         <div class="col-12 col-md-6 col-lg-4">
             <label class="form-label small fw-semibold text-muted mb-1">
-                Almacén / Sucursal <span class="text-danger fw-bold">*</span>
+                Almacén / Sucursal
             </label>
-            <select class="form-select" @bind="selectedWarehouse">
-                <option value="">Selecciona un almacén obligatorio...</option>
-                <option value="Almacén Central - Sede Matriz">Almacén Central - Sede Matriz</option>
-                <option value="Sucursal Norte - Quirófano">Sucursal Norte - Quirófano</option>
-                <option value="Cámara Fría #1 - Biológicos">Cámara Fría #1 - Biológicos</option>
-                <option value="Depósito Secundario - Insumos">Depósito Secundario - Insumos</option>
+            <select class="form-select" @bind="selectedWarehouseId" @bind:after="OnWarehouseChanged">
+                <option value="0">Todas las sucursales (Consolidado General)</option>
+                @foreach (var w in warehouses)
+                {
+                    <option value="@w.IdWarehouse">@w.Name</option>
+                }
             </select>
         </div>
 
-        <!-- Botón Principal Azul (btn-brand-primary) -->
+        <!-- Buscador Rápido -->
         <div class="col-12 col-md-6 col-lg-3">
-            <button type="button" class="btn btn-brand-primary w-100" @onclick="ApplyFilters">
-                <i class="bi bi-funnel"></i>
-                <span>Aplicar Filtros</span>
-            </button>
+            <label class="form-label small fw-semibold text-muted mb-1">Buscar Producto</label>
+            <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                <input type="text" class="form-control" placeholder="Nombre o SKU..." @bind="searchKeyword" @bind:event="oninput" />
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Barra Secundaria con Botones btn-outline-secondary -->
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+<!-- Barra Secundaria: Contador y Enlace a Lotes -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
     <div class="d-flex gap-2">
-        <button type="button" class="btn btn-outline-secondary" @onclick="ExportCsv">
-            <i class="bi bi-filetype-csv"></i>
-            <span>Exportar CSV</span>
-        </button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="ToggleAdvancedFilters">
-            <i class="bi bi-sliders"></i>
-            <span>Filtros @(isAdvancedFilterOpen ? "(-)" : "(+)")</span>
-        </button>
+        <a href="lots" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1">
+            <i class="bi bi-upc-scan"></i>
+            <span>Ver Lotes y Fechas de Vencimiento</span>
+        </a>
     </div>
 
     <div class="d-flex align-items-center gap-2">
         <span class="text-muted small">
-            Total en vista: <strong class="text-dark">@(filteredItems.Count)</strong> artículos
+            Mostrando: <strong class="text-dark">@(filteredItems.Count)</strong> de @Items.Count productos
         </span>
-        @if (Items.Any())
-        {
-            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" title="Vaciar para ver Empty State" @onclick="ClearItems">
-                <i class="bi bi-trash3 text-muted"></i> Limpiar vista
-            </button>
-        }
     </div>
 </div>
 
-@if (isAdvancedFilterOpen)
+@if (isLoading)
 {
-    <div class="card p-3 mb-3 bg-light border-dashed">
-        <div class="row g-2 align-items-center">
-            <div class="col-md-6">
-                <input type="text" class="form-control" placeholder="Buscar por código SKU o nombre..." @bind="searchKeyword" @bind:event="oninput" />
-            </div>
-            <div class="col-md-6 text-md-end">
-                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ResetFilters">
-                    <i class="bi bi-arrow-counterclockwise me-1"></i>Restablecer
-                </button>
-            </div>
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando existencias...</span>
         </div>
+        <p class="text-muted mt-2">Consultando inventario en tiempo real desde la base de datos...</p>
     </div>
 }
-
-<!-- Estado Vacío (Empty State): Renderizado Condicional (@if (Items == null || !Items.Any())) -->
-@if (Items == null || !Items.Any())
+else if (!filteredItems.Any())
 {
     <div class="empty-state-card">
         <div class="empty-state-icon">
             <i class="bi bi-inbox"></i>
         </div>
-        <h5 class="fw-bold text-dark mb-1">No se encontraron artículos en inventario</h5>
+        <h5 class="fw-bold text-dark mb-1">No se encontraron productos</h5>
         <p class="text-muted small mb-4 text-center" style="max-width: 440px;">
-            No hay existencias registradas con los criterios seleccionados o aún no has cargado el inventario inicial para este almacén.
+            No hay productos que coincidan con el filtro "@currentStatusTab" para la selección actual.
         </p>
-        <div class="d-flex flex-wrap gap-2 justify-content-center">
-            <button type="button" class="btn btn-outline-secondary" @onclick="ResetFilters">
-                <i class="bi bi-arrow-counterclockwise"></i>
-                <span>Restablecer Filtros</span>
-            </button>
-            <button type="button" class="btn btn-brand-primary" @onclick="LoadSampleData">
-                <i class="bi bi-box-arrow-in-down"></i>
-                <span>Cargar Datos de Demostración</span>
-            </button>
-        </div>
+        <button type="button" class="btn btn-outline-secondary" @onclick="ResetFilters">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>
+            <span>Restablecer Filtros</span>
+        </button>
     </div>
 }
 else
 {
     <!-- Tabla Plana Minimalista (Modern Flat) -->
-    <div class="card p-0 overflow-hidden">
+    <div class="card p-0 overflow-hidden border-0 shadow-sm">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-head-flat">
                     <tr class="text-muted small text-uppercase">
                         <th class="ps-3 py-3 border-0">Código SKU</th>
                         <th class="border-0">Producto / Insumo</th>
-                        <th class="border-0">Almacén</th>
+                        <th class="border-0">Ubicación / Sucursal</th>
+                        <th class="border-0 text-center">Lotes Activos</th>
                         <th class="border-0 text-center">Stock Físico</th>
                         <th class="border-0">Estado</th>
                         <th class="pe-3 border-0 text-end">Acciones</th>
@@ -173,8 +190,24 @@ else
                                 <div class="fw-medium text-dark">@item.Name</div>
                                 <span class="text-muted small">@item.Category</span>
                             </td>
-                            <td class="text-muted small">@item.Warehouse</td>
-                            <td class="text-center fw-bold text-dark">@item.Stock</td>
+                            <td class="text-muted small">
+                                <i class="bi bi-building me-1"></i>@item.Warehouse
+                            </td>
+                            <td class="text-center">
+                                @if (item.ActiveLotsCount > 0)
+                                {
+                                    <span class="badge bg-light text-dark border">
+                                        <i class="bi bi-boxes me-1"></i>@item.ActiveLotsCount @(item.ActiveLotsCount == 1 ? "lote" : "lotes")
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">Sin lotes</span>
+                                }
+                            </td>
+                            <td class="text-center fw-bold @(item.Stock == 0 ? "text-danger" : item.Stock <= item.MinThreshold ? "text-warning" : "text-dark")">
+                                @item.Stock
+                            </td>
                             <td>
                                 @if (item.Stock == 0)
                                 {
@@ -182,7 +215,7 @@ else
                                 }
                                 else if (item.Stock <= item.MinThreshold)
                                 {
-                                    <span class="status-pill status-low">Stock Bajo</span>
+                                    <span class="status-pill status-low">Stock Bajo (&le; @item.MinThreshold)</span>
                                 }
                                 else
                                 {
@@ -190,8 +223,9 @@ else
                                 }
                             </td>
                             <td class="pe-3 text-end">
-                                <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" title="Ver detalles">
+                                <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2 d-inline-flex align-items-center gap-1" title="Ver desglose de lotes" @onclick="() => OpenLotsDetail(item)">
                                     <i class="bi bi-eye"></i>
+                                    <span>Lotes</span>
                                 </button>
                             </td>
                         </tr>
@@ -202,29 +236,240 @@ else
     </div>
 }
 
+<!-- MODAL: DETALLE DE LOTES DEL PRODUCTO -->
+@if (selectedItemForLots != null)
+{
+    <div class="modal-backdrop show" style="background-color: rgba(0,0,0,0.5);" @onclick="() => selectedItemForLots = null"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow border-0 rounded-3">
+                <div class="modal-header">
+                    <div>
+                        <h6 class="modal-title fw-bold text-dark mb-0">Lotes de: @selectedItemForLots.Name</h6>
+                        <small class="text-muted">@selectedItemForLots.Warehouse | SKU: @selectedItemForLots.Sku</small>
+                    </div>
+                    <button type="button" class="btn-close" @onclick="() => selectedItemForLots = null" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body p-3">
+                    @if (!itemLots.Any())
+                    {
+                        <div class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                            <span>No hay lotes con existencias activas para este artículo.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light small">
+                                    <tr>
+                                        <th>Número Lote</th>
+                                        <th>Almacén</th>
+                                        <th>Caducidad (PEPS)</th>
+                                        <th class="text-end">Cantidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var lot in itemLots)
+                                    {
+                                        <tr>
+                                            <td class="font-monospace fw-semibold">@lot.LotNumber</td>
+                                            <td class="small text-muted">@(lot.Warehouse?.Name ?? "General")</td>
+                                            <td>
+                                                @lot.ExpirationDate.ToString("dd/MM/yyyy")
+                                                @if (lot.ExpirationDate <= DateTime.Today.AddDays(30))
+                                                {
+                                                    <span class="badge bg-danger ms-1">Próx. a vencer</span>
+                                                }
+                                            </td>
+                                            <td class="text-end fw-bold">@lot.Quantity</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-light fw-bold">
+                                        <td colspan="3" class="text-end">Stock Físico Total:</td>
+                                        <td class="text-end text-primary">@itemLots.Sum(l => l.Quantity)</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="() => selectedItemForLots = null">Cerrar</button>
+                    <a href="lots" class="btn btn-primary btn-sm">Ir a Gestión de Lotes</a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
-    // Definición de modelo
     public class InventoryRow
     {
+        public int IdProduct { get; set; }
+        public int IdWarehouse { get; set; }
         public string Sku { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
         public string Warehouse { get; set; } = string.Empty;
         public int Stock { get; set; }
         public int MinThreshold { get; set; }
+        public int ActiveLotsCount { get; set; }
     }
 
-    // Pestañas del selector segmentado
     private readonly string[] statusTabs = { "Todos", "En Stock", "Bajo Stock", "Agotados" };
     private string currentStatusTab = "Todos";
 
-    // Campos enlazados con @bind
-    private string selectedWarehouse = "";
+    private int selectedWarehouseId = 0;
     private string searchKeyword = "";
-    private bool isAdvancedFilterOpen = false;
+    private bool isLoading = true;
+    private int globalThreshold = 5;
 
-    // Lista de ítems (inicializada vacía para ilustrar Empty State de entrada)
+    private List<Warehouse> warehouses = new();
     private List<InventoryRow> Items = new();
+
+    private InventoryRow? selectedItemForLots;
+    private List<Lot> itemLots = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        try
+        {
+            // 1. Cargar Almacenes activos desde SQL Server
+            warehouses = await Db.Warehouses
+                .AsNoTracking()
+                .Where(w => w.IsActive)
+                .OrderBy(w => w.IdWarehouse)
+                .ToListAsync();
+
+            // 2. Umbral de stock general activo
+            var thresholdEntity = await Db.ThresholdInvetories.AsNoTracking().FirstOrDefaultAsync(t => t.IsActive);
+            globalThreshold = thresholdEntity?.Threshold ?? 5;
+
+            // 3. Consultar productos activos
+            var products = await Db.Products
+                .Include(p => p.Category)
+                .AsNoTracking()
+                .Where(p => p.IsActive)
+                .OrderBy(p => p.Name)
+                .ToListAsync();
+
+            // 4. Consultar lotes activos con existencias
+            var allActiveLots = await Db.Lots
+                .Include(l => l.Warehouse)
+                .AsNoTracking()
+                .Where(l => l.IsActive && l.Quantity > 0)
+                .ToListAsync();
+
+            var rows = new List<InventoryRow>();
+
+            if (selectedWarehouseId == 0)
+            {
+                // VISTA CONSOLIDADA GENERAL: Exactamente 1 fila por producto activo
+                foreach (var prod in products)
+                {
+                    var prodLots = allActiveLots.Where(l => l.IdProduct == prod.IdProduct).ToList();
+                    int totalStock = prodLots.Sum(l => l.Quantity);
+
+                    var whNames = prodLots
+                        .Select(l => l.Warehouse?.Name)
+                        .Where(n => !string.IsNullOrEmpty(n))
+                        .Distinct()
+                        .ToList();
+
+                    string whDisplay = whNames.Count switch
+                    {
+                        0 => "Sin almacén asignado",
+                        1 => whNames[0]!,
+                        _ => $"Consolidado ({whNames.Count} almacenes)"
+                    };
+
+                    rows.Add(new InventoryRow
+                    {
+                        IdProduct = prod.IdProduct,
+                        IdWarehouse = 0,
+                        Sku = prod.Code ?? "S/C",
+                        Name = prod.Name,
+                        Category = prod.Category?.Name ?? "General",
+                        Warehouse = whDisplay,
+                        Stock = totalStock,
+                        MinThreshold = globalThreshold,
+                        ActiveLotsCount = prodLots.Count
+                    });
+                }
+            }
+            else
+            {
+                // VISTA POR SUCURSAL ESPECÍFICA: Solo productos asociados a esta sucursal
+                var currentWh = warehouses.FirstOrDefault(w => w.IdWarehouse == selectedWarehouseId);
+                var whName = currentWh?.Name ?? $"Sucursal #{selectedWarehouseId}";
+
+                var warehouseLotProductIds = await Db.Lots
+                    .AsNoTracking()
+                    .Where(l => l.IdWarehouse == selectedWarehouseId)
+                    .Select(l => l.IdProduct)
+                    .Distinct()
+                    .ToListAsync();
+
+                var warehouseMovementProductIds = await Db.InventoryMovements
+                    .AsNoTracking()
+                    .Where(m => m.IdOriginWarehouse == selectedWarehouseId || m.IdDestinationWarehouse == selectedWarehouseId)
+                    .SelectMany(m => m.Details.Select(d => d.IdProduct))
+                    .Distinct()
+                    .ToListAsync();
+
+                var relevantIds = warehouseLotProductIds.Union(warehouseMovementProductIds).ToHashSet();
+
+                // Si es la Bodega Matriz (donde se recibe todo el catálogo), evaluar todos los productos
+                bool isMatriz = currentWh != null && (currentWh.Name.Contains("Matriz") || currentWh.Name.Contains("Carapungo") || currentWh.Name.Contains("Principal"));
+                var branchProducts = isMatriz 
+                    ? products 
+                    : products.Where(p => relevantIds.Contains(p.IdProduct)).ToList();
+
+                foreach (var prod in branchProducts)
+                {
+                    var prodLots = allActiveLots
+                        .Where(l => l.IdProduct == prod.IdProduct && l.IdWarehouse == selectedWarehouseId)
+                        .ToList();
+
+                    int branchStock = prodLots.Sum(l => l.Quantity);
+
+                    rows.Add(new InventoryRow
+                    {
+                        IdProduct = prod.IdProduct,
+                        IdWarehouse = selectedWarehouseId,
+                        Sku = prod.Code ?? "S/C",
+                        Name = prod.Name,
+                        Category = prod.Category?.Name ?? "General",
+                        Warehouse = whName,
+                        Stock = branchStock,
+                        MinThreshold = globalThreshold,
+                        ActiveLotsCount = prodLots.Count
+                    });
+                }
+            }
+
+            Items = rows.OrderBy(r => r.Name).ToList();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error al consultar existencias: {ex.Message}", "Error");
+            Items = new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
 
     private List<InventoryRow> filteredItems
     {
@@ -232,15 +477,10 @@ else
         {
             var query = Items.AsEnumerable();
 
-            if (!string.IsNullOrWhiteSpace(selectedWarehouse))
-            {
-                query = query.Where(i => i.Warehouse.Equals(selectedWarehouse, StringComparison.OrdinalIgnoreCase));
-            }
-
             if (!string.IsNullOrWhiteSpace(searchKeyword))
             {
-                query = query.Where(i => i.Name.Contains(searchKeyword, StringComparison.OrdinalIgnoreCase)
-                                      || i.Sku.Contains(searchKeyword, StringComparison.OrdinalIgnoreCase));
+                var kw = searchKeyword.Trim().ToLower();
+                query = query.Where(i => i.Name.ToLower().Contains(kw) || i.Sku.ToLower().Contains(kw));
             }
 
             if (currentStatusTab == "En Stock")
@@ -265,57 +505,32 @@ else
         currentStatusTab = tab;
     }
 
-    private void ApplyFilters()
+    private async Task OnWarehouseChanged()
     {
-        if (string.IsNullOrWhiteSpace(selectedWarehouse))
-        {
-            ToastService.Warning("El campo 'Almacén / Sucursal' marcado con (*) es obligatorio.", "Validación de filtros");
-            return;
-        }
-
-        ToastService.Success($"Filtros aplicados para: {selectedWarehouse}", "Búsqueda completada");
-    }
-
-    private void ToggleAdvancedFilters()
-    {
-        isAdvancedFilterOpen = !isAdvancedFilterOpen;
+        await LoadDataAsync();
     }
 
     private void ResetFilters()
     {
         currentStatusTab = "Todos";
-        selectedWarehouse = "";
+        selectedWarehouseId = 0;
         searchKeyword = "";
-        ToastService.Info("Filtros restablecidos.", "Limpieza");
+        _ = LoadDataAsync();
     }
 
-    private void ClearItems()
+    private async Task OpenLotsDetail(InventoryRow item)
     {
-        Items.Clear();
-    }
+        selectedItemForLots = item;
+        var query = Db.Lots
+            .Include(l => l.Warehouse)
+            .AsNoTracking()
+            .Where(l => l.IdProduct == item.IdProduct && l.IsActive && l.Quantity > 0);
 
-    private void LoadSampleData()
-    {
-        Items = new List<InventoryRow>
+        if (item.IdWarehouse > 0)
         {
-            new() { Sku = "MED-001", Name = "Amoxicilina + Ácido Clavulánico 500mg", Category = "Antibióticos", Warehouse = "Almacén Central - Sede Matriz", Stock = 145, MinThreshold = 20 },
-            new() { Sku = "VAC-002", Name = "Vacuna Antirrábica Felina / Canina 1ml", Category = "Biológicos", Warehouse = "Cámara Fría #1 - Biológicos", Stock = 14, MinThreshold = 30 },
-            new() { Sku = "INS-003", Name = "Jeringas Descartables 3ml x 100", Category = "Material Quirúrgico", Warehouse = "Almacén Central - Sede Matriz", Stock = 0, MinThreshold = 10 },
-            new() { Sku = "ANE-004", Name = "Ketamina Solución Inyectable 50ml", Category = "Anestésicos", Warehouse = "Sucursal Norte - Quirófano", Stock = 8, MinThreshold = 15 },
-            new() { Sku = "VIT-005", Name = "Complejo B + Calcio Frasco 250ml", Category = "Vitaminas", Warehouse = "Almacén Central - Sede Matriz", Stock = 62, MinThreshold = 15 }
-        };
+            query = query.Where(l => l.IdWarehouse == item.IdWarehouse);
+        }
 
-        selectedWarehouse = "Almacén Central - Sede Matriz";
-        ToastService.Success("Se cargaron 5 artículos de demostración.", "Datos Listos");
-    }
-
-    private void ExportCsv()
-    {
-        ToastService.Info("Generando archivo CSV de inventario...", "Exportación");
-    }
-
-    private void CreateNewItem()
-    {
-        NavigationManager.NavigateTo("/products");
+        itemLots = await query.OrderBy(l => l.ExpirationDate).ToListAsync();
     }
 }
